@@ -1,0 +1,52 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://Scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://Scripts/run_manager.gd" id="2_run"]
+[ext_resource type="Script" path="res://Scripts/extraction_system.gd" id="3_ext"]
+[ext_resource type="Script" path="res://Scripts/hud.gd" id="4_hud"]
+[ext_resource type="Script" path="res://Scripts/enemy_system.gd" id="5_enemy"]
+[ext_resource type="Script" path="res://Scripts/fog_system.gd" id="6_fog"]
+[ext_resource type="Script" path="res://Scripts/minimap.gd" id="7_map"]
+[ext_resource type="Script" path="res://Scripts/base_system.gd" id="8_base"]
+[ext_resource type="Script" path="res://Scripts/warehouse_panel.gd" id="9_wh"]
+[ext_resource type="Script" path="res://Scripts/statue_panel.gd" id="10_st"]
+[ext_resource type="Script" path="res://Scripts/loot_system.gd" id="11_loot"]
+[ext_resource type="Script" path="res://Scripts/survival_system.gd" id="12_surv"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1_main")
+
+[node name="RunManager" type="Node" parent="."]
+script = ExtResource("2_run")
+
+[node name="GameRoot" type="Node2D" parent="."]
+
+[node name="ExtractionSystem" type="Node" parent="."]
+script = ExtResource("3_ext")
+
+[node name="EnemySystem" type="Node" parent="."]
+script = ExtResource("5_enemy")
+
+[node name="LootSystem" type="Node" parent="."]
+script = ExtResource("11_loot")
+
+[node name="SurvivalSystem" type="Node" parent="."]
+script = ExtResource("12_surv")
+
+[node name="FogSystem" type="Node" parent="."]
+script = ExtResource("6_fog")
+
+[node name="BaseSystem" type="Node" parent="."]
+script = ExtResource("8_base")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("4_hud")
+
+[node name="Minimap" type="CanvasLayer" parent="."]
+script = ExtResource("7_map")
+
+[node name="WarehousePanel" type="CanvasLayer" parent="."]
+script = ExtResource("9_wh")
+
+[node name="StatuePanel" type="CanvasLayer" parent="."]
+script = ExtResource("10_st")

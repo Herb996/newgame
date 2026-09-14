@@ -1,0 +1,25 @@
+# Godot 4 缓存目录（自动生成，勿提交）
+.godot/
+/android/
+
+# 系统杂项
+*.tmp
+.DS_Store
+Thumbs.db
+
+# 导出配置（含签名密钥，不应入库）
+export_presets.cfg
+export/
+*.pck
+*.exe
+
+# 美术源材料：体积大且可重新生成，本地另存即可
+#   Raw/       — AI 出的 1024x1024 原始大图
+#   Source3D/  — 3D 源模型（GLB/OBJ）与预览页
+# 只有处理完成的 48x48 精灵（Assets/Art/Sprites/）入库
+Assets/Art/Raw/
+Assets/Art/Source3D/
+
+# 临时文件
+*.log
+*.backup
