@@ -1,5 +1,4 @@
 extends Node
-class_name NoiseSystem
 ## ============================================================
 ## NoiseSystem — 噪音系统（06_FIGHT.md 第 8 节「噪音机制」）
 ##

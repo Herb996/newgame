@@ -42,6 +42,9 @@ func setup(root: Node2D, map_data: Dictionary) -> void:
 	# A* 网格全体敌人共享：只构建一次（每个敌人各建一次会直接卡死）
 	var astar := MapGenerator.build_astar(walls, tile_size)
 
+	# 把墙体网格注入噪音系统（供隔墙衰减），只注一次
+	NoiseSystem.setup(walls, tile_size)
+
 	# 洗牌抽取，保证不重复
 	candidates.shuffle()
 	for i in range(count):
@@ -51,10 +54,6 @@ func setup(root: Node2D, map_data: Dictionary) -> void:
 		root.add_child(enemy)
 		# 入树后再注入导航数据，保证 global_position（= 巡逻中心）已正确
 		enemy.setup(walls, tile_size, astar)
-
-	# 把墙体网格注入噪音系统（隔墙衰减用），只注一次即可
-	if not NoiseSystem._map_ready:
-		NoiseSystem.setup(walls, tile_size)
 
 	print("[Enemy] 敌人生成完成：%d 个（距出生点 ≥ %.0f 格，AI = 巡逻 + 追击）" % [
 		count, min_d])

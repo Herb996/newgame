@@ -45,3 +45,9 @@
     生成一个 LootNode（复用资源点场景，缩放 0.8 便于区分），种类按 enemy.drop.weights
     加权随机（木/石/食 3、铁 2、金/油 1），数量 2~6（低于地图资源点的 10）。
     已实现于 enemy.gd 的 _die/_spawn_drop + loot_node.gd 的 setup(res_id, amount, scale)。
+20. 噪音机制（2026-09-15 用户定"开始做"）：06_FIGHT.md 第 8 节设计稿**已实装**。
+    全局广播中心 NoiseSystem（autoload）+ 敌人 noise_alertness 三档阈值（suspicious 15 /
+    investigate 30 / combat 70）+ enemy_investigate_state（前往声源调查）+ 衰减（10/秒）
+    + 敌人咆哮警报扩散 + 视觉（声源扩散圆环 + 敌人本体染色）。玩家攻击/冲刺/技能/脚步均发声。
+    数值全部在 config.noise 节点。已同步至 02 第 10 节、05 文件树、06 第 8 节。
+    后续可选增强（未做）：小地图 Tween 噪音图标、白噪音区掩蔽、动态寻路权重、程序化声学地形。

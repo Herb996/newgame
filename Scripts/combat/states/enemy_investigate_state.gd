@@ -27,7 +27,7 @@ func enter(_msg: Dictionary = {}) -> void:
 
 
 func _repath() -> void:
-	var src := actor.noise_source()
+	var src: Vector2 = actor.noise_source()
 	if src == Vector2.ZERO:
 		return
 	_target = src
@@ -50,7 +50,7 @@ func physics_update(delta: float) -> void:
 	if actor.noise_alertness >= inv and actor.noise_source() != _target:
 		_repath()
 		_arrived = false
-	var speed := actor.patrol_speed()
+	var speed: float = actor.patrol_speed()
 	if actor.noise_alertness >= combat:
 		speed = actor.chase_speed()   # 狂暴：用追击速度
 	if not _arrived:

@@ -40,7 +40,7 @@ func physics_update(delta: float) -> void:
 	actor.velocity = Vector2.ZERO
 	actor.move_and_slide()
 
-		match _phase:
+	match _phase:
 		Phase.WINDUP:
 			if _timer >= windup:
 				_phase = Phase.ACTIVE

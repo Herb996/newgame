@@ -139,7 +139,29 @@
 * 实现：survival\_system.gd（挂 Main 下，组 survival\_system），
   通过 RunManager.consume\_loot() 扣背包、Player.heal() / Player.apply\_direct\_damage() 改血量
 
-## 10\. 数值配置
+## 10\. 噪音机制（已实现，2026-09-15）
+
+* 设计稿：06\_FIGHT.md 第 8 节。全局广播中心 NoiseSystem（autoload，见 project.godot）
+  统一派发噪音事件，敌人接收后累加警觉度，由 FSM 阈值决定行为（疑惑 / 调查 / 狂暴）。
+* 触发源（数值在 config.noise.sources）：玩家攻击(120) / 蒸汽爆发(90) / 钩爪突进(60) /
+  齿轮护盾(45) / 冲刺(40) / 行走脚步(22) / 敌人咆哮(160)。
+  各动作在对应状态里调用 `NoiseSystem.emit(世界坐标, 强度)`。
+* 派发模型（性能：事件广播而非物理 Area2D，100 敌人同时发声不爆）：
+  * 距离衰减：线性，received = 强度 × (1 − 距离 / 听力半径)；听力半径 noise.hear\_radius\_cells（16 格）
+  * 墙体遮挡：隔墙减半 noise.wall\_attenuation（0.5）；视线用网格采样（与敌人视野同源），绝不做每帧射线
+  * 低于 noise.min\_notice（4）的微弱噪音直接忽略
+* 三档阈值（noise.thresholds，敌人警觉度 noise\_alertness 累加/衰减）：
+  * suspicious(15)：转黄、原地留意（不移动）
+  * investigate(30)：转橙、前往声源调查（新噪音更新目标；到达后搜索，衰减到 15 以下回巡逻）
+  * combat(70)：用追击速度走（表现"狂暴"）；任意时刻看见玩家直接切 Chase
+* 衰减：每帧 noise.decay\_per\_second（10）回落，模拟"听到动静→去看→没发现→慢慢放松"
+* 敌人咆哮联动：任一敌人发现玩家（进入 Chase）会 emit 咆哮噪音，惊动附近同伴 → 警报扩散
+* 视觉反馈：① 每次噪音在声源处生成扩散圆环（半径=实际可听范围，fx\_ring 灰盒）
+  ② 敌人本体 Polygon2D 按状态染色（红=巡逻 / 浅黄=疑惑 / 橙=调查 / 亮红=看见玩家）
+* 实现文件：noise\_system.gd（广播中心）、enemy.gd（警觉度/听觉/hear\_noise）、
+  enemy\_investigate\_state.gd（调查状态）、各玩家状态接入 emit
+
+## 11\. 数值配置
 
 所有数值统一放 Data/config.json，禁止硬编码。
 

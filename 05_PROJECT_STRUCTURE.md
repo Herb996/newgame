@@ -13,6 +13,7 @@ SteamPunkExtraction/
 ├── Scripts/
 │   ├── config_loader.gd        总管家①：数值配置读取（autoload: Config）
 │   ├── meta_progression.gd     总管家②：局外养成+存档（autoload: Meta）
+│   ├── noise_system.gd         噪音系统（autoload: NoiseSystem，全局噪音广播+距离/墙体衰减+视觉圆环）
 │   ├── run_manager.gd          总管家③：一局的生命周期（挂在 Main 下）
 │   ├── main.gd                 顶层装配脚本（开局→生成地图→出生玩家→撤离调度）
 │   ├── map_generator.gd        程序化地图生成（噪声地形+墙体碰撞+占位瓦片+洪水填充可达性分析+导航网格，返回 walls/reachable/占比）
@@ -24,13 +25,13 @@ SteamPunkExtraction/
 │   │   ├── skill_system.gd      技能装配 / 体力与冷却校验 / 释放（发信号，挂在 Player 下）
 │   │   ├── fx_ring.gd           冲击波圆环（灰盒特效，播完自毁）
 │   │   └── states/              玩家：idle / move / attack / hitstun / dodge / skill / dead
-│   │                            敌人：patrol / chase
+│   │                            敌人：patrol / investigate / chase
 │   ├── player.gd                玩家功能组件（点击选中+寻路移动+体力+技能效果，对外暴露接口供 FSM 调用，组: player）
 │   ├── camera_controller.gd    独立相机控制器（WASD/方向键平移 + F 回到玩家，边界限制，挂载到 GameRoot）
 │   ├── extraction_system.gd    撤离点调度（时间轴开启/关闭+预定关闭顺序+小地图触发）
 │   ├── extraction_point.gd     撤离点本体（触发区域+站N秒+进度弧脉冲，组: extraction_points）
 │   ├── enemy_system.gd         敌人生成（数量/距离可配置，地板采样不重复）
-│   ├── enemy.gd                敌人功能层（感知/寻路/移动/受击/接触伤害/击杀掉落；AI=巡逻+追击，视野含墙体遮挡，组: enemies）
+│   ├── enemy.gd                敌人功能层（感知/寻路/移动/受击/接触伤害/击杀掉落/噪音警觉度与听觉；AI=巡逻+调查+追击，视野含墙体遮挡，组: enemies）
 │   ├── loot_system.gd          资源点生成（密度可配，可达格采样，稀有度加权绑定资源）
 │   ├── loot_node.gd            资源点本体（色块占位+进入拾取半径自动拾取；setup 可指定数量与缩放，敌人掉落物复用本场景，组: loot_nodes）
 │   ├── fog_system.gd           战争迷雾（黑幕+探索记忆+敌人/资源点视野内显隐）
@@ -103,9 +104,11 @@ SteamPunkExtraction/
 - [x] 敌人视野墙体遮挡（2026-09-15）：视线采样 + 跟丢走最后已知位置，不再透视追踪
 - [x] 敌人击杀掉落（2026-09-15）：75% 概率原地掉 LootNode，数量 2~6
 - [x] 技能组追认（2026-09-15 用户"先用着"）：三技能沿用，数值全在 config 的 combat.skills
+- [x] 噪音机制（2026-09-15 已实装）：NoiseSystem 全局广播 + 距离/墙体衰减 + 敌人三档警觉度
+      （suspicious/investigate/combat）+ enemy_investigate_state 调查状态 + 衰减 + 敌人咆哮警报扩散
+      + 视觉反馈（声源圆环 + 敌人染色），玩家攻击/冲刺/技能/脚步均发声；数值全在 config 的 noise 节点
 - [ ] 后续：手感清单四项（伤害飘字 / 命中停顿 Hit Stop / 屏幕震动 / 搜刮时减速）、
-      连招派生链（输入缓冲扩展）、4 向精灵的方向切换与动画状态机（当前只接了 down 向静态帧）、
-      噪音机制（06 第 8 节，纯设计草案，未决定要不要做）
+      连招派生链（输入缓冲扩展）、4 向精灵的方向切换与动画状态机（当前只接了 down 向静态帧）
 
 ## 当前操作
 

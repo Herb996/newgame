@@ -66,18 +66,18 @@
     "max_alertness": 150,
     "footstep_interval_seconds": 0.4,
     "thresholds": {
-      "suspicious": 20,
-      "investigate": 50,
-      "combat": 100
+      "suspicious": 15,
+      "investigate": 30,
+      "combat": 70
     },
     "sources": {
-      "walk": 10,
-      "dodge": 28,
-      "attack": 55,
-      "shout": 70,
-      "skill_steam_burst": 45,
-      "skill_grapple_dash": 35,
-      "skill_gear_guard": 30
+      "walk": 22,
+      "dodge": 40,
+      "attack": 120,
+      "shout": 160,
+      "skill_steam_burst": 90,
+      "skill_grapple_dash": 60,
+      "skill_gear_guard": 45
     },
     "ring_duration_seconds": 0.7,
     "ring_color": "#ffd54f"
