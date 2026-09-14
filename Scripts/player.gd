@@ -62,107 +62,42 @@ var state_machine: StateMachine
 var skill_system: SkillSystem
 
 @onready var _select_area: Area2D = $SelectArea
-@onready var _select_circle: Polygon2D = $SelectCircle
+@onready var _select_icon: Node2D = $SelectIcon
 @onready var _sprite: Sprite2D = $Body
 @onready var hitbox: Area2D = $Hitbox
 var _path_line: Line2D
 
-# 四向待机基准帧（2.5D 出图，见 03_ART_STYLE_GUIDE）
-# 用运行时 load 而非 preload：贴图若尚未被 Godot 导入，preload 会让整个脚本加载失败，
-# 角色直接消失。改为缺失时告警并保留占位节点，游戏仍可运行。
-const SPRITE_IDLE_PATH := {
-	&"down": "res://Assets/Art/Sprites/Player/player_idle_down_00.png",
-	&"up": "res://Assets/Art/Sprites/Player/player_idle_up_00.png",
-	&"left": "res://Assets/Art/Sprites/Player/player_idle_left_00.png",
-	&"right": "res://Assets/Art/Sprites/Player/player_idle_right_00.png",
-}
-var _sprite_textures: Dictionary = {}
-var _anim_time := 0.0                         # 动画计时（程序化动作用）
-const SPRITE_OFFSET := Vector2(0, -24)        # 脚底对齐偏移（锚点在脚下，见 03 规格）
-const SPRITE_SCALE := 0.5                     # 48×48 画布按 2 倍超采样显示
+# 表现层动画状态机（4 向精灵方向切换 + 程序化动画），详见 player_animator.gd
+var _animator: PlayerAnimator
 
 
-func _load_sprites() -> void:
-	for dir in SPRITE_IDLE_PATH:
-		var tex_path: String = SPRITE_IDLE_PATH[dir]
-		if ResourceLoader.exists(tex_path):
-			_sprite_textures[dir] = load(tex_path)
-		else:
-			push_warning("[Player] 贴图未导入，先让 Godot 扫描文件系统：" + tex_path)
 
-
-## 表现层：①按 facing 换四向贴图 ②按 FSM 当前状态做形变（位移/旋转/拉伸/染色）
-## 这是"零素材动画"方案：不额外出图，靠代码驱动让角色有动作感。
-## 后续补了走路/攻击真动画帧，可切到 AnimatedSprite2D 接 SpriteFrames。
-func _update_sprite(delta: float) -> void:
-	_anim_time += delta
-	if _sprite_textures.is_empty():
-		return
-	var dir := &"down"
-	if absf(facing.x) > absf(facing.y):
-		dir = &"right" if facing.x >= 0.0 else &"left"
-	else:
-		dir = &"down" if facing.y >= 0.0 else &"up"
-	var tex: Texture2D = _sprite_textures[dir]
-	if _sprite.texture != tex:
-		_sprite.texture = tex
-
-	var st_name := &""
-	if state_machine != null and state_machine.current_state != null:
-		st_name = state_machine.current_state.name
-
-	var off := SPRITE_OFFSET
-	var rot := 0.0
-	var sc := Vector2(SPRITE_SCALE, SPRITE_SCALE)
-	var mod := Color(1, 1, 1)
-
-	match st_name:
-		&"move":
-			# 走路：上下起伏 + 轻微左右摆动
-			var t := _anim_time * 14.0
-			off.y += sin(t) * 1.5
-			rot = sin(t) * 0.05
-		&"attack":
-			# 挥击：朝 facing 前冲 + 摆臂
-			off += facing * 2.5
-			rot = sin(_anim_time * 26.0) * 0.10
-		&"hitstun":
-			# 受击：高频抖动 + 泛红
-			off.x += sin(_anim_time * 55.0) * 2.0
-			mod = Color(1.0, 0.55, 0.5)
-		&"dodge":
-			# 冲刺：沿朝向拉伸 + 半透明（配合无敌帧）
-			if absf(facing.x) > absf(facing.y):
-				sc = Vector2(SPRITE_SCALE * 1.3, SPRITE_SCALE * 0.85)
-			else:
-				sc = Vector2(SPRITE_SCALE * 0.88, SPRITE_SCALE * 1.2)
-			mod = Color(1, 1, 1, 0.65)
-		&"dead":
-			rot = 0.4
-			off.y += 5.0
-			mod = Color(0.55, 0.55, 0.55)
-		_:
-			# 待机：极轻的呼吸起伏
-			off.y += sin(_anim_time * 2.2) * 0.5
-
-	_sprite.offset = off
-	_sprite.rotation = rot
-	_sprite.scale = sc
-	_sprite.modulate = mod
+## FSM 当前状态名 → 动画状态（供 PlayerAnimator 使用）
+func _current_anim() -> int:
+	if state_machine == null or state_machine.current_state == null:
+		return PlayerAnimator.Anim.IDLE
+	match state_machine.current_state.name:
+		&"dead": return PlayerAnimator.Anim.DEAD
+		&"hitstun": return PlayerAnimator.Anim.HIT
+		&"attack": return PlayerAnimator.Anim.ATTACK
+		&"dodge": return PlayerAnimator.Anim.DODGE
+		&"skill": return PlayerAnimator.Anim.ATTACK
+		&"move": return PlayerAnimator.Anim.WALK
+		_: return PlayerAnimator.Anim.IDLE
 
 
 func _ready() -> void:
 	add_to_group("player")
 	z_index = 1
-	_load_sprites()
+	_animator = PlayerAnimator.new(_sprite)
+	_animator.load_from_config(Config.get_value("sprites", {}))
+	facing = Vector2(0, 1)   # 出生默认朝下方（标准俯视）
 	speed = float(Config.get_value("player.speed", 160.0))
 	var select_radius := float(Config.get_value("player.select_radius_px", 16.0))
 	(_select_area.get_node("CollisionShape2D").shape as CircleShape2D).radius = select_radius
 	var sel_color := Color(str(Config.get_value("player.selected_color", "#4fc3f7")))
-	sel_color.a = 0.5
-	_select_circle.color = sel_color
-	_build_select_circle(select_radius + 4.0)
-	_select_circle.visible = false
+	_select_icon.icon_color = sel_color
+	_select_icon.visible = false
 	_select_area.input_event.connect(_on_select_area_input)
 	_path_line = Line2D.new()
 	_path_line.width = 2.0
@@ -198,7 +133,8 @@ func _physics_process(delta: float) -> void:
 	_tick_combat_timers(delta)
 	# 行为决策交给状态机，本组件只提供能力
 	state_machine.physics_update(delta)
-	_update_sprite(delta)
+	if _animator != null:
+		_animator.update(delta, _current_anim(), facing)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -291,7 +227,7 @@ func _tick_combat_timers(delta: float) -> void:
 			_input_buffer.remove_at(i)
 
 
-## 输入缓冲：按下即入队（蓝图 2.1：支持连招派生与取消后摇）
+## 输入缓冲：按下即入队（蓝图 2.1：提升操作响应；技能在资源/冷却不足时自动重试。注意：已移除攻击连招派生链——本作非动作游戏，攻击为离散动作）
 func push_input(action: StringName) -> void:
 	_input_buffer.append({"action": action, "age": 0.0})
 
@@ -662,15 +598,6 @@ func _query_path(from_cell: Vector2i, to_cell: Vector2i) -> PackedVector2Array:
 # 选中交互
 # ------------------------------------------------------------
 
-func _build_select_circle(radius: float) -> void:
-	var pts := PackedVector2Array()
-	var segments := 32
-	for i in range(segments):
-		var a := TAU * float(i) / float(segments)
-		pts.append(Vector2(cos(a), sin(a)) * radius)
-	_select_circle.polygon = pts
-
-
 func _on_select_area_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
 	if event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
@@ -679,7 +606,7 @@ func _on_select_area_input(_viewport: Node, event: InputEvent, _shape_idx: int) 
 
 func _set_selected(value: bool) -> void:
 	selected = value
-	_select_circle.visible = value
+	_select_icon.visible = value
 	if not value:
 		stop_moving()
 	_path_line.visible = value and not _cached_path.is_empty()

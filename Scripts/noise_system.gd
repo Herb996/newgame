@@ -22,6 +22,7 @@ const FX_RING := preload("res://Scripts/combat/fx_ring.gd")
 var _walls: Array = []
 var _tile_size: int = 16
 var _map_ready := false
+var _last_ring_time := -999.0
 
 
 ## 由 EnemySystem.setup 在地图生成后注入墙体网格（供噪音的隔墙衰减使用）
@@ -34,7 +35,10 @@ func setup(walls: Array, tile_size: int) -> void:
 ## 发出一次噪音。intensity = 基础强度（config.noise.sources 的取值，如攻击=55）。
 ## 会自动向所有听力范围内的敌人派发（带衰减），并生成视觉圆环。
 func emit(source_pos: Vector2, intensity: float) -> void:
-	_spawn_ring(source_pos, intensity)
+	# 视觉圆环仅在大噪音时出现，避免脚步等轻噪音形成高频光圈
+	var ring_min_intensity := float(Config.get_value("noise.ring_min_intensity", 35.0))
+	if intensity >= ring_min_intensity:
+		_spawn_ring(source_pos, intensity)
 	var hear_radius := float(Config.get_value("noise.hear_radius_cells", 16)) * float(_tile_size)
 	var min_notice := float(Config.get_value("noise.min_notice", 4.0))
 	for e in get_tree().get_nodes_in_group("enemies"):
@@ -56,13 +60,19 @@ func emit(source_pos: Vector2, intensity: float) -> void:
 ## 在声源处生成一圈扩散圆环；半径 = 实际可听范围（received == min_notice 处），
 ## 这样玩家能直观看到"这声响传了多远"。
 func _spawn_ring(pos: Vector2, intensity: float) -> void:
+	# 全局限频：即便多次大噪音叠加，也限制光圈最小间隔，防止堆叠刺眼
+	var now := Time.get_ticks_msec() / 1000.0
+	var min_interval := float(Config.get_value("noise.ring_min_interval_seconds", 0.15))
+	if now - _last_ring_time < min_interval:
+		return
+	_last_ring_time = now
 	var ring: Node2D = FX_RING.new()
 	var hear_radius := float(Config.get_value("noise.hear_radius_cells", 16)) * float(_tile_size)
 	var min_notice := float(Config.get_value("noise.min_notice", 4.0))
 	var radius := hear_radius * (1.0 - min_notice / maxf(intensity, min_notice))
 	var dur := float(Config.get_value("noise.ring_duration_seconds", 0.7))
 	var col := Color(str(Config.get_value("noise.ring_color", "#ffd54f")))
-	col.a = 0.85
+	col.a = float(Config.get_value("noise.ring_alpha", 0.35))
 	ring.setup(radius, dur, col)
 	var parent := get_tree().current_scene
 	if parent != null:

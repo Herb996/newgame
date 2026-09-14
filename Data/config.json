@@ -5,14 +5,16 @@
     "tile_size": 16,
     "noise_frequency": 0.03,
     "noise_threshold": 0.25,
+    "biome_noise_frequency": 0.008,
+    "biome_count": 4,
+    "cluster_noise_frequency": 0.05,
+    "cluster_threshold": 0.5,
     "min_reachable_ratio": 0.3,
     "max_regen_attempts": 10,
     "decor": {
       "noise_frequency": 0.09,
       "noise_threshold": 0.1,
-      "tree_density": 0.035,
-      "rock_density": 0.022,
-      "debris_density": 0.03,
+      "density": 0.6,
       "clear_spawn_radius_cells": 3
     }
   },
@@ -22,6 +24,14 @@
     "select_radius_px": 16,
     "path_arrive_threshold_px": 6,
     "selected_color": "#4fc3f7"
+  },
+  "sprites": {
+    "idle": {
+      "down": "res://Assets/Art/Sprites/Player/player_idle_down_00.png",
+      "up": "res://Assets/Art/Sprites/Player/player_idle_up_00.png",
+      "left": "res://Assets/Art/Sprites/Player/player_idle_left_00.png",
+      "right": "res://Assets/Art/Sprites/Player/player_idle_right_00.png"
+    }
   },
   "camera": {
     "pan_speed": 400,
@@ -80,7 +90,10 @@
       "skill_gear_guard": 45
     },
     "ring_duration_seconds": 0.7,
-    "ring_color": "#ffd54f"
+    "ring_color": "#ffd54f",
+    "ring_alpha": 0.35,
+    "ring_min_intensity": 35,
+    "ring_min_interval_seconds": 0.15
   },
   "combat": {
     "input": {
@@ -350,6 +363,6 @@
     "time_scale": 20.0,
     "log_state_transitions": true,
     "map_preview": "",
-    "map_preview_cells": 40
+    "map_preview_cells": 56
   }
 }

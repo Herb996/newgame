@@ -36,4 +36,4 @@ func _draw() -> void:
 	var c := ring_color
 	c.a = ring_color.a * (1.0 - k)
 	# 分段数随半径增长，保证大圆也平滑
-	draw_arc(Vector2.ZERO, r, 0.0, TAU, maxi(int(r * 0.5), 16), c, 3.0, true)
+	draw_arc(Vector2.ZERO, r, 0.0, TAU, maxi(int(r * 0.5), 16), c, 2.0, true)
