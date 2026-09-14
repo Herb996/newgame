@@ -58,6 +58,30 @@
       }
     }
   },
+  "noise": {
+    "hear_radius_cells": 16,
+    "min_notice": 4,
+    "wall_attenuation": 0.5,
+    "decay_per_second": 10,
+    "max_alertness": 150,
+    "footstep_interval_seconds": 0.4,
+    "thresholds": {
+      "suspicious": 20,
+      "investigate": 50,
+      "combat": 100
+    },
+    "sources": {
+      "walk": 10,
+      "dodge": 28,
+      "attack": 55,
+      "shout": 70,
+      "skill_steam_burst": 45,
+      "skill_grapple_dash": 35,
+      "skill_gear_guard": 30
+    },
+    "ring_duration_seconds": 0.7,
+    "ring_color": "#ffd54f"
+  },
   "combat": {
     "input": {
       "buffer_seconds": 0.25,
@@ -104,7 +128,8 @@
         "recovery_seconds": 0.25,
         "damage": 30,
         "radius_px": 72,
-        "knockback_speed": 220
+        "knockback_speed": 220,
+        "noise": 45
       },
       "grapple_dash": {
         "name": "钩爪突进",
@@ -117,7 +142,8 @@
         "recovery_seconds": 0.2,
         "damage": 20,
         "dash_speed": 900,
-        "hit_radius_px": 26
+        "hit_radius_px": 26,
+        "noise": 35
       },
       "gear_guard": {
         "name": "齿轮护盾",
@@ -129,7 +155,8 @@
         "active_seconds": 0.15,
         "recovery_seconds": 0.15,
         "damage_reduction": 0.6,
-        "buff_duration_seconds": 2.5
+        "buff_duration_seconds": 2.5,
+        "noise": 30
       }
     }
   },

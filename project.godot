@@ -22,6 +22,7 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 
 Config="*res://Scripts/config_loader.gd"
 Meta="*res://Scripts/meta_progression.gd"
+NoiseSystem="*res://Scripts/noise_system.gd"
 
 [display]
 

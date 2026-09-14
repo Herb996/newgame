@@ -24,6 +24,10 @@ func physics_update(delta: float) -> void:
 	if actor.can_see_player():
 		request_transition(&"chase")
 		return
+	# 听到足够大的噪音（达到 investigate 阈值）→ 去声源调查（06_FIGHT.md 第 8 节）
+	if actor.noise_alertness >= float(Config.get_value("noise.thresholds.investigate", 50.0)):
+		request_transition(&"investigate")
+		return
 	# 到达巡逻点后的停留（模拟"站岗观察"）
 	if _wait > 0.0:
 		_wait -= delta

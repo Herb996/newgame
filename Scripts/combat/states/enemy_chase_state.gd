@@ -19,6 +19,9 @@ func _init(p_actor: Node = null) -> void:
 func enter(_msg: Dictionary = {}) -> void:
 	_lost = 0.0
 	actor.repath_to_player()
+	# 发现玩家 → 咆哮，惊动附近敌人（通过噪音系统统一广播，形成"警报扩散"）
+	NoiseSystem.emit(actor.global_position,
+			float(Config.get_value("noise.sources.shout", 70.0)))
 
 
 func physics_update(delta: float) -> void:
@@ -29,7 +32,13 @@ func physics_update(delta: float) -> void:
 	else:
 		_lost += delta
 		if _lost >= float(Config.get_value("enemy.lose_sight_seconds", 3.0)):
-			request_transition(&"patrol")
+			# 跟丢：把最后已知位置当作声源，让调查状态前往那里再搜索
+			actor.set_noise_source(actor.last_known_position())
+			# 仍高度警觉 → 去调查；否则直接回巡逻
+			if actor.noise_alertness >= float(Config.get_value("noise.thresholds.investigate", 50.0)):
+				request_transition(&"investigate")
+			else:
+				request_transition(&"patrol")
 			return
 		# 跟丢（多数是被墙挡住）：只朝最后已知位置走，不透视追踪
 		if not actor.has_move_target():

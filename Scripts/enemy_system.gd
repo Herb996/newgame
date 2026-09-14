@@ -52,5 +52,9 @@ func setup(root: Node2D, map_data: Dictionary) -> void:
 		# 入树后再注入导航数据，保证 global_position（= 巡逻中心）已正确
 		enemy.setup(walls, tile_size, astar)
 
+	# 把墙体网格注入噪音系统（隔墙衰减用），只注一次即可
+	if not NoiseSystem._map_ready:
+		NoiseSystem.setup(walls, tile_size)
+
 	print("[Enemy] 敌人生成完成：%d 个（距出生点 ≥ %.0f 格，AI = 巡逻 + 追击）" % [
 		count, min_d])

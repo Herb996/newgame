@@ -40,12 +40,15 @@ func physics_update(delta: float) -> void:
 	actor.velocity = Vector2.ZERO
 	actor.move_and_slide()
 
-	match _phase:
+		match _phase:
 		Phase.WINDUP:
 			if _timer >= windup:
 				_phase = Phase.ACTIVE
 				_timer = 0.0
 				actor.begin_attack_hit()
+				# 挥击发声：惊动附近敌人（06_FIGHT.md 第 8 节 噪音机制）
+				NoiseSystem.emit(actor.global_position,
+						float(Config.get_value("noise.sources.attack", 55.0)))
 		Phase.ACTIVE:
 			actor.resolve_attack_hit()   # 判定帧内每帧结算（内部按目标去重）
 			if _timer >= active:

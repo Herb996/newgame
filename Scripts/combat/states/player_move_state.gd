@@ -14,7 +14,16 @@ func _init(p_actor: Node = null) -> void:
 	super(&"move", p_actor)
 
 
-func physics_update(_delta: float) -> void:
+var _footstep := 0.0
+
+
+func physics_update(delta: float) -> void:
+	# 行走脚步声：周期性发出（比攻击/技能轻），惊动附近敌人
+	_footstep += delta
+	if _footstep >= float(Config.get_value("noise.footstep_interval_seconds", 0.4)):
+		_footstep = 0.0
+		NoiseSystem.emit(actor.global_position,
+				float(Config.get_value("noise.sources.walk", 10.0)))
 	# 技能可以打断移动（进入 skill 状态时会 stop_moving）
 	if actor.try_cast_buffered_skill():
 		return

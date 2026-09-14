@@ -33,6 +33,10 @@ var max_hp := 0
 var _contact_cooldown := 0.0
 var _last_known := Vector2.ZERO   # 玩家最后被看到的位置（跟丢后走这里）
 
+# --- 噪音警觉度（06_FIGHT.md 第 8 节 噪音机制）---
+var noise_alertness := 0.0
+var _noise_source := Vector2.ZERO   # 最后听到的声源位置（调查状态前往这里）
+
 # --- 导航（由 EnemySystem 注入） ---
 var _walls: Array = []
 var _tile_size: int = 16
@@ -64,15 +68,20 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if _contact_cooldown > 0.0:
 		_contact_cooldown -= delta
+	# 噪音警觉度随时间衰减（听到动静→去查看→没发现→慢慢放松）
+	if noise_alertness > 0.0:
+		noise_alertness = maxf(0.0, noise_alertness
+				- float(Config.get_value("noise.decay_per_second", 10.0)) * delta)
 	# 休眠判定（0.5 秒一次，避免每帧测量距离）
 	_dormant_check += delta
 	if _dormant_check >= 0.5:
 		_dormant_check = 0.0
-		_dormant = distance_to_player_cells() \
-				> float(Config.get_value("enemy.ai_active_radius_cells", 32))
+	_dormant = distance_to_player_cells() \
+			> float(Config.get_value("enemy.ai_active_radius_cells", 32))
 	if _dormant:
 		return
 	state_machine.physics_update(delta)
+	_update_alert_visual()
 
 
 func _init_state_machine() -> void:
@@ -82,6 +91,7 @@ func _init_state_machine() -> void:
 	state_machine.setup(self, &"patrol",
 			bool(Config.get_value("debug.log_state_transitions", false)))
 	state_machine.add_state(EnemyPatrolState.new(self))
+	state_machine.add_state(EnemyInvestigateState.new(self))
 	state_machine.add_state(EnemyChaseState.new(self))
 	state_machine.start()
 
@@ -148,6 +158,58 @@ func remember_player_position() -> void:
 	var p := _get_player()
 	if p != null:
 		_last_known = p.global_position
+
+
+# ------------------------------------------------------------
+# 噪音感知（06_FIGHT.md 第 8 节）
+# ------------------------------------------------------------
+
+## 听到一次噪音：累加警觉度并记录声源（阈值驱动状态切换在 enemy_*_state 里）
+func hear_noise(source_pos: Vector2, intensity: float) -> void:
+	noise_alertness = minf(noise_alertness + intensity,
+			float(Config.get_value("noise.max_alertness", 150.0)))
+	_noise_source = source_pos
+
+
+## 调查目标位置（最后听到的声源）
+func noise_source() -> Vector2:
+	return _noise_source
+
+
+## 写入调查目标（追击跟丢时把最后已知位置当作声源，让调查状态走向它）
+func set_noise_source(pos: Vector2) -> void:
+	_noise_source = pos
+
+
+## 玩家最后被看到的位置（供 chase 跟丢后使用）
+func last_known_position() -> Vector2:
+	return _last_known
+
+
+## 走向噪音声源（与 repath_to_last_known 同构，但目标来自听力）
+func repath_to_noise_source() -> void:
+	if _noise_source == Vector2.ZERO:
+		return
+	if not _set_path_to(_noise_source):
+		clear_move_target()
+
+
+## 警觉视觉反馈：本体 Polygon2D 染色（红=正常/巡逻，黄=疑惑，橙=调查，亮红=看见玩家）
+## 轻量、零素材，便于玩家一眼判断敌人状态。
+func _update_alert_visual() -> void:
+	var body := get_node_or_null("Body")
+	if body == null:
+		return
+	var susp := float(Config.get_value("noise.thresholds.suspicious", 20.0))
+	var inv := float(Config.get_value("noise.thresholds.investigate", 50.0))
+	if can_see_player():
+		body.modulate = Color(1.0, 0.35, 0.2)
+	elif noise_alertness >= inv:
+		body.modulate = Color(1.0, 0.7, 0.2)    # 调查：橙
+	elif noise_alertness >= susp:
+		body.modulate = Color(1.0, 0.9, 0.4)    # 疑惑：浅黄
+	else:
+		body.modulate = Color(1.0, 1.0, 1.0)    # 正常（本体自带红色）
 
 
 # ------------------------------------------------------------

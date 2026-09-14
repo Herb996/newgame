@@ -68,6 +68,14 @@ func physics_update(delta: float) -> void:
 
 ## 进入 Cast 阶段：一次性效果在这里结算，并打印日志便于编辑器验证
 func _on_cast_begin() -> void:
+	# 技能发声（数值读 config：combat.skills.<id>.noise，缺项按类型兜底）
+	var n := float(Config.get_value("combat.skills.%s.noise" % str(_skill.id), 0.0))
+	if n <= 0.0:
+		match _skill.type():
+			Skill.Type.AOE_SELF: n = float(Config.get_value("noise.sources.skill_steam_burst", 45.0))
+			Skill.Type.DASH: n = float(Config.get_value("noise.sources.skill_grapple_dash", 35.0))
+			Skill.Type.BUFF: n = float(Config.get_value("noise.sources.skill_gear_guard", 30.0))
+	NoiseSystem.emit(actor.global_position, n)
 	match _skill.type():
 		Skill.Type.AOE_SELF:
 			var radius := _skill.num("radius_px", 60.0)
