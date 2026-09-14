@@ -60,7 +60,7 @@ const BIOMES := [
 	{"name": "林地", "floor": Color(0.20, 0.28, 0.15), "wall": Color(0.42, 0.30, 0.17),
 	 "tree": 0.16, "rock": 0.03, "debris": 0.02},
 	{"name": "荒原", "floor": Color(0.33, 0.27, 0.18), "wall": Color(0.52, 0.37, 0.20),
-	 "tree": 0.02, "rock": 0.06, "debris": 0.07},
+	 "tree": 0.025, "rock": 0.040, "debris": 0.07},
 	{"name": "锈泽", "floor": Color(0.17, 0.22, 0.16), "wall": Color(0.46, 0.31, 0.18),
 	 "tree": 0.05, "rock": 0.02, "debris": 0.06},
 	{"name": "石原", "floor": Color(0.31, 0.31, 0.33), "wall": Color(0.50, 0.42, 0.35),
@@ -92,6 +92,13 @@ const DECOR_PATHS := {
 	DECOR_TREE: "res://Assets/Art/Sprites/Decor/tree_00.png",
 	DECOR_ROCK: "res://Assets/Art/Sprites/Decor/rock_00.png",
 	DECOR_DEBRIS: "res://Assets/Art/Sprites/Decor/debris_00.png",
+}
+
+# 每类装饰物的基准亮度：石头原画偏浅，直接铺在暗色地表上会过于抢眼，压暗一档
+const DECOR_BASE_TINT := {
+	DECOR_TREE: Color(1.00, 1.00, 1.00),
+	DECOR_ROCK: Color(0.80, 0.80, 0.82),
+	DECOR_DEBRIS: Color(0.95, 0.95, 0.95),
 }
 
 static var _decor_tex: Dictionary = {}     # 装饰物贴图缓存（只加载/生成一次）
@@ -240,8 +247,11 @@ static func generate() -> Dictionary:
 			# 每株装饰做随机缩放/翻转/亮度抖动 + 按群系偏色，消除克隆感
 			s.scale = Vector2(rng.randf_range(0.88, 1.12), rng.randf_range(0.88, 1.12))
 			s.flip_h = rng.randf() < 0.5
+			# 群系色调 × 类别基准亮度，再叠随机明暗抖动
 			var tint: Color = BIOME_DECOR_TINT[biome[y][x]]
-			s.modulate = Color(tint.r, tint.g, tint.b) * rng.randf_range(0.88, 1.10)
+			var base_tint: Color = DECOR_BASE_TINT.get(k, Color(1, 1, 1))
+			s.modulate = Color(tint.r * base_tint.r, tint.g * base_tint.g,
+					tint.b * base_tint.b) * rng.randf_range(0.88, 1.10)
 			# 脚底对齐格心（图片底边落在格心下方 2px，视觉上"站在"这一格）
 			s.position = Vector2(x * tile_size + tile_size * 0.5,
 								 y * tile_size + tile_size * 0.5)
