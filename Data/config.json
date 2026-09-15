@@ -6,16 +6,31 @@
     "noise_frequency": 0.03,
     "noise_threshold": 0.25,
     "biome_noise_frequency": 0.008,
+    "biome_border_frequency": 0.08,
+    "biome_border_jitter": 0.06,
+    "biome_spread": 1.35,
+    "biome_edge_blend": 0.45,
     "biome_count": 4,
     "cluster_noise_frequency": 0.05,
     "cluster_threshold": 0.5,
     "min_reachable_ratio": 0.3,
     "max_regen_attempts": 10,
+    "grade": {
+      "contrast": 1.12,
+      "brightness": -0.03,
+      "saturation": 0.75
+    },
+    "macro_light": {
+      "enabled": true,
+      "frequency": 0.013,
+      "strength": 0.28
+    },
     "decor": {
       "noise_frequency": 0.09,
       "noise_threshold": 0.1,
-      "density": 1.3,
-      "clear_spawn_radius_cells": 3
+      "density": 1.05,
+      "clear_spawn_radius_cells": 3,
+      "shadow": true
     }
   },
   "player": {

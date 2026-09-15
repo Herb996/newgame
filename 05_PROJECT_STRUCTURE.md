@@ -113,6 +113,13 @@ SteamPunkExtraction/
 - [x] 噪音机制（2026-09-15 已实装）：NoiseSystem 全局广播 + 距离/墙体衰减 + 敌人三档警觉度
       （suspicious/investigate/combat）+ enemy_investigate_state 调查状态 + 衰减 + 敌人咆哮警报扩散
       + 视觉反馈（声源圆环 + 敌人染色），玩家攻击/冲刺/技能/脚步均发声；数值全在 config 的 noise 节点
+- [x] 地图观感调优 A 档（2026-09-15 二轮）：群系边界抖动 + 交界渗透（消除像素台阶）、
+      biome_spread 修正群系分布失衡（原中间两段吃掉近九成面积）、图集色调分级
+      （对比 → 去饱和 → 群系色调；铁律：主要动明度、色相只做轻偏移）、宏观明暗乘法混合层、
+      装饰落地投影。参数全在 config 的 map.grade / map.macro_light / map.biome_border_* /
+      map.biome_edge_blend / map.decor.shadow。详见 03 文档「观感调优」一节
+- [ ] 地图观感调优 B 档（待做）：相机斜俯视（Y 压缩伪等距）、瓦片 16→32、墙体立体化
+      （顶面亮 + 正面暗）、光照层（CanvasModulate + PointLight2D + 暗角）、装饰 y_sort 遮挡
 - [ ] 后续：手感清单四项（伤害飘字 / 命中停顿 Hit Stop / 屏幕震动 / 搜刮时减速）、
       连招派生链（输入缓冲扩展）、4 向精灵的方向切换与动画状态机（当前只接了 down 向静态帧）
 

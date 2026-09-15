@@ -67,12 +67,17 @@ const BIOMES := [
 	 "tree": 0.03, "rock": 0.14, "debris": 0.02},
 ]
 
-# 装饰物按群系的色调：让"同一棵树"在不同区域呈现不同生态感
-const BIOME_DECOR_TINT := [
-	Color(1.00, 1.00, 1.00),   # 林地：本色
-	Color(1.12, 1.00, 0.80),   # 荒原：偏枯黄
-	Color(0.90, 1.00, 0.90),   # 锈泽：偏湿绿
-	Color(0.94, 0.98, 1.08),   # 石原：偏冷灰
+# 每群系的整体色调（乘到图集上）：把四个区域的明暗拉开，形成大尺度明暗构图。
+# 这是"整张图糊成一片泥巴色"的解药——原先四区明度太接近，眼睛找不到层次。
+#
+# 调参铁律：**主要动明度，色相只做轻微偏移**。第一版把荒原写成 (1.18, 1.07, 0.82)
+# 这种强暖偏移，叠加原本就偏棕黄的贴图后整片变成饱和橙黄，比"脏"更糟。低饱和的
+# 层次感来自明暗差，不来自色相差。
+const BIOME_TINT := [
+	Color(0.93, 0.98, 0.95),   # 林地：微冷绿、偏暗（树冠遮光）
+	Color(1.06, 1.02, 0.96),   # 荒原：最亮、一点点暖（不能再多加暖，会变橙）
+	Color(0.86, 0.92, 0.93),   # 锈泽：最暗、微青（水汽弥漫）
+	Color(0.85, 0.83, 0.82),   # 石原：压暗偏暖（原贴图是亮冷灰石板，不压就会像冰面）
 ]
 
 # ---------- 调色板（回退绘制用；03_ART_STYLE_GUIDE：暗棕/铜锈/蒸汽白）----------
@@ -103,6 +108,7 @@ const DECOR_BASE_TINT := {
 
 static var _decor_tex: Dictionary = {}     # 装饰物贴图缓存（只加载/生成一次）
 static var _decor_img: Dictionary = {}     # 装饰物原始 Image（预览合成用）
+static var _decor_shadow_tex: Dictionary = {}  # 装饰物落地投影贴图缓存（按类别）
 static var _atlas_img: Image = null        # 瓦片图集 Image（预览合成用）
 static var _used_ai_atlas := false         # 本次图集是否来自 AI 素材（调试用）
 
@@ -123,6 +129,19 @@ static func generate() -> Dictionary:
 	biome_noise.frequency = float(Config.get_value("map.biome_noise_frequency", 0.008))
 	biome_noise.seed = randi()
 
+	# 群系边界抖动噪声：中频，叠在低频群系噪声上，把平滑边界打散成自然犬牙。
+	# 没有它，四个群系就是四块硬边色块，像油漆桶填色分区图。
+	var edge_noise := FastNoiseLite.new()
+	edge_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	edge_noise.frequency = float(Config.get_value("map.biome_border_frequency", 0.06))
+	edge_noise.seed = randi()
+
+	# 宏观明暗噪声：超低频，制造"大片区"明暗落差（见 _make_macro_light_image）
+	var macro_noise := FastNoiseLite.new()
+	macro_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	macro_noise.frequency = float(Config.get_value("map.macro_light.frequency", 0.013))
+	macro_noise.seed = randi()
+
 	# 装饰物用独立噪声：成片分布（林子/石堆），而不是均匀撒点
 	var veg := FastNoiseLite.new()
 	veg.frequency = float(Config.get_value("map.decor.noise_frequency", 0.09))
@@ -135,6 +154,12 @@ static func generate() -> Dictionary:
 
 	var density: float = float(Config.get_value("map.decor.density", 0.6))
 	var cluster_threshold: float = float(Config.get_value("map.cluster_threshold", 0.5))
+	var border_jitter: float = float(Config.get_value("map.biome_border_jitter", 0.055))
+	var biome_spread: float = float(Config.get_value("map.biome_spread", 1.35))
+	var edge_blend: float = float(Config.get_value("map.biome_edge_blend", 0.45))
+	var macro_on: bool = bool(Config.get_value("map.macro_light.enabled", true))
+	var macro_strength: float = float(Config.get_value("map.macro_light.strength", 0.22))
+	var shadow_on: bool = bool(Config.get_value("map.decor.shadow", true))
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = randi()
@@ -166,8 +191,12 @@ static func generate() -> Dictionary:
 			# 中心 5x5 出生区强制为地板，保证玩家不出生在墙里
 			elif abs(x - center.x) <= 2 and abs(y - center.y) <= 2:
 				is_wall = false
-			# 生物群系：低频噪声归一化后分段
-			var bf: float = (biome_noise.get_noise_2d(x, y) + 1.0) * 0.5
+			# 生物群系：低频噪声分段，再叠中频抖动把边界打散成犬牙。
+			# 必须先"扩幅"（biome_spread）：simplex 噪声值集中在 0 附近，直接
+			# (n+1)/2 分段会让中间两段吃掉近九成面积，四个群系严重失衡。
+			var bf: float = clampf(0.5 + biome_noise.get_noise_2d(x, y) * biome_spread,
+					0.0, 1.0)
+			bf += edge_noise.get_noise_2d(x, y) * border_jitter
 			var b: int = clampi(int(bf * BIOME_COUNT), 0, BIOME_COUNT - 1)
 			trow.append(is_wall)
 			wrow.append(is_wall)
@@ -177,6 +206,20 @@ static func generate() -> Dictionary:
 		walls.append(wrow)
 		decor.append(drow)
 		biome.append(brow)
+
+	# 边界渗透：处在两群系交界的格子按概率改判为邻格群系，让两块区域互相"咬"进去。
+	# 只靠抖动噪声，边界仍是一条格级直角折线（像素台阶）；渗透才能把它打散成互相
+	# 交错的混合带。必须在生成阶段做——放到渲染时临时算，biome 数组与实际渲染、
+	# 装饰物偏色就会不一致。
+	if edge_blend > 0.0:
+		var blended: Array = []
+		for y in range(height):
+			var brow2: Array = []
+			brow2.resize(width)
+			for x in range(width):
+				brow2[x] = _blended_biome(biome, x, y, edge_blend)
+			blended.append(brow2)
+		biome = blended
 
 	# 装饰只落在地板上；出生区留空；树/石头并入 walls（寻路会绕开）
 	# 权重按所在生物群系取，树在"成簇噪声"高值区会被放大 → 形成树林而非均匀撒点
@@ -238,23 +281,39 @@ static func generate() -> Dictionary:
 			var k: int = decor[y][x]
 			if k == DECOR_NONE:
 				continue
-			var s := Sprite2D.new()
-			s.texture = _decor_texture(k)
-			if s.texture == null:
+			var tex := _decor_texture(k)
+			if tex == null:
 				continue
+			var tex_size := Vector2(tex.get_size())
+			# 每株装饰做随机缩放/翻转/亮度抖动，消除克隆感
+			var sc := Vector2(rng.randf_range(0.88, 1.12), rng.randf_range(0.88, 1.12))
+			# 脚底对齐格心（图片底边落在格心下方 2px，视觉上"站在"这一格）
+			var pos := Vector2(x * tile_size + tile_size * 0.5,
+							   y * tile_size + tile_size * 0.5)
+			# 落地投影：必须先添加影子再添加本体——同 y 时 y_sort 保持添加序，
+			# 影子就永远压在本体下面。残骸本来就平摊在地上，不需要投影。
+			if shadow_on and k != DECOR_DEBRIS:
+				var shadow_tex := _decor_shadow_texture(k, tex_size.x)
+				if shadow_tex != null:
+					var sh := Sprite2D.new()
+					sh.texture = shadow_tex
+					sh.centered = false
+					sh.scale = sc
+					sh.position = pos
+					sh.offset = Vector2(-shadow_tex.get_width() * 0.5, 0.0)
+					sh.z_index = 0
+					decor_root.add_child(sh)
+			var s := Sprite2D.new()
+			s.texture = tex
 			s.centered = false
-			var tex_size := Vector2(s.texture.get_size())
-			# 每株装饰做随机缩放/翻转/亮度抖动 + 按群系偏色，消除克隆感
-			s.scale = Vector2(rng.randf_range(0.88, 1.12), rng.randf_range(0.88, 1.12))
+			s.scale = sc
 			s.flip_h = rng.randf() < 0.5
-			# 群系色调 × 类别基准亮度，再叠随机明暗抖动
-			var tint: Color = BIOME_DECOR_TINT[biome[y][x]]
+			# 群系整体色调（与地表同源：地面亮的地方物件也亮）× 类别基准亮度 × 随机抖动
+			var tint: Color = BIOME_TINT[biome[y][x]]
 			var base_tint: Color = DECOR_BASE_TINT.get(k, Color(1, 1, 1))
 			s.modulate = Color(tint.r * base_tint.r, tint.g * base_tint.g,
-					tint.b * base_tint.b) * rng.randf_range(0.88, 1.10)
-			# 脚底对齐格心（图片底边落在格心下方 2px，视觉上"站在"这一格）
-			s.position = Vector2(x * tile_size + tile_size * 0.5,
-								 y * tile_size + tile_size * 0.5)
+					tint.b * base_tint.b) * rng.randf_range(0.90, 1.08)
+			s.position = pos
 			s.offset = Vector2(-tex_size.x * 0.5, 2.0 - tex_size.y)
 			s.z_index = 0   # 与地形同层：玩家（z=1）始终在前景，未探索区被雾盖住
 			decor_root.add_child(s)
@@ -264,6 +323,13 @@ static func generate() -> Dictionary:
 	root.name = "MapRoot"
 	root.add_child(layer)
 	root.add_child(decor_root)
+	# 宏观明暗层：低分辨率光照图放大后乘法混合。刻意最后添加 —— 同 z_index 下
+	# 绘制在最上层，连装饰一起受光；否则会出现"地面有明暗、树却一样亮"的割裂。
+	var macro_img: Image = null
+	if macro_on and macro_strength > 0.0:
+		macro_img = _make_macro_light_image(width, height, macro_noise, macro_strength)
+		if macro_img != null:
+			root.add_child(_wrap_macro_light(macro_img, tile_size))
 
 	var spawn := Vector2(center) * tile_size + Vector2(tile_size * 0.5, tile_size * 0.5)
 
@@ -301,7 +367,8 @@ static func generate() -> Dictionary:
 	print("[Map] 群系分布：" + biome_str)
 	return {"node": root, "spawn": spawn, "spawn_cell": center,
 			"walls": walls, "reachable": reachable, "reachable_ratio": ratio,
-			"terrain": terrain, "decor": decor, "biome": biome, "tile_size": tile_size}
+			"terrain": terrain, "decor": decor, "biome": biome, "tile_size": tile_size,
+			"macro": macro_img}
 
 
 ## ------------------------------------------------------------
@@ -344,6 +411,7 @@ static func build_preview(result: Dictionary, cells: int) -> Image:
 						Vector2i(x * ts, y * ts))
 
 	# 装饰层：按 y 递增绘制（等价于 y_sort，下方的遮上方的）
+	var shadow_on: bool = bool(Config.get_value("map.decor.shadow", true))
 	for y in range(mini(cells, h)):
 		for x in range(mini(cells, w)):
 			var gy: int = y0 + y
@@ -352,15 +420,41 @@ static func build_preview(result: Dictionary, cells: int) -> Image:
 			if k == DECOR_NONE or not _decor_img.has(k):
 				continue
 			var src: Image = _decor_img[k]
+			var tint: Color = BIOME_TINT[biome[gy][gx]]
+			var base_tint: Color = DECOR_BASE_TINT.get(k, Color(1, 1, 1))
+			var use_tint := Color(tint.r * base_tint.r, tint.g * base_tint.g,
+					tint.b * base_tint.b)
+			# 落地投影：与运行时同序（先影后本体），残骸不投影
+			if shadow_on and k != DECOR_DEBRIS:
+				var sw: float = maxf(6.0, src.get_width() * 0.80)
+				var shh: float = maxf(3.0, sw * 0.34)
+				_blend_shadow(out, int(x * ts + ts * 0.5),
+						int(y * ts + ts * 0.5 + shh * 0.5), sw * 0.5, shh * 0.5)
 			# 与游戏中 Sprite2D 的对齐方式一致：脚底落在格心下方 2px
 			var dx: int = int(x * ts + ts * 0.5 - src.get_width() * 0.5)
 			var dy: int = int(y * ts + ts * 0.5 + 2.0 - src.get_height())
-			_blend(out, src, dx, dy)
+			_blend(out, src, dx, dy, use_tint)
+
+	# 宏观明暗：等价于运行时 MacroLight 的乘法混合（先放大插值，再逐像素乘）
+	var macro: Image = result.get("macro", null)
+	if macro != null and macro.get_width() > 0:
+		var cw: int = mini(cells, w)
+		var chh: int = mini(cells, h)
+		var region := macro.get_region(Rect2i(x0, y0, cw, chh))
+		region.resize(out.get_width(), out.get_height(), Image.INTERPOLATE_BILINEAR)
+		for py in range(out.get_height()):
+			for px in range(out.get_width()):
+				var m := region.get_pixel(px, py)
+				var px_col := out.get_pixel(px, py)
+				out.set_pixel(px, py, Color(clampf(px_col.r * m.r, 0.0, 1.0),
+						clampf(px_col.g * m.g, 0.0, 1.0),
+						clampf(px_col.b * m.b, 0.0, 1.0), 1.0))
 	return out
 
 
-## 把 src 以 alpha 混合方式叠到 out 的 (dx, dy) 处
-static func _blend(out: Image, src: Image, dx: int, dy: int) -> void:
+## 把 src 以 alpha 混合方式叠到 out 的 (dx, dy) 处，tint 决定叠上去时的色调
+static func _blend(out: Image, src: Image, dx: int, dy: int,
+		tint: Color = Color(1, 1, 1)) -> void:
 	for y in range(src.get_height()):
 		for x in range(src.get_width()):
 			var s := src.get_pixel(x, y)
@@ -372,20 +466,77 @@ static func _blend(out: Image, src: Image, dx: int, dy: int) -> void:
 				continue
 			var d := out.get_pixel(ox, oy)
 			var a: float = s.a
-			out.set_pixel(ox, oy, Color(s.r * a + d.r * (1.0 - a),
-					s.g * a + d.g * (1.0 - a), s.b * a + d.b * (1.0 - a), 1.0))
+			out.set_pixel(ox, oy, Color(s.r * tint.r * a + d.r * (1.0 - a),
+					s.g * tint.g * a + d.g * (1.0 - a),
+					s.b * tint.b * a + d.b * (1.0 - a), 1.0))
+
+
+## 在 out 上叠一个椭圆软影（形状与 _decor_shadow_texture 一致，供预览复用）
+static func _blend_shadow(out: Image, cx: int, cy: int, rx: float, ry: float) -> void:
+	var py0: int = int(float(cy) - ry) - 1
+	var py1: int = int(float(cy) + ry) + 1
+	var px0: int = int(float(cx) - rx) - 1
+	var px1: int = int(float(cx) + rx) + 1
+	for y in range(py0, py1 + 1):
+		if y < 0 or y >= out.get_height():
+			continue
+		for x in range(px0, px1 + 1):
+			if x < 0 or x >= out.get_width():
+				continue
+			var dx := (float(x) - float(cx)) / maxf(rx, 1.0)
+			var dy := (float(y) - float(cy)) / maxf(ry, 1.0)
+			var dd := dx * dx + dy * dy
+			if dd > 1.0:
+				continue
+			var a: float = (1.0 - dd) * 0.42
+			if a <= 0.02:
+				continue
+			var d := out.get_pixel(x, y)
+			out.set_pixel(x, y, Color(d.r * (1.0 - a), d.g * (1.0 - a),
+					d.b * (1.0 - a), 1.0))
 
 
 ## ------------------------------------------------------------
 ## 瓦片图集：优先用 AI 生成的 2.5D 手绘贴图，缺失时回退程序化绘制
 ## ------------------------------------------------------------
 
-## 确定性变体选择：同一格永远得到同一个变体，重生成地图不会闪烁
-static func _variant(x: int, y: int, count: int) -> int:
-	var h: int = (x * 73856093) ^ (y * 19349663)
+## 确定性二维哈希：同一格 + 同一 salt 永远得到同一个值（重生成地图不闪烁）
+static func _hash_xy(x: int, y: int, salt: int) -> int:
+	var h: int = (x * 73856093) ^ (y * 19349663) ^ (salt * 83492791)
 	h = h ^ (h >> 13)
 	h = h ^ (h << 7)
-	return absi(h) % count
+	return absi(h)
+
+
+## 确定性变体选择：同一格永远得到同一个变体，重生成地图不会闪烁
+static func _variant(x: int, y: int, count: int) -> int:
+	return _hash_xy(x, y, 17) % count
+
+
+## 群系边界渗透：若该格处在两个群系的交界且哈希命中，则改用某个邻格的群系。
+## 效果是把"一条硬直的切缝"变成"互相咬进去的混合带"。
+static func _blended_biome(biome: Array, x: int, y: int, blend: float) -> int:
+	var b: int = biome[y][x]
+	if blend <= 0.0:
+		return b
+	var h: int = biome.size()
+	var w: int = biome[0].size()
+	# 先看四邻有没有别的群系。绝大多数格子不属于边界，在这里就早退了。
+	var cand: Array = []
+	for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var nx: int = x + d.x
+		var ny: int = y + d.y
+		if nx < 0 or ny < 0 or nx >= w or ny >= h:
+			continue
+		var nb: int = biome[ny][nx]
+		if nb != b and not cand.has(nb):
+			cand.append(nb)
+	if cand.is_empty():
+		return b
+	# 用确定性随机决定「咬不咬」以及「咬向谁」
+	if float(_hash_xy(x, y, 91) % 1000) >= blend * 1000.0:
+		return b
+	return cand[_hash_xy(x, y, 53) % cand.size()]
 
 
 ## 读出 PNG 的 Image（未导入的 PNG 会返回 null，交给调用方回退）
@@ -453,6 +604,7 @@ static func _build_atlas_image(tile_size: int) -> Image:
 			img.blit_rect(col, Rect2i(0, 0, tile_size, tile_size),
 					Vector2i((ATLAS_WALL_TOP + i) * tile_size, 0))
 		_used_ai_atlas = true
+		_grade_atlas(img, tile_size)
 		return img
 
 	# ---- 回退：AI 贴图缺失时用程序化逐像素绘制 ----
@@ -469,7 +621,44 @@ static func _build_atlas_image(tile_size: int) -> Image:
 		for v in range(WALL_VARIANTS):
 			_paint_wall(img, (ATLAS_WALL_TOP + b * WALL_VARIANTS + v) * tile_size, tile_size,
 					v, rng, true, w["wall"])
+	_grade_atlas(img, tile_size)
 	return img
+
+
+## 色调分级：对整张图集做「对比曲线 + 去饱和 + 群系色调」。
+## 顺序有讲究：
+##   1. 对比曲线把灰糊的中间调拉开，同时整体压暗一点（给群系提亮留空间）；
+##   2. 去饱和让画面沉稳——AI 贴图本身的饱和度偏高，直接叠色调会"艳"；
+##   3. 最后才乘 BIOME_TINT，四个区域的明暗和色温才真正分开。
+static func _grade_atlas(img: Image, ts: int) -> void:
+	var contrast: float = float(Config.get_value("map.grade.contrast", 1.12))
+	var bright: float = float(Config.get_value("map.grade.brightness", -0.03))
+	var sat: float = float(Config.get_value("map.grade.saturation", 0.82))
+	for y in range(ts):
+		for x in range(img.get_width()):
+			var tint: Color = BIOME_TINT[_biome_of_column(x / ts)]
+			var c := img.get_pixel(x, y)
+			var r: float = clampf((c.r - 0.5) * contrast + 0.5 + bright, 0.0, 1.0)
+			var g: float = clampf((c.g - 0.5) * contrast + 0.5 + bright, 0.0, 1.0)
+			var b: float = clampf((c.b - 0.5) * contrast + 0.5 + bright, 0.0, 1.0)
+			# 去饱和：向亮度灰靠拢（Rec.601 权重）
+			var luma: float = r * 0.299 + g * 0.587 + b * 0.114
+			r = luma + (r - luma) * sat
+			g = luma + (g - luma) * sat
+			b = luma + (b - luma) * sat
+			img.set_pixel(x, y, Color(
+					clampf(r * tint.r, 0.0, 1.0),
+					clampf(g * tint.g, 0.0, 1.0),
+					clampf(b * tint.b, 0.0, 1.0)))
+
+
+## 图集列号 → 所属群系（地板 / 墙体 / 墙顶三段列区各自换算）
+static func _biome_of_column(col: int) -> int:
+	if col < ATLAS_WALL:
+		return clampi(col / FLOOR_VARIANTS, 0, BIOME_COUNT - 1)
+	if col < ATLAS_WALL_TOP:
+		return clampi((col - ATLAS_WALL) / WALL_VARIANTS, 0, BIOME_COUNT - 1)
+	return clampi((col - ATLAS_WALL_TOP) / WALL_VARIANTS, 0, BIOME_COUNT - 1)
 
 
 static func _build_tileset(tile_size: int) -> TileSet:
@@ -496,6 +685,41 @@ static func _build_tileset(tile_size: int) -> TileSet:
 			Vector2(tile_size, tile_size), Vector2(0, tile_size),
 		]))
 	return ts
+
+
+## ------------------------------------------------------------
+## 宏观明暗层：把"均匀铺满整张图"变成"有明暗节奏"
+##
+## TileMapLayer 做不到单格 modulate，所以改为生成一张与地图等格数的低分辨率
+## 灰度图（每格 1 像素），用 BLEND_MODE_MUL 放大混合。线性过滤把低频噪声
+## 平滑成大片渐变，既省显存又天然没有硬边。
+## ------------------------------------------------------------
+static func _make_macro_light_image(width: int, height: int, noise: FastNoiseLite,
+		strength: float) -> Image:
+	var img := Image.create(width, height, false, Image.FORMAT_RGB8)
+	for y in range(height):
+		for x in range(width):
+			var v: float = (noise.get_noise_2d(x, y) + 1.0) * 0.5
+			# 映射到 [1-strength, 1]：乘法混合下 1 = 不变，越暗越压暗。
+			# 刻意不做提亮（>1 会被 RGB8 截断），改用"整体压暗"留出对比空间。
+			var k: float = clampf(1.0 - strength * (1.0 - v), 0.0, 1.0)
+			img.set_pixel(x, y, Color(k, k, k))
+	return img
+
+
+## 把宏观明暗图包成乘法混合的 Sprite2D（scale = 瓦片边长 → 正好铺满整张地图）
+static func _wrap_macro_light(img: Image, tile_size: int) -> Sprite2D:
+	var s := Sprite2D.new()
+	s.name = "MacroLight"
+	s.texture = ImageTexture.create_from_image(img)
+	s.centered = false
+	s.scale = Vector2(tile_size, tile_size)
+	s.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	s.z_index = 0
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_MUL
+	s.material = mat
+	return s
 
 
 ## 地板（回退绘制）：基色 + 颗粒噪点，各变体再加一种地表特征
@@ -613,6 +837,32 @@ static func _decor_texture(kind: int) -> Texture2D:
 	_decor_img[kind] = img
 	var tex := ImageTexture.create_from_image(img)
 	_decor_tex[kind] = tex
+	return tex
+
+
+## 装饰物落地投影：按物件宽度生成椭圆软影（中心最暗、边缘羽化）。
+## 改动很小，但能去掉"贴纸浮在地面上"的观感。
+static func _decor_shadow_texture(kind: int, base_width: float) -> Texture2D:
+	if _decor_shadow_tex.has(kind):
+		return _decor_shadow_tex[kind]
+	var w: int = maxi(6, int(base_width * 0.80))
+	var h: int = maxi(3, int(float(w) * 0.34))
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var cx := float(w - 1) * 0.5
+	var cy := float(h - 1) * 0.5
+	var rx := maxf(float(w) * 0.5, 1.0)
+	var ry := maxf(float(h) * 0.5, 1.0)
+	for y in range(h):
+		for x in range(w):
+			var dx := (float(x) - cx) / rx
+			var dy := (float(y) - cy) / ry
+			var d := dx * dx + dy * dy
+			if d > 1.0:
+				continue
+			img.set_pixel(x, y, Color(0.0, 0.0, 0.0, (1.0 - d) * 0.42))
+	var tex := ImageTexture.create_from_image(img)
+	_decor_shadow_tex[kind] = tex
 	return tex
 
 
