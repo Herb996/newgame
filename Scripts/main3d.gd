@@ -362,12 +362,28 @@ func _pixel_to_world(p: Vector2) -> Vector3:
 # 玩家 3D 视觉
 # ------------------------------------------------------------
 
-## 优先用序列帧公告板；素材/接口缺失时回退到胶囊占位，保证 3D 场景永远能跑起来。
+## 优先用 HD 序列帧公告板（config sprites_hd + player3d.sprite_set="hd"）；
+## HD 缺失 → 退回 SD 像素帧；素材/接口全缺失才回退到胶囊占位，保证 3D 场景永远能跑。
 func _build_player_visual() -> void:
+	var p3d: Dictionary = Config.get_value("player3d", {})
+	if String(p3d.get("sprite_set", "sd")) == "hd":
+		var hd: Dictionary = Config.get_value("sprites_hd", {})
+		if not hd.is_empty():
+			var vh: Node3D = PLAYER_VISUAL.new()
+			vh.name = "PlayerVisual"
+			world.add_child(vh)
+			if vh.build(hd, p3d):
+				_visual = vh
+				_visual_is_sprite = true
+				return
+			vh.queue_free()
+			print("[Main3D] sprites_hd 一帧都没装载成功，回退 SD 像素帧")
+		else:
+			print("[Main3D] sprites_hd 未配置，回退 SD 像素帧")
 	var v: Node3D = PLAYER_VISUAL.new()
 	v.name = "PlayerVisual"
 	world.add_child(v)
-	if v.build(Config.get_value("sprites", {}), Config.get_value("player3d", {})):
+	if v.build(Config.get_value("sprites", {}), p3d):
 		_visual = v
 		_visual_is_sprite = true
 		return

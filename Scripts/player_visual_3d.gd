@@ -25,7 +25,10 @@ extends Node3D
 ## ============================================================
 
 const ANIMATOR := preload("res://Scripts/player_animator.gd")
-const CANVAS := 48.0          # 帧画布边长（与 tools/gen_player_frames.py 一致）
+
+## 帧画布边长**不再写死**：HD 序列帧是 512，旧像素帧是 48，必须按首张贴图实测，
+## 否则 pixel_size 会差一个数量级（画布错 → 角色要么米粒要么顶天）。
+var _canvas := 48.0
 
 var _anim: AnimatedSprite3D = null
 var _shadow: MeshInstance3D = null
@@ -54,6 +57,13 @@ func build(sprites_cfg: Dictionary, cfg: Dictionary) -> bool:
 						list.append(tex)
 			if list.is_empty():
 				continue          # 该状态没帧 → set_state 会自动回退到 idle
+			# 画布 = 首个装载帧的宽度（正方形画布约定）。后续帧若宽度不一致要立刻吼出来：
+			# pixel_size 是全局的，48px 像素帧混进 512px HD 集会让角色放大/缩小一个数量级。
+			if loaded == 0:
+				_canvas = maxf(float(list[0].get_width()), 1.0)
+			elif not is_equal_approx(float(list[0].get_width()), _canvas):
+				push_warning("[PlayerVisual3D] 帧分辨率混用：%s 是 %dpx，画布按 %dpx 算，" +
+						"该方向角色比例会错" % [String(anim), list[0].get_width(), int(_canvas)])
 			var key := StringName("%s_%s" % [String(anim), String(dir)])
 			sf.add_animation(key)
 			sf.set_animation_speed(key, float(fps_map[anim]))
@@ -65,22 +75,33 @@ func build(sprites_cfg: Dictionary, cfg: Dictionary) -> bool:
 		push_warning("[PlayerVisual3D] 没有找到任何玩家帧序列，将回退到占位视觉")
 		return false
 
-	var pixel_size := float(cfg.get("world_height", 1.6)) / CANVAS   # 一整张画布的世界高度
+	var pixel_size := float(cfg.get("world_height", 1.6)) / _canvas   # 一整张画布的世界高度
 	_brightness = float(cfg.get("brightness", 1.06))
 
 	_anim = AnimatedSprite3D.new()
 	_anim.name = "Frames"
 	_anim.sprite_frames = sf
 	_anim.billboard = BaseMaterial3D.BILLBOARD_ENABLED      # 永远朝向相机 = HD-2D 的关键
-	_anim.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	_anim.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+	# 过滤器按素材分辨率选（config player3d.filter）：
+	#   nearest — 旧 48px 像素帧，放大要保持硬边；
+	#   linear  — HD 帧（512px 缩到屏上 ~95px 是 5:1 缩小），NEAREST 会闪成噪点，
+	#             必须 LINEAR_WITH_MIPMAPS（导入需开 mipmap，见 tools/enable_hd_mipmap.py）。
+	match String(cfg.get("filter", "nearest")):
+		"linear":
+			_anim.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		_:
+			_anim.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	# HD 手绘帧有软边（半透明 anti-alias 像素），DISCARD 会把软边切成锯齿硬边 → 默认关闭；
+	# 旧像素帧要保持利落轮廓可配 alpha_cut=true。
+	_anim.alpha_cut = (SpriteBase3D.ALPHA_CUT_DISCARD
+			if bool(cfg.get("alpha_cut", false)) else SpriteBase3D.ALPHA_CUT_DISABLED)
 	_anim.shaded = bool(cfg.get("shaded", false))
 	_anim.pixel_size = pixel_size
 	_anim.centered = true
 	# 锚点=画布底边中心，与 2D 版 SPRITE_OFFSET_Y=-24 同约定。
 	# 注意：offset 的"像素→世界"换算与直觉不完全一致，anchor_offset_px 做成配置项，
-	# 配合 debug_marker（在地面点放一颗品红小球）用来实测校准。
-	_anim.offset = Vector2(0.0, float(cfg.get("anchor_offset_px", CANVAS * 0.5)))
+	# 配合 debug_marker（在地面点放一颗品红小球）用来实测校准。默认=半画布。
+	_anim.offset = Vector2(0.0, float(cfg.get("anchor_offset_px", _canvas * 0.5)))
 	_anim.modulate = Color(_brightness, _brightness, _brightness, 1.0)
 	_anim.play(_first_key(sf))
 	add_child(_anim)

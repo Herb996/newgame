@@ -325,7 +325,10 @@
     "ring_radius": 0.34,
     "ring_color": "#4fc3f7",
     "anchor_offset_px": 24,
-    "debug_marker": false
+    "debug_marker": false,
+    "sprite_set": "hd",
+    "filter": "linear",
+    "alpha_cut": false
   },
   "camera": {
     "pan_speed": 400,
@@ -709,5 +712,59 @@
   "nav": {
     "snap_radius_cells": 3,
     "unstick_radius_cells": 4
+  },
+  "sprites_hd": {
+    "fps": {
+      "idle": 3,
+      "walk": 10,
+      "attack": 14,
+      "dodge": 14,
+      "hit": 16,
+      "dead": 8
+    },
+    "idle": {
+      "down": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_down_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_down_01.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_up_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_up_01.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_left_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_left_01.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_right_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_right_01.png"
+      ]
+    },
+    "walk": {
+      "down": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_down_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_down_01.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_down_02.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_down_03.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_up_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_up_01.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_up_02.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_up_03.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_left_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_left_01.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_left_02.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_left_03.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_right_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_right_01.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_right_02.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_right_03.png"
+      ]
+    }
   }
 }
