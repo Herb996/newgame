@@ -1,7 +1,7 @@
 class_name PlayerSkillState
 extends State
 ## ============================================================
-## PlayerSkillState — 技能释放状态（06_FIGHT.md 蓝图 2.3）
+## PlayerSkillState — 技能释放状态（02_TECH_BUILD.md 第二部分 技能系统）
 ##
 ## 生命周期三段式（全部时长读 config 的 combat.skills.<id>）：
 ##   WINDUP   前摇：定身、朝鼠标；可被 HitStun 打断（打断不退资源）

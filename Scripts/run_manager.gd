@@ -7,7 +7,7 @@ extends Node
 ## 结局只有三种：
 ##   extracted  撤离成功：本局资源入库（Meta.bank_loot）
 ##   died       玩家死亡：全部丢失
-##   timeout    时间耗尽：全部丢失（与死亡同罚，见 01_GAME_DESIGN.md）
+##   timeout    时间耗尽：全部丢失（与死亡同罚，见 00_GAME_DESIGN.md）
 ##
 ## 后续系统（地图生成/搜刮/敌人/撤离点）都通过本脚本的
 ## 公共接口接入，不要自己另开倒计时或另写结算逻辑。

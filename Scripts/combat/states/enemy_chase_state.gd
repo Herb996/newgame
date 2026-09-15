@@ -1,7 +1,7 @@
 class_name EnemyChaseState
 extends State
 ## ============================================================
-## EnemyChaseState — 敌人追击（06_FIGHT.md 蓝图 Phase 3 基础 AI）
+## EnemyChaseState — 敌人追击（02_TECH_BUILD.md 第二部分 Phase 3 基础 AI）
 ## 行为：持续朝玩家寻路移动（速度 × chase_speed_multiplier，比玩家慢一点）；
 ##       脱离视野满 lose_sight_seconds 判定跟丢 → 回 Patrol。
 ## 路径按 repath_interval_seconds 节流重算（100 个敌人的 CPU 保护）。

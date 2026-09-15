@@ -1,0 +1,501 @@
+<!doctype html>
+<html>
+
+  <head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="/assets/css/normalize.css">
+  	<link rel="stylesheet" href="/assets/css/thumbnails.css">
+  	<link rel="stylesheet" href="/assets/css/style_new.css">
+    <link rel="shortcut icon" href="/assets/images/site/favicon.ico" />
+    <link rel="stylesheet" href="/assets/css/lightbox.min.css">
+    <link rel="stylesheet" href="/assets/css/lity.min.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script src="https://kit.fontawesome.com/f9d695b775.js" crossorigin="anonymous"></script>
+<script type="text/javascript">
+
+
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-99971748-1', 'auto');
+  ga('send', 'pageview');
+
+
+
+ $(document).ready(function(){
+ $('#search').keyup(function(){
+
+  // Search text
+  var text = $(this).val();
+
+  // Hide all content class element
+  $('.pack').hide();
+
+  // Search
+  $('.pack:contains("'+text+'")').closest('.pack').show();
+
+ //If the search bar gets emptied, show all packs
+ if(text == ''){
+       $('.pack').show();
+ }
+ });
+});
+
+//Case insensitive
+$.expr[":"].contains = $.expr.createPseudo(function(arg) {
+  return function( elem ) {
+   return $(elem).text().toUpperCase().indexOf(arg.toUpperCase()) >= 0;
+  };
+});
+
+function responsiveHamburger() {
+	var x = document.getElementById("navButtons-id");
+	if (x.className === "navButtons") {
+		x.className += " responsive";
+	} else {
+		x.className = "navButtons";
+	}
+}
+
+function setValue(tag) {
+
+			var text = document.getElementById("search").value;
+		$('.pack').hide();
+		$('.pack:contains("'+tag+'")').closest('.pack').show();
+
+	}
+
+	function showAll(){
+		 $('.pack').show();
+	}
+	function openTutorial(number) {
+		console.log(number);
+  var x = document.getElementById(number);
+  if (x.style.display === "none") {
+    x.style.display = "block";
+  } else {
+    x.style.display = "none";
+  }
+}
+
+	</script>
+
+  <div class="container">
+
+      <header>
+			<button class="btnHamb hamburger" id="hamburger" onclick="responsiveHamburger()"> <img src="/assets/svg/bars.svg" class="iconBig"></button>
+     	<div class="nav-menu">
+						<div class="navButtons" id ="navButtons-id">
+               <button class="btn btnNavBar"   onClick="window.location='/index.html'"; ><div class="navicon"><img src="/assets/svg/rook.svg" class="iconBig"></div> Assets</button>
+							 <button class="btn btnNavBar"   onClick="window.location='/tutorials.html'"; ><div class="navicon"><img src="/assets/svg/book.svg" class="iconBig"></div> Tutorials</button>
+							 <button class="btn btnNavBar"   onClick="window.location='/faq.html'"; ><div class="navicon"><img src="/assets/svg/question.svg" class="iconBig"></div> FAQ</button>
+						  <button class="btn btnNavBar"  onclick=" window.open('https://www.artstation.com/quaternius','_blank')"; ><div class="navicon"><img src="/assets/svg/frog.svg" class="iconBig"></div> Portfolio</button>
+
+
+							 </div>
+<div class="socials">
+	<button class="btn licensebtn"  style="padding-top:7px;"onClick="window.location='/license.html'"; ><div class="navicon"><img src="/assets/svg/book.svg" class="iconBig"></div> License</button>
+<button class="btn twitter"  onclick=" window.open('https://discord.gg/hXB2qTTEnJ','_blank')" ><div class="joinDiscord"><img src="/assets/svg/discord.svg" class="iconBig"> Join on Discord</div></button>
+
+				<button class="btn twitter"  onclick=" window.open('https://twitter.com/quaternius','_blank')" ><img src="/assets/svg/square-twitter.svg" class="iconBig"></button>
+
+
+			</div></div>
+
+            <a href="/index.html"><img src ="/assets/images/site/logo.png" class ="logo"/></a>
+</header>
+
+      <div id="patreonBanner">
+    <nav class="menu-text-center">
+        <a href="https://www.patreon.com/quaternius" style="text-decoration:none" target=blank><img src="/assets/images/site/PatreonBanner.png" /></a>
+
+    </nav>
+</div>
+
+
+  </div>
+</head>
+
+<body>
+  <div class="container">
+
+
+
+      <title>Quaternius • Universal Base Characters</title>
+
+<head>
+	<meta name="title" content="Quaternius • Universal Base Characters"/>
+	<meta name="description" content="The <b>Universal Base Characters Kit</b> includes 6 <b>game-ready</b> character models in Superhero, Regular, and Teen proportions (male and female). Designed with optimized, animation-friendly topology and rigged with a Humanoid rig allowing easy retargeting in any engine. Mix and match 20 hairstyles, the Source version includes shaders to customize eye and skin colors allowing hundreds of unique combinations."/>
+
+	<meta name="twitter:image" content="/assets/images/fullres/universalbasecharacters.jpg">
+	<meta name="twitter:card" value="summary_large_image">
+	<meta property="twitter:title" content="Quaternius • Universal Base Characters"/>
+	<meta property="twitter:description" content="The <b>Universal Base Characters Kit</b> includes 6 <b>game-ready</b> character models in Superhero, Regular, and Teen proportions (male and female). Designed with optimized, animation-friendly topology and rigged with a Humanoid rig allowing easy retargeting in any engine. Mix and match 20 hairstyles, the Source version includes shaders to customize eye and skin colors allowing hundreds of unique combinations."/>
+	<meta property="twitter:site" content="@Quaternius">
+
+
+
+	<meta property="og:type" content="website">
+	<meta property="og:url" content="https://quaternius.com/packs/universalbasecharacters.html">
+	<meta property="og:site-name" content="Quaternius">
+	<meta property="og:title" content="Quaternius • Universal Base Characters">
+	<meta property="og:description" content="The <b>Universal Base Characters Kit</b> includes 6 <b>game-ready</b> character models in Superhero, Regular, and Teen proportions (male and female). Designed with optimized, animation-friendly topology and rigged with a Humanoid rig allowing easy retargeting in any engine. Mix and match 20 hairstyles, the Source version includes shaders to customize eye and skin colors allowing hundreds of unique combinations.">
+	<meta property="og:image" content="/assets/images/fullres/universalbasecharacters.jpg">
+	<meta property="og:image:url" content="/assets/images/fullres/universalbasecharacters.jpg">
+</head>
+
+<div class="row">
+	<div class="column wide">
+
+
+<div class="youtubePlayerContainer">
+		<iframe src="https://www.youtube.com/embed/eLgsBM46pvQ?si=9IBqX3JlBk695nPh" class="youtubePlayer" frameborder="0" allowfullscreen></iframe>
+		</div>
+		
+<div class="titleContainer">
+
+	</div>
+
+</div>
+
+	<div class="column small info">
+
+
+		<a href="/assets/images/fullres/universalbasecharacters.jpg" data-lightbox="image-1"><img class="smallPackImg" src="/assets/images/fullres/universalbasecharacters.jpg" alt="" /></a>
+
+
+
+		<div class="infoitem"><img src="/assets/svg/models.svg" class="iconBig"> Models<div class="text-right">26</div></div>
+		<div class="infoitem"><img src="/assets/svg/animated.svg" class="iconBig"> Animated<div class="text-right">
+			
+		<img src="/assets/svg/xmark-solid.svg" class="icon">
+			</div></div>
+
+
+		<div class="infoitem"><img src="/assets/svg/textured.svg" class="iconBig"> Textured<div class="text-right">	
+	  <img src="/assets/svg/check-solid.svg" class="icon">
+			</div></div>
+
+
+
+
+
+		<div class="infoitem"><img src="/assets/svg/formats.svg" class="iconBig"> Formats
+			<div class="text-right tags">FBX</div>
+			
+			<div class="text-right tags">OBJ</div>
+			
+			
+			<div class="text-right tags">Blend</div>
+			
+			<div class="text-right tags">glTF</div>
+			
+
+
+		</div>
+		
+		<div class="infoitem"><img src="/assets/svg/license.svg" class="iconBig"> License<div class="text-right"><a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" >CC0</a></div></div>
+		
+
+
+
+
+
+<div id="inline" class="lity-hide">
+<div id="donationTitle"> Consider supporting me !</div>
+
+<div id="donationText"> These assets are possible thanks to lovely people like you that support me through Patreon. </div>
+<div id="donationText" style="font-weight:600;padding-bottom:20px;"> Help me continue making free stuff for everyone.</div>
+
+<div class="cardContainer">
+
+	<div class="donationCardSingle donationCard">
+
+		<img src="/assets/svg/patreon.svg" class="iconCard"><div class="cardTitle">Support on Patreon</div>
+			<div class="cardText">
+				Get <b>1.5x your pledge</b> each month in credits to claim <b>Source</b> keys (30% off compared to just buying individually) <br><br> <b>All the packs in one file</b> and exclusive models made <b>just for you</b>.
+				</div>
+
+				<button class="cardButton" onclick="window.open('https://www.patreon.com/quaternius','_blank');">Support <img src="/assets/svg/arrow-right-grey.svg" class="icon"></button>
+
+	</div>
+
+	<div class="donationCardSingle donationCard">
+			<img src="/assets/svg/discord.svg" class="iconCard"><div class="cardTitle">Join the Discord</div>
+				<div class="cardText">
+					Don't miss out on new releases!<br> Receive notifications and sneak peeks of <b>upcoming packs</b>.
+				</div>
+
+					<button class="cardButton" onclick="window.open('https://discord.gg/hXB2qTTEnJ','_blank');">Join <img src="/assets/svg/arrow-right-grey.svg" class="icon"></button>
+	</div>
+
+
+	<div class="donationCardSingle donationCard">
+		<img src="/assets/svg/download-solid.svg" class="iconCard"><div class="cardTitle">Just give me the Download</div>
+
+
+	 <button class="cardButton" id="buy_button" data-lity-close>Download here  <img src="/assets/svg/download-dark.svg" class="iconBig"></button>
+	 <button class="cardButton" onclick="window.open('https://quaternius.itch.io/universal-base-characters','_blank');">Download on Itch.io  <img src="/assets/svg/download-dark.svg" class="iconBig"></button>
+
+
+
+</div>
+
+
+
+</div>
+</div>
+
+<div id="patron-discount" class="lity-hide">
+    <div id="donationTitle">Get <b>Source</b> kits cheaper by becoming a <b>Patron!</b></div>
+
+		<div id="donationText" style="padding-bottom:20px;">
+			<b>Every month, get more than you give</b> — 1.5x of your pledge in <b>Claim Credits</b> you can use to get any of the <b>Source</b> kits.
+		</div>
+
+		<div class="cardContainer">
+		    <!-- Silver Tier -->
+		    <div class="donationCardSingle donationCard" style="background-color:#89b5be;">
+		        <img src="/assets/svg/patreon.svg" class="iconCard">
+		        <div class="cardTitle">Silver Tier</div>
+		        <div class="cardText">
+		            Your <b>$10</b> pledge gets you <b>ONE Source key</b> every month.<br><i>(worth $15)</i>
+		        </div>
+		        <div class="cardFooterText">
+		            <i>Claim the kits through the #pack-claim channel on <b>Discord</b></i>
+		        </div>
+		        <button class="cardButton" onclick="window.open('https://www.patreon.com/quaternius','_blank');">Join <img src="/assets/svg/arrow-right-grey.svg" class="icon"></button>
+		    </div>
+		    <!-- Gold Tier -->
+		    <div class="donationCardSingle donationCard" style="background-color: #faca2a;">
+		        <img src="/assets/svg/patreon.svg" class="iconCard">
+		        <div class="cardTitle">Gold Tier</div>
+		        <div class="cardText">
+		            Your <b>$20</b> pledge gets you <b>TWO Source keys</b> every month.<br><i>(worth $30)</i>
+		        </div>
+		        <div class="cardFooterText">
+		            <i>Claim the kits through the #pack-claim channel on <b>Discord</b></i>
+		        </div>
+		        <button class="cardButton" onclick="window.open('https://www.patreon.com/quaternius','_blank');">Join <img src="/assets/svg/arrow-right-grey.svg" class="icon"></button>
+		    </div>
+		    <!-- Diamond Tier -->
+		    <div class="donationCardSingle donationCard" style="background-color:#50478a;">
+		        <img src="/assets/svg/patreon.svg" class="iconCard">
+		        <div class="cardTitle">Diamond Tier</div>
+		        <div class="cardText">
+		            Your <b>$50</b> pledge gets you <b>FIVE Source keys</b> every month.<br><i>(worth $75)</i>
+		        </div>
+		        <div class="cardFooterText">
+		            <i>Claim the kits through the #pack-claim channel on <b>Discord</b></i>
+		        </div>
+		        <button class="cardButton" onclick="window.open('https://www.patreon.com/quaternius','_blank');">Join <img src="/assets/svg/arrow-right-grey.svg" class="icon"></button>
+		    </div>
+		</div>
+</div>
+
+
+</div>
+</div>
+<div class="row description">
+
+		<div class="column wide">
+
+			<div style="background-color: #ee3a23; color:#f4edec;" class="indPackTitle">Universal Base Characters  <div class="titleDate" style=" color:#f4edec;"><i class="far fa-calendar-check fa-fw" ></i>August 2025</div></div>
+
+						<div class="indPackText">
+							The <b>Universal Base Characters Kit</b> includes 6 <b>game-ready</b> character models in Superhero, Regular, and Teen proportions (male and female). Designed with optimized, animation-friendly topology and rigged with a Humanoid rig allowing easy retargeting in any engine. Mix and match 20 hairstyles, the Source version includes shaders to customize eye and skin colors allowing hundreds of unique combinations.
+
+							
+						</div>
+						
+							<div class="indPackTitle" style="background-color: #ee3a23">Features</div>
+
+							<div class="featuresText">
+								
+									  
+									   <div class="singleFeature"><img src="/assets/svg/dot.svg" class="icon"> 6 Base models.</div>
+									  
+									   <div class="singleFeature"><img src="/assets/svg/dot.svg" class="icon"> <b>Game-ready topology</b> optimized for animation.</div>
+									  
+									   <div class="singleFeature"><img src="/assets/svg/dot.svg" class="icon"> <b>20 Hairstyles</b> to mix and match, along with customizable eye and skin color, allowing you to create a <b>wide variety</b> of unique characters.</div>
+									  
+									   <div class="singleFeature"><img src="/assets/svg/dot.svg" class="icon"> <b>Humanoid Rig</b> compatible with retargeting in any engine, <b>Source</b> version includes the rigged .blend files.</div>
+									  
+									   <div class="singleFeature"><img src="/assets/svg/dot.svg" class="icon"> Average 13k triangle count</div>
+									  
+									   <div class="singleFeature"><img src="/assets/svg/dot.svg" class="icon"> Compatible with the <b>Universal Animation Library</b>.</div>
+									  
+									   <div class="singleFeature"><img src="/assets/svg/dot.svg" class="icon"> <b>Free to use in personal, educational and commercial projects.</b> (CC0 License)</div>
+									  
+									   <div class="singleFeature"><img src="/assets/svg/dot.svg" class="icon"> <b>.FBX and .glTF formats</b>, compatible with all engines.</div>
+									  
+								
+
+						</div>
+
+
+
+
+	<div class="prices">
+		<div class="pricesImageContainer" style="background-color: #ed8e83; border-radius: 10px 10px 0 0;">
+			<img src ="/assets/images/site/Standard_Banner.png"  class ="pricesImg"/>
+			<img src ="/assets/images/site/Standard_Price.png" class ="pricesPriceImg"/>
+		</div>
+
+		<div class="pricesText">
+		• 60-70% of my pack is <b>completely free</b>.<br>
+		• Available in <b>OBJ, FBX and glTF formats</b>.<br>
+		• Free to use in <b>personal, educational and commercial</b> projects.
+
+	</div>
+
+
+
+
+			<div class="pricesImageContainer" style="background-color: #7b78bf">
+				<img src ="/assets/images/site/Source_Banner.png"  class ="pricesImg"/>
+
+			
+				<img src ="/assets/images/site/Source20_Price.png" class ="pricesPriceImg"/>
+			
+
+		</div>
+		<div class="pricesText">
+			• <b>All 100% of the models</b> and <b>implemented</b>, including
+			custom shaders, into <b>Unreal Engine, Unity</b> (URP) and <b>Godot</b>.<br>
+			• <b>.BLEND</b> source files with all the models. <br>
+
+<div class="engineText">
+			<b>Versions used for the engine projects</b> (anything above these work)<br>
+				Godot_v4.3 | Unity (URP) 2022.3.4 | Unreal Engine 5.4.4
+			</div>
+</div>
+
+
+		</div>
+
+
+
+
+
+
+
+
+
+
+
+	</div>
+	<div class="column support">
+
+		
+			<a href="/assets/images/fullres/universalbasecharacters/standard.jpg" data-lightbox="image-1"><img class="sourceprostandard" src="/assets/images/fullres/universalbasecharacters/standard.jpg" alt="" /></a>
+			<a href="/assets/images/fullres/universalbasecharacters/pro.jpg" data-lightbox="image-1"><img class="sourceprostandard" src="/assets/images/fullres/universalbasecharacters/pro.jpg" alt="" /></a>
+			<a href="/assets/images/fullres/universalbasecharacters/source.jpg" data-lightbox="image-1"><img class="sourceprostandard" src="/assets/images/fullres/universalbasecharacters/source.jpg" alt="" /></a>
+
+		
+
+
+		<div class="madePossible">Made possible by Patreon supporters </div>
+
+
+		<a href="#inline" class="btnDownload download" id="button1" data-lity>Download  <img src="/assets/svg/download.svg" class="iconBig"></a>
+
+		<!-- Displayed when hasDonated is true -->
+		
+		<button class="btnDownload download" id="button3">Download <img src="/assets/svg/download.svg" class="iconBig"></button>
+		<button class="btnDownload download" id="button2" onclick="window.open('https://quaternius.itch.io/universal-base-characters','_blank');">Download on Itch.io <img src="/assets/svg/download.svg" class="iconBig"></button>
+		
+
+
+
+
+<a href="#patron-discount" class="btnDownload download patreonbutton" data-lity>Member Rewards <img src="/assets/svg/download.svg" class="iconBig"></a>
+
+
+
+
+</div>
+
+
+
+
+</div>
+<script src="/assets/js/lightbox.min.js"></script>
+<script src="/assets/js/lity.min.js"></script>
+<script>
+
+	document.addEventListener('DOMContentLoaded', function() {
+       // Check if the checkbox state is stored in localStorage
+       const isChecked = localStorage.getItem('checkboxState') === 'true';
+
+       // Set the checkbox state based on the localStorage value
+       //document.getElementById('myCheckbox').checked = isChecked;
+
+
+
+       // Show/hide the buttons based on the checkbox state
+       const button1 = document.getElementById('button1');
+       const button2 = document.getElementById('button2');
+
+       button1.style.display = isChecked ? 'none' : 'inline-block';
+       button2.style.display = isChecked ? 'inline-block' : 'none';
+			 button3.style.display = isChecked ? 'inline-block' : 'none';
+       // Add a change event listener to the checkbox
+      // document.getElementById('myCheckbox').addEventListener('change', function() {
+         // Update the localStorage with the checkbox state
+        // localStorage.setItem('checkboxState', this.checked);
+
+         // Show/hide the message based on the checkbox state
+
+         // Show/hide the buttons based on the checkbox state
+        // button1.style.display = this.checked ? 'block' : 'none';
+        // button2.style.display = this.checked ? 'none' : 'block';
+       //});
+     });
+
+  document.getElementById('download').addEventListener('click', function() {
+    this.blur();
+  });
+
+	lightbox.option({
+	      'fadeDuration': 0,
+	      'resizeDuration': 0
+	    })
+
+
+
+
+</script>
+
+<script type="text/javascript" src="https://static.itch.io/api.js"></script>
+<script type="text/javascript">
+  function attachButtons() {
+    const buttons = ["buy_button", "button3"];
+
+    buttons.forEach(buttonId => {
+      const button = document.getElementById(buttonId);
+      if (button) {
+        Itch.attachBuyButton(button, {
+          user: "quaternius",
+          game: "universal-base-characters"
+        });
+      }
+    });
+  }
+
+  // Run the function after the page loads
+  document.addEventListener("DOMContentLoaded", attachButtons);
+</script>
+
+      <footer>
+        <a class="float-left" target="_blank" href="https://www.twitter.com/quaternius">	&copy; Quaternius</a>
+        <a class="float-right" >laulhet@gmail.com</a>
+	</footer>
+
+  </div>
+</body>
+</html>

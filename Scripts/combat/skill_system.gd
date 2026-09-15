@@ -1,7 +1,7 @@
 class_name SkillSystem
 extends Node
 ## ============================================================
-## SkillSystem — 技能系统（06_FIGHT.md 蓝图 2.3）
+## SkillSystem — 技能系统（02_TECH_BUILD.md 第二部分 技能系统）
 ##
 ## 职责：从 config 装配技能表 → 冷却 tick → 资源校验（体力）→ 交给 FSM 释放。
 ## 事件驱动：释放成功/被拒都发信号，UI 与音效只监听信号，不轮询。

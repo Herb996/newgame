@@ -1,7 +1,7 @@
 class_name EnemyInvestigateState
 extends State
 ## ============================================================
-## EnemyInvestigateState — 敌人调查（06_FIGHT.md 第 8 节 噪音机制）
+## EnemyInvestigateState — 敌人调查（02_TECH_BUILD.md 第二部分 噪音机制）
 ##
 ## 触发：noise_alertness 达到 investigate 阈值（默认 50），由 patrol / chase 状态切过来。
 ## 行为：前往最后听到的声源位置（repath_to_noise_source）；到达后原地搜索。

@@ -29,7 +29,7 @@ func setup(id: String, b_name: String, hint_text: String) -> void:
 	$Body.color = _color_for(id)
 
 
-## 建筑配色（03_ART_STYLE_GUIDE.md 色调）
+## 建筑配色（01_ART_GUIDE.md 色调）
 func _color_for(id: String) -> Color:
 	match id:
 		"warehouse": return Color(0.55, 0.33, 0.16)   # 铜锈

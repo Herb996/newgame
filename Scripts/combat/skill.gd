@@ -1,7 +1,7 @@
 class_name Skill
 extends RefCounted
 ## ============================================================
-## Skill — 单个技能的数据 + 运行时状态（06_FIGHT.md 蓝图 2.3 技能系统）
+## Skill — 单个技能的数据 + 运行时状态（02_TECH_BUILD.md 第二部分 技能系统）
 ##
 ## 生命周期（由 PlayerSkillState 驱动）：
 ##   PreCast 前摇 → Cast 生效 → PostCast 后摇 → Cooldown 冷却

@@ -47,7 +47,7 @@ func physics_update(delta: float) -> void:
 				_phase = Phase.ACTIVE
 				_timer = 0.0
 				actor.begin_attack_hit()
-				# 挥击发声：惊动附近敌人（06_FIGHT.md 第 8 节 噪音机制）
+				# 挥击发声：惊动附近敌人（02_TECH_BUILD.md 第二部分 噪音机制）
 				NoiseSystem.emit(actor.global_position,
 						float(Config.get_value("noise.sources.attack", 55.0)))
 		Phase.ACTIVE:

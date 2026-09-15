@@ -1,7 +1,7 @@
 class_name State
 extends RefCounted
 ## ============================================================
-## State — 状态基类（对应 06_FIGHT.md 蓝图的 IState 接口）
+## State — 状态基类（对应 02_TECH_BUILD.md 蓝图的 IState 接口）
 ##
 ## 生命周期：enter(msg) → physics_update(delta) → exit()
 ##

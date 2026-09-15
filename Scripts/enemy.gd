@@ -33,7 +33,7 @@ var max_hp := 0
 var _contact_cooldown := 0.0
 var _last_known := Vector2.ZERO   # 玩家最后被看到的位置（跟丢后走这里）
 
-# --- 噪音警觉度（06_FIGHT.md 第 8 节 噪音机制）---
+# --- 噪音警觉度（02_TECH_BUILD.md 第二部分 噪音机制）---
 var noise_alertness := 0.0
 var _noise_source := Vector2.ZERO   # 最后听到的声源位置（调查状态前往这里）
 
@@ -161,7 +161,7 @@ func remember_player_position() -> void:
 
 
 # ------------------------------------------------------------
-# 噪音感知（06_FIGHT.md 第 8 节）
+# 噪音感知（02_TECH_BUILD.md 第二部分 噪音机制）
 # ------------------------------------------------------------
 
 ## 听到一次噪音：累加警觉度并记录声源（阈值驱动状态切换在 enemy_*_state 里）
