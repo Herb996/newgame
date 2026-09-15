@@ -86,6 +86,12 @@ func _current_anim() -> int:
 		_: return PlayerAnimator.Anim.IDLE
 
 
+## 表现层公共查询：当前动画状态。
+## 3D 视觉层（PlayerVisual3D）靠它复用同一套 FSM 判定，避免两套状态逻辑各说各话。
+func current_anim() -> int:
+	return _current_anim()
+
+
 func _ready() -> void:
 	add_to_group("player")
 	z_index = 1

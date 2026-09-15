@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bproberegistry01"]
+
+[ext_resource type="Script" path="res://Dev/probe_registry.gd" id="1_probe"]
+
+[node name="ProbeRegistry" type="Node"]
+script = ExtResource("1_probe")

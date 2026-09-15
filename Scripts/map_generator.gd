@@ -4,8 +4,9 @@ extends RefCounted
 ## MapGenerator — 程序化地图生成
 ##
 ## 三层渲染（2026-09-15 改版，见 03_ART_STYLE_GUIDE「地形美术」）：
-##   1. 地形层 TileMapLayer：生物群系分区（4 种）+ 每群系地板 12 变体 /
-##      墙 6 变体 + 墙顶受光变体；变体按格子哈希确定性挑选。
+##   1. 地形层 TileMapLayer：生物群系分区（数量由 config.json 的 map.biomes 决定，
+##      当前含草地共 5 种）+ 每群系地板 12 变体 / 墙 6 变体 + 墙顶受光变体；
+##      变体按格子哈希确定性挑选。
 ##   2. 装饰层 Node2D：树 / 石头（并入 walls，参与寻路与连通性）、
 ##      地面残骸（纯视觉，不阻挡）。贴地投影 + 2.5D 高度。
 ##      每株装饰随机缩放/翻转/亮度 + 按群系色调，消除克隆感。
@@ -13,8 +14,8 @@ extends RefCounted
 ##
 ## 【贴图来源】地形瓦片与装饰物贴图均为 AI 生成的 2.5D 手绘质感素材，
 ## 由 tools/ 下的 Python 脚本离线处理好放进 Assets/Art/：
-##   Assets/Art/Tiles/atlas_floor.png  4 群系 x 12 变体（横向一行）
-##   Assets/Art/Tiles/atlas_wall.png   4 群系 x  6 变体
+##   Assets/Art/Tiles/atlas_floor.png  N 群系 x 12 变体（横向一行，N=biome_count）
+##   Assets/Art/Tiles/atlas_wall.png   N 群系 x  6 变体
 ##   Assets/Art/Sprites/Decor/{tree,rock,debris}_00.png  透明通道精灵
 ## 贴图缺失时自动回退到程序化逐像素绘制（_paint_floor/_paint_wall/
 ## _make_tree/...），保证工程在任何状态下都能跑起来。
@@ -42,43 +43,82 @@ extends RefCounted
 # 每个 biome 各自拥有一组地板/墙/墙顶变体，使不同区域观感明显区分
 const FLOOR_VARIANTS := 12       # 单 biome 地板变体数
 const WALL_VARIANTS := 6         # 单 biome 墙体变体数
-const BIOME_COUNT := 4           # 生物群系数量
 const ATLAS_FLOOR := 0           # 地板起始列
-const ATLAS_WALL := FLOOR_VARIANTS * BIOME_COUNT        # 墙体起始列 (48)
-const ATLAS_WALL_TOP := ATLAS_WALL + WALL_VARIANTS * BIOME_COUNT  # 墙顶受光起始列 (72)
-const ATLAS_COLS := ATLAS_WALL_TOP + WALL_VARIANTS * BIOME_COUNT  # 图集总列数 (96)
 const ATLAS_SEED := 20260915     # 回退图集固定种子：外观稳定，不随地图变化
+
+# 生物群系数量与图集列布局：不再写死常量，改为运行时从 config.json 的
+# map.biomes 读取（biome_count()），因此【加一种地形只改配置、GDScript 零改码】。
+# 草地、雪原等后续地形都只需在 config 里加一项，再跑一次 build_tile_atlas.py。
+# 图集列数学仍按 BIOME_COUNT 推导，所以自动跟着变。
+# 注意：3D 迁移时 RGBA 四通道权重贴图最多只能 4 群系，N 群系需改用
+# 「主导群系 id + 次主导 id/权重」数据贴图（见 memory 记录），现在定数据格式就按 N 设计。
+static func biome_count() -> int:
+	return _biomes().size()
+
+static func atlas_wall_start() -> int:      # 墙体起始列 = 全群系地板列之后
+	return FLOOR_VARIANTS * biome_count()
+
+static func atlas_wall_top_start() -> int:  # 墙顶受光起始列 = 全群系墙体列之后
+	return atlas_wall_start() + WALL_VARIANTS * biome_count()
+
+static func atlas_cols() -> int:            # 图集总列数
+	return atlas_wall_top_start() + WALL_VARIANTS * biome_count()
 
 # ---------- 外部 AI 贴图资源 ----------
 const ATLAS_FLOOR_PATH := "res://Assets/Art/Tiles/atlas_floor.png"
 const ATLAS_WALL_PATH := "res://Assets/Art/Tiles/atlas_wall.png"
 const SRC_TILE := 16             # AI 图集原始瓦片边长（缩放前）
 
-# 生物群系定义（名称 / 墙体基色 / 装饰相对权重）
-# 顺序：0 林地 / 1 荒原 / 2 锈泽 / 3 石原
-const BIOMES := [
+# ---------- 生物群系定义（数据驱动，唯一真相源 = Data/config.json 的 map.biomes）----------
+# 每项：{id, name, floor:[r,g,b], wall:[r,g,b], tint:[r,g,b], tree, rock, debris,
+#        floor_src?（AI 无缝地面纹理文件名，缺省则程序化生成）}
+# 历史默认值（config 缺失时回落，确保工程随时可跑）：
+const _DEFAULT_BIOMES := [
 	{"name": "林地", "floor": Color(0.20, 0.28, 0.15), "wall": Color(0.42, 0.30, 0.17),
-	 "tree": 0.16, "rock": 0.03, "debris": 0.02},
+	 "tint": Color(0.93, 0.98, 0.95), "tree": 0.16, "rock": 0.03, "debris": 0.02},
 	{"name": "荒原", "floor": Color(0.33, 0.27, 0.18), "wall": Color(0.52, 0.37, 0.20),
-	 "tree": 0.025, "rock": 0.040, "debris": 0.07},
+	 "tint": Color(1.06, 1.02, 0.96), "tree": 0.025, "rock": 0.040, "debris": 0.07},
 	{"name": "锈泽", "floor": Color(0.17, 0.22, 0.16), "wall": Color(0.46, 0.31, 0.18),
-	 "tree": 0.05, "rock": 0.02, "debris": 0.06},
+	 "tint": Color(0.86, 0.92, 0.93), "tree": 0.05, "rock": 0.02, "debris": 0.06},
 	{"name": "石原", "floor": Color(0.31, 0.31, 0.33), "wall": Color(0.50, 0.42, 0.35),
-	 "tree": 0.03, "rock": 0.14, "debris": 0.02},
+	 "tint": Color(0.85, 0.83, 0.82), "tree": 0.03, "rock": 0.14, "debris": 0.02},
 ]
 
-# 每群系的整体色调（乘到图集上）：把四个区域的明暗拉开，形成大尺度明暗构图。
-# 这是"整张图糊成一片泥巴色"的解药——原先四区明度太接近，眼睛找不到层次。
-#
-# 调参铁律：**主要动明度，色相只做轻微偏移**。第一版把荒原写成 (1.18, 1.07, 0.82)
-# 这种强暖偏移，叠加原本就偏棕黄的贴图后整片变成饱和橙黄，比"脏"更糟。低饱和的
-# 层次感来自明暗差，不来自色相差。
-const BIOME_TINT := [
-	Color(0.93, 0.98, 0.95),   # 林地：微冷绿、偏暗（树冠遮光）
-	Color(1.06, 1.02, 0.96),   # 荒原：最亮、一点点暖（不能再多加暖，会变橙）
-	Color(0.86, 0.92, 0.93),   # 锈泽：最暗、微青（水汽弥漫）
-	Color(0.85, 0.83, 0.82),   # 石原：压暗偏暖（原贴图是亮冷灰石板，不压就会像冰面）
-]
+static var _biome_cache: Array = []
+
+static func _biomes() -> Array:
+	if _biome_cache.is_empty():
+		_biome_cache = _load_biomes()
+	return _biome_cache
+
+static func _load_biomes() -> Array:
+	var raw = Config.get_value("map.biomes", null)
+	if raw == null or not (raw is Array) or raw.is_empty():
+		return _DEFAULT_BIOMES.duplicate(true)
+	var out: Array = []
+	for entry in raw:
+		var b: Dictionary = {}
+		b["name"] = str(entry.get("name", "?"))
+		b["floor"] = _arr_to_color(entry.get("floor", [0.30, 0.30, 0.30]))
+		b["wall"] = _arr_to_color(entry.get("wall", [0.40, 0.35, 0.30]))
+		b["tint"] = _arr_to_color(entry.get("tint", [1.0, 1.0, 1.0]))
+		b["tree"] = float(entry.get("tree", 0.05))
+		b["rock"] = float(entry.get("rock", 0.03))
+		b["debris"] = float(entry.get("debris", 0.02))
+		out.append(b)
+	return out
+
+static func _biome_at(i: int) -> Dictionary:
+	var bs: Array = _biomes()
+	return bs[clampi(i, 0, bs.size() - 1)]
+
+static func _biome_tint(i: int) -> Color:
+	return _biome_at(i)["tint"]
+
+static func _arr_to_color(a) -> Color:
+	if a is Array and a.size() >= 3:
+		return Color(float(a[0]), float(a[1]), float(a[2]))
+	return Color(0.30, 0.30, 0.30)
 
 # ---------- 调色板（回退绘制用；03_ART_STYLE_GUIDE：暗棕/铜锈/蒸汽白）----------
 const C_RUST := Color(0.66, 0.45, 0.24)    # 铜锈高光
@@ -105,6 +145,13 @@ const DECOR_BASE_TINT := {
 	DECOR_ROCK: Color(0.80, 0.80, 0.82),
 	DECOR_DEBRIS: Color(0.95, 0.95, 0.95),
 }
+
+# ---------- 矿脉（地图资源节点，非装饰、不阻挡通行）----------
+const VEIN_IRON := 0
+const VEIN_GOLD := 1
+const VEIN_OIL := 2
+const VEIN_RES := {"iron": VEIN_IRON, "gold": VEIN_GOLD, "oil": VEIN_OIL}
+static var _ore_tex: Dictionary = {}     # 矿脉贴图缓存（按 kind）
 
 static var _decor_tex: Dictionary = {}     # 装饰物贴图缓存（只加载/生成一次）
 static var _decor_img: Dictionary = {}     # 装饰物原始 Image（预览合成用）
@@ -197,7 +244,7 @@ static func generate() -> Dictionary:
 			var bf: float = clampf(0.5 + biome_noise.get_noise_2d(x, y) * biome_spread,
 					0.0, 1.0)
 			bf += edge_noise.get_noise_2d(x, y) * border_jitter
-			var b: int = clampi(int(bf * BIOME_COUNT), 0, BIOME_COUNT - 1)
+			var b: int = clampi(int(bf * biome_count()), 0, biome_count() - 1)
 			trow.append(is_wall)
 			wrow.append(is_wall)
 			drow.append(DECOR_NONE)
@@ -232,7 +279,7 @@ static func generate() -> Dictionary:
 			if veg.get_noise_2d(x, y) <= veg_threshold:
 				continue
 			var b: int = biome[y][x]
-			var w: Dictionary = BIOMES[b]
+			var w: Dictionary = _biome_at(b)
 			var in_patch: bool = cluster.get_noise_2d(x, y) > cluster_threshold
 			var p_tree: float = w["tree"] * density * (3.0 if in_patch else 1.0)
 			var p_rock: float = w["rock"] * density
@@ -257,6 +304,44 @@ static func generate() -> Dictionary:
 			if kind == DECOR_TREE or kind == DECOR_ROCK:
 				walls[y][x] = true   # 实体障碍，参与寻路与连通性
 
+	# ---- 矿脉生成：从 config.map.veins 读取 iron/gold/oil 的限定群系 + 数量 + 距出生点 ----
+	# 矿脉落在地板格（非墙、非装饰、限定群系内、距出生点足够远），不阻挡通行；
+	# 视觉上是一块矿石露头精灵，数据上登记进 ResourceRegistry 供采集。
+	var veins: Array = []
+	var vein_occ: Dictionary = {}   # "x,y" -> true，避免矿脉互相重叠
+	var vein_cfg: Dictionary = Config.get_value("map.veins", {})
+	for res_key in vein_cfg.keys():
+		var vc: Dictionary = vein_cfg[res_key]
+		# JSON 数值默认解析为 float，而 biome 数组存的是 int；两侧都转 int，
+		# 避免 [3.0].has(3) 在本版 GDScript 下返回 false 导致矿脉一个都生成不出来。
+		var v_allowed_raw: Array = vc.get("biomes", [])
+		var v_allowed: Array = []
+		for bid in v_allowed_raw:
+			v_allowed.append(int(bid))
+		var v_wanted: int = int(vc.get("count", 0))
+		var v_min_dist: int = int(vc.get("min_distance_from_spawn_cells", 8))
+		for _n in range(v_wanted):
+			var tries := 0
+			while tries < 250:
+				tries += 1
+				var gx: int = rng.randi_range(2, width - 3)
+				var gy: int = rng.randi_range(2, height - 3)
+				if terrain[gy][gx]:
+					continue                       # 不能压在墙上
+				if decor[gy][gx] != DECOR_NONE:
+					continue                       # 不与树/石重叠
+				if not v_allowed.has(int(biome[gy][gx])):
+					continue                       # 只在限定群系出矿
+				var d: int = abs(gx - center.x) + abs(gy - center.y)
+				if d < v_min_dist:
+					continue                       # 离出生点太近
+				var vkey: String = "%d,%d" % [gx, gy]
+				if vein_occ.has(vkey):
+					continue
+				vein_occ[vkey] = true
+				veins.append({"res_id": str(res_key), "gx": gx, "gy": gy})
+				break
+
 	# ---- 第二遍：渲染瓦片（按生物群系取对应变体列；墙顶受光判断依赖最终 terrain）----
 	for y in range(height):
 		for x in range(width):
@@ -265,7 +350,7 @@ static func generate() -> Dictionary:
 				# 上方是地板 → 这格是墙的顶面，加受光边（2.5D 俯视的体积感）
 				var is_top: bool = (y > 0 and not terrain[y - 1][x])
 				var v := _variant(x, y, WALL_VARIANTS)
-				var col: int = (ATLAS_WALL_TOP if is_top else ATLAS_WALL) + b * WALL_VARIANTS + v
+				var col: int = (atlas_wall_top_start() if is_top else atlas_wall_start()) + b * WALL_VARIANTS + v
 				layer.set_cell(Vector2i(x, y), 0, Vector2i(col, 0))
 			else:
 				var v := _variant(x, y, FLOOR_VARIANTS)
@@ -309,7 +394,7 @@ static func generate() -> Dictionary:
 			s.scale = sc
 			s.flip_h = rng.randf() < 0.5
 			# 群系整体色调（与地表同源：地面亮的地方物件也亮）× 类别基准亮度 × 随机抖动
-			var tint: Color = BIOME_TINT[biome[y][x]]
+			var tint: Color = _biome_tint(biome[y][x])
 			var base_tint: Color = DECOR_BASE_TINT.get(k, Color(1, 1, 1))
 			s.modulate = Color(tint.r * base_tint.r, tint.g * base_tint.g,
 					tint.b * base_tint.b) * rng.randf_range(0.90, 1.08)
@@ -318,6 +403,42 @@ static func generate() -> Dictionary:
 			s.z_index = 0   # 与地形同层：玩家（z=1）始终在前景，未探索区被雾盖住
 			decor_root.add_child(s)
 			counts[k] = int(counts[k]) + 1
+
+	# 矿脉精灵：矿石露头，非阻挡。按类型配色，采完由 ResourceRegistry 隐藏
+	for vd in veins:
+		var kind: int = int(VEIN_RES.get(vd["res_id"], -1))
+		if kind < 0:
+			continue
+		var otex := _ore_texture(kind)
+		if otex == null:
+			continue
+		var opos := Vector2(vd["gx"] * tile_size + tile_size * 0.5,
+							vd["gy"] * tile_size + tile_size * 0.5)
+		var osc := Vector2(rng.randf_range(0.85, 1.1), rng.randf_range(0.85, 1.1))
+		# 落地软影（比树小）
+		if shadow_on:
+			var osh := _decor_shadow_texture(DECOR_ROCK, otex.get_width() * 0.7)
+			if osh != null:
+				var sh := Sprite2D.new()
+				sh.texture = osh
+				sh.centered = false
+				sh.scale = osc
+				sh.position = opos
+				sh.offset = Vector2(-osh.get_width() * 0.5, 0.0)
+				sh.z_index = 0
+				decor_root.add_child(sh)
+		var os := Sprite2D.new()
+		os.texture = otex
+		os.centered = false
+		os.scale = osc
+		os.flip_h = rng.randf() < 0.5
+		var bt: Color = _biome_tint(biome[vd["gy"]][vd["gx"]])
+		os.modulate = bt * rng.randf_range(0.92, 1.06)
+		os.position = opos
+		os.offset = Vector2(-otex.get_width() * 0.5, 2.0 - otex.get_height())
+		os.z_index = 0
+		decor_root.add_child(os)
+		vd["sprite"] = os
 
 	var root := Node2D.new()
 	root.name = "MapRoot"
@@ -347,8 +468,8 @@ static func generate() -> Dictionary:
 
 	# 群系分布统计（调试用）
 	var biome_counts := []
-	biome_counts.resize(BIOME_COUNT)
-	for i in range(BIOME_COUNT):
+	biome_counts.resize(biome_count())
+	for i in range(biome_count()):
 		biome_counts[i] = 0
 	for y in range(height):
 		for x in range(width):
@@ -360,15 +481,15 @@ static func generate() -> Dictionary:
 	print("[Map] 装饰物：树 %d / 石头 %d / 残骸 %d，出生点 %s"
 		% [int(counts[DECOR_TREE]), int(counts[DECOR_ROCK]), int(counts[DECOR_DEBRIS]), spawn])
 	var biome_str := ""
-	for i in range(BIOME_COUNT):
+	for i in range(biome_count()):
 		if i > 0:
 			biome_str += ", "
-		biome_str += "%s %d" % [BIOMES[i]["name"], int(biome_counts[i])]
+		biome_str += "%s %d" % [_biome_at(i)["name"], int(biome_counts[i])]
 	print("[Map] 群系分布：" + biome_str)
 	return {"node": root, "spawn": spawn, "spawn_cell": center,
 			"walls": walls, "reachable": reachable, "reachable_ratio": ratio,
 			"terrain": terrain, "decor": decor, "biome": biome, "tile_size": tile_size,
-			"macro": macro_img}
+			"veins": veins, "macro": macro_img}
 
 
 ## ------------------------------------------------------------
@@ -403,7 +524,7 @@ static func build_preview(result: Dictionary, cells: int) -> Image:
 				if terrain[gy][gx]:
 					var is_top: bool = (gy > 0 and not terrain[gy - 1][gx])
 					var v := _variant(gx, gy, WALL_VARIANTS)
-					col = (ATLAS_WALL_TOP if is_top else ATLAS_WALL) + b * WALL_VARIANTS + v
+					col = (atlas_wall_top_start() if is_top else atlas_wall_start()) + b * WALL_VARIANTS + v
 				else:
 					var v := _variant(gx, gy, FLOOR_VARIANTS)
 					col = b * FLOOR_VARIANTS + v
@@ -420,7 +541,7 @@ static func build_preview(result: Dictionary, cells: int) -> Image:
 			if k == DECOR_NONE or not _decor_img.has(k):
 				continue
 			var src: Image = _decor_img[k]
-			var tint: Color = BIOME_TINT[biome[gy][gx]]
+			var tint: Color = _biome_tint(biome[gy][gx])
 			var base_tint: Color = DECOR_BASE_TINT.get(k, Color(1, 1, 1))
 			var use_tint := Color(tint.r * base_tint.r, tint.g * base_tint.g,
 					tint.b * base_tint.b)
@@ -586,23 +707,23 @@ static func _paint_top_light(col: Image, ts: int) -> void:
 
 ## 组装完整图集：地板列 + 墙体列 + 墙顶列
 static func _build_atlas_image(tile_size: int) -> Image:
-	var img := Image.create(tile_size * ATLAS_COLS, tile_size, false, Image.FORMAT_RGB8)
+	var img := Image.create(tile_size * atlas_cols(), tile_size, false, Image.FORMAT_RGB8)
 	img.fill(Color(0, 0, 0))
 
 	var floor_img := _load_image(ATLAS_FLOOR_PATH)
 	var wall_img := _load_image(ATLAS_WALL_PATH)
 	if floor_img != null and wall_img != null:
-		var fi := _resize_atlas(floor_img, tile_size, BIOME_COUNT * FLOOR_VARIANTS)
-		var wi := _resize_atlas(wall_img, tile_size, BIOME_COUNT * WALL_VARIANTS)
+		var fi := _resize_atlas(floor_img, tile_size, biome_count() * FLOOR_VARIANTS)
+		var wi := _resize_atlas(wall_img, tile_size, biome_count() * WALL_VARIANTS)
 		img.blit_rect(fi, Rect2i(0, 0, fi.get_width(), fi.get_height()), Vector2i(0, 0))
 		img.blit_rect(wi, Rect2i(0, 0, wi.get_width(), wi.get_height()),
-				Vector2i(ATLAS_WALL * tile_size, 0))
+				Vector2i(atlas_wall_start() * tile_size, 0))
 		# 墙顶受光变体由墙体列派生（省一份素材，且光照关系天然一致）
-		for i in range(BIOME_COUNT * WALL_VARIANTS):
+		for i in range(biome_count() * WALL_VARIANTS):
 			var col := wi.get_region(Rect2i(i * tile_size, 0, tile_size, tile_size))
 			_paint_top_light(col, tile_size)
 			img.blit_rect(col, Rect2i(0, 0, tile_size, tile_size),
-					Vector2i((ATLAS_WALL_TOP + i) * tile_size, 0))
+					Vector2i((atlas_wall_top_start() + i) * tile_size, 0))
 		_used_ai_atlas = true
 		_grade_atlas(img, tile_size)
 		return img
@@ -611,15 +732,15 @@ static func _build_atlas_image(tile_size: int) -> Image:
 	_used_ai_atlas = false
 	var rng := RandomNumberGenerator.new()
 	rng.seed = ATLAS_SEED  # 固定种子：图集外观稳定
-	for b in range(BIOME_COUNT):
-		var w: Dictionary = BIOMES[b]
+	for b in range(biome_count()):
+		var w: Dictionary = _biome_at(b)
 		for v in range(FLOOR_VARIANTS):
 			_paint_floor(img, (b * FLOOR_VARIANTS + v) * tile_size, tile_size, v, rng, w["floor"])
 		for v in range(WALL_VARIANTS):
-			_paint_wall(img, (ATLAS_WALL + b * WALL_VARIANTS + v) * tile_size, tile_size,
+			_paint_wall(img, (atlas_wall_start() + b * WALL_VARIANTS + v) * tile_size, tile_size,
 					v, rng, false, w["wall"])
 		for v in range(WALL_VARIANTS):
-			_paint_wall(img, (ATLAS_WALL_TOP + b * WALL_VARIANTS + v) * tile_size, tile_size,
+			_paint_wall(img, (atlas_wall_top_start() + b * WALL_VARIANTS + v) * tile_size, tile_size,
 					v, rng, true, w["wall"])
 	_grade_atlas(img, tile_size)
 	return img
@@ -636,7 +757,7 @@ static func _grade_atlas(img: Image, ts: int) -> void:
 	var sat: float = float(Config.get_value("map.grade.saturation", 0.82))
 	for y in range(ts):
 		for x in range(img.get_width()):
-			var tint: Color = BIOME_TINT[_biome_of_column(x / ts)]
+			var tint: Color = _biome_tint(_biome_of_column(x / ts))
 			var c := img.get_pixel(x, y)
 			var r: float = clampf((c.r - 0.5) * contrast + 0.5 + bright, 0.0, 1.0)
 			var g: float = clampf((c.g - 0.5) * contrast + 0.5 + bright, 0.0, 1.0)
@@ -654,11 +775,11 @@ static func _grade_atlas(img: Image, ts: int) -> void:
 
 ## 图集列号 → 所属群系（地板 / 墙体 / 墙顶三段列区各自换算）
 static func _biome_of_column(col: int) -> int:
-	if col < ATLAS_WALL:
-		return clampi(col / FLOOR_VARIANTS, 0, BIOME_COUNT - 1)
-	if col < ATLAS_WALL_TOP:
-		return clampi((col - ATLAS_WALL) / WALL_VARIANTS, 0, BIOME_COUNT - 1)
-	return clampi((col - ATLAS_WALL_TOP) / WALL_VARIANTS, 0, BIOME_COUNT - 1)
+	if col < atlas_wall_start():
+		return clampi(col / FLOOR_VARIANTS, 0, biome_count() - 1)
+	if col < atlas_wall_top_start():
+		return clampi((col - atlas_wall_start()) / WALL_VARIANTS, 0, biome_count() - 1)
+	return clampi((col - atlas_wall_top_start()) / WALL_VARIANTS, 0, biome_count() - 1)
 
 
 static func _build_tileset(tile_size: int) -> TileSet:
@@ -671,13 +792,13 @@ static func _build_tileset(tile_size: int) -> TileSet:
 	ts.tile_size = Vector2i(tile_size, tile_size)
 	var src := TileSetAtlasSource.new()
 	src.texture = ImageTexture.create_from_image(img)
-	for i in range(ATLAS_COLS):
+	for i in range(atlas_cols()):
 		src.create_tile(Vector2i(i, 0))
 	ts.add_source(src, 0)
 
 	# 碰撞：所有墙变体（普通 + 墙顶，含各群系）都是整格实心
 	ts.add_physics_layer()
-	for i in range(ATLAS_WALL, ATLAS_COLS):
+	for i in range(atlas_wall_start(), atlas_cols()):
 		var d := src.get_tile_data(Vector2i(i, 0), 0)
 		d.set_collision_polygons_count(0, 1)
 		d.set_collision_polygon_points(0, 0, PackedVector2Array([
@@ -925,6 +1046,45 @@ static func _make_debris() -> Image:
 			_set_rgba(img, x, y, C_RUST * rng.randf_range(0.6, 0.85))
 	_ellipse(img, 12, 5, 3, 3, Color(0.42, 0.38, 0.30), rng, 0.14)
 	_ellipse(img, 12, 5, 1, 1, Color(0.16, 0.14, 0.12), rng, 0.0)
+	return img
+
+
+## 矿脉露头贴图（缓存）：铁灰 / 金黄 / 油黑，含落地投影与高光矿点
+static func _ore_texture(kind: int) -> Texture2D:
+	if _ore_tex.has(kind):
+		return _ore_tex[kind]
+	var img := _make_ore(kind)
+	var tex := ImageTexture.create_from_image(img)
+	_ore_tex[kind] = tex
+	return tex
+
+
+static func _make_ore(kind: int) -> Image:
+	var w := 18
+	var h := 14
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1000 + kind
+	# 落地投影
+	_ellipse(img, w / 2, h - 2, 7, 2, Color(0, 0, 0, 0.30), rng, 0.0)
+	var base: Color
+	match kind:
+		VEIN_IRON: base = Color(0.55, 0.52, 0.50)
+		VEIN_GOLD: base = Color(0.85, 0.65, 0.20)
+		VEIN_OIL:  base = Color(0.10, 0.09, 0.11)
+	# 主体团块
+	_ellipse(img, w / 2, h / 2 - 1, 7, 4, base, rng, 0.08)
+	# 高光矿点
+	for _i in range(4):
+		var px := rng.randi_range(4, w - 5)
+		var py := rng.randi_range(3, h - 4)
+		var hl: Color
+		match kind:
+			VEIN_IRON: hl = Color(0.78, 0.75, 0.72)
+			VEIN_GOLD: hl = Color(1.0, 0.86, 0.38)
+			VEIN_OIL:  hl = Color(0.32, 0.30, 0.36)
+		_set_rgba(img, px, py, hl)
 	return img
 
 

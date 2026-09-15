@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Dev/probe_map3d_full.gd" id="1_probe3dfull"]
+
+[node name="ProbeMap3DFull" type="Node3D"]
+script = ExtResource("1_probe3dfull")

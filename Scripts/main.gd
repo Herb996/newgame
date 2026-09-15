@@ -118,8 +118,16 @@ func _enter_run() -> void:
 	get_tree().paused = false
 	_clear_game_root()
 	run.start_run()
+	# 固定种子只给开发/对比用（0 = 每局随机）。**只 seed 一次**，
+	# 这样可达率不达标重试时仍会换图，不会卡在同一张（与 main3d.gd 同规则）。
+	var forced_seed := int(Config.get_value("map.force_seed", 0))
+	if forced_seed != 0:
+		seed(forced_seed)
 	var result := _generate_valid_map()
 	game_root.add_child(result.node)
+	# 采集资源注册表：把地图上的树/石登记进 ResourceRegistry（供采集/小地图/HUD 查询）
+	ResourceRegistry.build_from_map(result)
+	print("[ResourceRegistry] 已登记资源节点：", ResourceRegistry.count_by_type())
 	var player: CharacterBody2D = PLAYER_SCENE.instantiate()
 	player.position = result.spawn
 	player.setup_navigation(result.walls, int(Config.get_value("map.tile_size", 16)))

@@ -17,20 +17,39 @@ const WALL_TEX := "wall_plate.png"
 
 const MODEL_DIR := "res://Assets/Art/Models/"
 const MODEL_FILES := ["tree.glb", "rock.glb", "debris.glb"]
-const MODEL_HEIGHT := [3.4, 1.2, 0.45]      # 各类装饰物目标世界高度（格 = 1 单位）
+const MODEL_HEIGHT := [6.5, 1.7, 0.6]       # 各类装饰物目标世界高度（格 = 1 单位）
 const MODEL_CAP := 130                      # 单类装饰物在小样中的上限（控制显存）
 
 const OUT := "D:/SteamPunkExtraction/Dev/probe_map3d.png"
-const UV_PER_TEX := 6.0                     # 一张纹理覆盖多少格
-const WALL_H := 1.35
+## 仅探针用：MapGenerator 内部用 randi() 播种，每局地图都不同。
+## A/B 对比必须同源，所以这里固定全局种子（只影响探针进程，不动游戏本体）。
+const MAP_SEED := 20260915
+const UV_PER_TEX := 4.5                     # 一张纹理覆盖多少格
+const WALL_H := 1.8
 const HALF_VIEW_X := 44                     # 取景窗口半宽（格）
 const HALF_VIEW_Y := 30
+
+# 装饰物材质亮度校正（AI 原画明度不一，石头偏白会抢眼）
+const DECOR_TINT := [
+	Color(1.00, 1.00, 1.00),   # 树
+	Color(0.70, 0.70, 0.72),   # 石头
+	Color(0.88, 0.88, 0.88),   # 残骸
+]
+
+# 群系亮度校正：AI 原画本身明度差太多（石原接近白色），直接铺上去会曝白
+const BIOME_TUNE := [
+	Color(1.06, 1.06, 1.02),   # 林地：原画偏暗，略提
+	Color(0.96, 0.93, 0.88),   # 荒原：原画偏橙，稍收
+	Color(0.94, 1.00, 0.97),   # 锈泽
+	Color(0.44, 0.45, 0.47),   # 石原：原画是灰白石板，必须大幅压暗
+]
 
 
 func _ready() -> void:
 	var t0 := Time.get_ticks_msec()
 
 	# ---- 1. 复用现有地图生成（拿到四张数据表，丢弃它建的 2D 节点树）----
+	seed(MAP_SEED)   # 固定种子：A/B 对比必须同源
 	var map: Dictionary = MapGenerator.generate()
 	if map.get("node") != null:
 		map["node"].free()
@@ -49,14 +68,17 @@ func _ready() -> void:
 	var y1: int = mini(h, center.y + HALF_VIEW_Y)
 
 	# ---- 2. 地板：按群系合并网格 ----
-	for b in range(MapGenerator.BIOME_COUNT):
+	for b in range(MapGenerator.biome_count()):
 		var mesh := _build_ground_mesh(terrain, biome, b, x0, x1, y0, y1)
 		if mesh == null:
+			continue
+		var gmat := _ground_material(b)
+		if gmat == null:
 			continue
 		var mi := MeshInstance3D.new()
 		mi.name = "Ground_B%d" % b
 		mi.mesh = mesh
-		mi.material_override = _ground_material(b)
+		mi.material_override = gmat
 		add_child(mi)
 
 	# ---- 3. 墙体：MultiMesh 立方体 ----
@@ -78,17 +100,69 @@ func _ready() -> void:
 # 地板
 # ------------------------------------------------------------
 
-func _ground_material(b: int) -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	var path := TEX_DIR + GROUND_TEX[b]
-	if ResourceLoader.exists(path):
-		mat.albedo_texture = load(path)
-	# 世界尺寸的 UV（顶点 UV 直接写格坐标），靠 uv1_scale 控制平铺密度
-	mat.uv1_scale = Vector3(1.0 / UV_PER_TEX, 1.0 / UV_PER_TEX, 1.0)
-	mat.roughness = 1.0
-	mat.metallic = 0.0
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	return mat
+## 地面着色器：三个不同尺度/偏移的采样叠加，破坏"单一平铺周期"。
+## 单一尺度平铺时，纹理里的特征会以固定间隔规律重复，远看就是一张壁纸；
+## 叠上 0.38 倍与 0.11 倍的错位采样后，重复周期被彻底打散。
+## 只写 ALBEDO/ROUGHNESS，光照、阴影仍由引擎的 PBR 管线负责。
+const GROUND_SHADER := """
+shader_type spatial;
+render_mode cull_disabled;
+
+uniform sampler2D tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float base_scale = 0.22;
+uniform vec3 tint : source_color = vec3(1.0);
+uniform float rough = 1.0;
+
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 345.45));
+	p += dot(p, p + 34.345);
+	return fract(p.x * p.y);
+}
+
+float vnoise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = hash21(i);
+	float b = hash21(i + vec2(1.0, 0.0));
+	float c = hash21(i + vec2(0.0, 1.0));
+	float d = hash21(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+void fragment() {
+	vec2 uv = UV * base_scale;
+	vec3 c = texture(tex, uv).rgb * 0.52;
+	c += texture(tex, uv * 0.383 + vec2(0.317, 0.173)).rgb * 0.30;
+	c += texture(tex, uv * 0.113 + vec2(0.631, 0.419)).rgb * 0.18;
+	// 大尺度明暗：高通滤波把宏观结构压掉了，这里用低频噪声补回来，
+	// 让地面有"大片区"的明暗节奏，而不是一张均匀的毯子（噪声不平铺，不会重复）
+	float macro = vnoise(UV * 0.032) * 0.65 + vnoise(UV * 0.085) * 0.35;
+	ALBEDO = c * tint * (0.78 + 0.44 * macro);
+	ROUGHNESS = rough;
+	METALLIC = 0.0;
+}
+"""
+
+
+func _ground_material(b: int) -> Material:
+	var path: String = TEX_DIR + String(GROUND_TEX[b])
+	if not ResourceLoader.exists(path):
+		return null
+	# 手动生成 mipmap：贴图在屏幕上被大幅缩小，没 mipmap 就是一片高频噪点
+	var img := Image.load_from_file(path)
+	if img == null:
+		return null
+	img.generate_mipmaps()
+	var m := ShaderMaterial.new()
+	var sh := Shader.new()
+	sh.code = GROUND_SHADER
+	m.shader = sh
+	m.set_shader_parameter("tex", ImageTexture.create_from_image(img))
+	m.set_shader_parameter("base_scale", 1.0 / UV_PER_TEX)
+	m.set_shader_parameter("tint", BIOME_TUNE[b])
+	m.set_shader_parameter("rough", 1.0)
+	return m
 
 
 func _build_ground_mesh(terrain: Array, biome: Array, b: int,
@@ -148,12 +222,17 @@ func _wall_multimesh(terrain: Array, x0: int, x1: int, y0: int, y1: int) -> void
 	var box := BoxMesh.new()
 	box.size = Vector3(1.0, WALL_H, 1.0)
 	var mat := StandardMaterial3D.new()
-	var wp := TEX_DIR + WALL_TEX
+	var wp: String = TEX_DIR + WALL_TEX
 	if ResourceLoader.exists(wp):
-		mat.albedo_texture = load(wp)
-	mat.uv1_scale = Vector3(1.0, WALL_H, 1.0)
-	mat.roughness = 0.75
-	mat.metallic = 0.35
+		var wimg := Image.load_from_file(wp)
+		if wimg != null:
+			wimg.generate_mipmaps()
+			mat.albedo_texture = ImageTexture.create_from_image(wimg)
+	mat.uv1_scale = Vector3(1.5, 1.5, 1.5)
+	mat.albedo_color = Color(0.88, 0.88, 0.90)
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	mat.roughness = 0.80
+	mat.metallic = 0.25
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -195,6 +274,14 @@ func _decor_multimesh(decor: Array, biome: Array, x0: int, x1: int, y0: int, y1:
 				if mat == null and mesh != null and mesh.get_surface_count() > 0:
 					mat = mesh.surface_get_material(0)
 			inst.free()
+		# 模型材质做一份亮度校正副本（原画明度不统一）
+		if mat != null:
+			var m2: Material = mat.duplicate()
+			if m2 is StandardMaterial3D:
+				var sm := m2 as StandardMaterial3D
+				sm.albedo_color = sm.albedo_color * DECOR_TINT[k_i]
+				sm.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+			mat = m2
 		if mesh == null:
 			# 模型缺失时的替代几何体，保证探针仍可出图
 			var fb := BoxMesh.new()
@@ -202,7 +289,7 @@ func _decor_multimesh(decor: Array, biome: Array, x0: int, x1: int, y0: int, y1:
 			mesh = fb
 		# GLB 常自带轴修正等节点变换，AABB 必须跟着变换后再用，否则会躺倒或尺寸失控
 		var aabb := _transformed_aabb(mesh.get_aabb(), node_xf)
-		var base_s := MODEL_HEIGHT[k_i] / maxf(aabb.size.y, 0.001)
+		var base_s: float = float(MODEL_HEIGHT[k_i]) / maxf(aabb.size.y, 0.001)
 		var pts: Array[Vector3] = []
 		for y in range(y0, y1):
 			for x in range(x0, x1):
@@ -311,11 +398,13 @@ func _setup_camera(target: Vector3) -> void:
 func _setup_light() -> void:
 	var l := DirectionalLight3D.new()
 	l.name = "Sun"
-	l.rotation_degrees = Vector3(-42.0, 38.0, 0.0)
-	l.light_energy = 1.35
+	# 光源方位取相机方位 +90°：物体侧面受光、阴影横投，既看得见又不背光成剪影
+	l.rotation_degrees = Vector3(-40.0, 135.0, 0.0)
+	l.light_energy = 1.55
 	l.light_color = Color(1.0, 0.95, 0.87)
 	l.shadow_enabled = true
-	l.shadow_bias = 0.04
+	l.shadow_bias = 0.03
+	l.shadow_blur = 1.2
 	l.directional_shadow_max_distance = 140.0
 	l.light_angular_distance = 1.6      # 软阴影（Forward+ 有效）
 	add_child(l)
@@ -326,8 +415,8 @@ func _setup_env() -> void:
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.055, 0.052, 0.05)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.42, 0.45, 0.52)
-	env.ambient_light_energy = 0.32
+	env.ambient_light_color = Color(0.40, 0.44, 0.54)
+	env.ambient_light_energy = 0.28
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.13, 0.13, 0.13)
 	env.fog_light_energy = 0.6
@@ -339,9 +428,10 @@ func _setup_env() -> void:
 	env.glow_hdr_threshold = 1.15
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_white = 1.0
+	env.tonemap_exposure = 1.18
 	env.adjustment_enabled = true
-	env.adjustment_contrast = 1.08
-	env.adjustment_saturation = 0.94
+	env.adjustment_contrast = 1.14
+	env.adjustment_saturation = 0.90
 	var we := WorldEnvironment.new()
 	we.name = "Env"
 	we.environment = env

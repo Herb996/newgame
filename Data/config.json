@@ -10,11 +10,23 @@
     "biome_border_jitter": 0.06,
     "biome_spread": 1.35,
     "biome_edge_blend": 0.45,
-    "biome_count": 4,
+    "biomes": [
+      {"id": 0, "name": "林地", "floor": [0.20, 0.28, 0.15], "wall": [0.42, 0.30, 0.17], "tint": [0.93, 0.98, 0.95], "tree": 0.16, "rock": 0.03, "debris": 0.02, "floor_src": "Seamless_tileable_ground_textu_2026-09-14T23-34-47.png", "ground_3d": "ground_forest.png"},
+      {"id": 1, "name": "荒原", "floor": [0.33, 0.27, 0.18], "wall": [0.52, 0.37, 0.20], "tint": [1.06, 1.02, 0.96], "tree": 0.025, "rock": 0.040, "debris": 0.07, "floor_src": "Seamless_tileable_ground_textu_2026-09-14T23-35-17.png", "ground_3d": "ground_waste.png"},
+      {"id": 2, "name": "锈泽", "floor": [0.17, 0.22, 0.16], "wall": [0.46, 0.31, 0.18], "tint": [0.86, 0.92, 0.93], "tree": 0.05, "rock": 0.02, "debris": 0.06, "floor_src": "Seamless_tileable_ground_textu_2026-09-14T23-35-18.png", "ground_3d": "ground_marsh.png"},
+      {"id": 3, "name": "石原", "floor": [0.31, 0.31, 0.33], "wall": [0.50, 0.42, 0.35], "tint": [0.85, 0.83, 0.82], "tree": 0.03, "rock": 0.14, "debris": 0.02, "floor_src": "Seamless_tileable_ground_textu_2026-09-14T23-35-22.png", "ground_3d": "ground_rock.png"},
+      {"id": 4, "name": "草地", "floor": [0.30, 0.36, 0.18], "wall": [0.50, 0.46, 0.34], "tint": [1.02, 1.00, 0.92], "tree": 0.04, "rock": 0.02, "debris": 0.01, "ground_3d": "ground_grass.png"}
+    ],
+    "veins": {
+      "iron": {"biomes": [3], "count": 18, "min_distance_from_spawn_cells": 10},
+      "gold": {"biomes": [3], "count": 6, "min_distance_from_spawn_cells": 14},
+      "oil":  {"biomes": [2], "count": 10, "min_distance_from_spawn_cells": 10}
+    },
     "cluster_noise_frequency": 0.05,
     "cluster_threshold": 0.5,
     "min_reachable_ratio": 0.3,
     "max_regen_attempts": 10,
+    "force_seed": 0,
     "grade": {
       "contrast": 1.12,
       "brightness": -0.03,
@@ -41,16 +53,83 @@
     "selected_color": "#4fc3f7"
   },
   "sprites": {
+    "fps": {
+      "idle": 3,
+      "walk": 10,
+      "attack": 14,
+      "dodge": 14,
+      "hit": 16,
+      "dead": 8
+    },
     "idle": {
-      "down": "res://Assets/Art/Sprites/Player/player_idle_down_00.png",
-      "up": "res://Assets/Art/Sprites/Player/player_idle_up_00.png",
-      "left": "res://Assets/Art/Sprites/Player/player_idle_left_00.png",
-      "right": "res://Assets/Art/Sprites/Player/player_idle_right_00.png"
+      "down": [
+        "res://Assets/Art/Sprites/Player/player_idle_down_00.png",
+        "res://Assets/Art/Sprites/Player/player_idle_down_01.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/Player/player_idle_up_00.png",
+        "res://Assets/Art/Sprites/Player/player_idle_up_01.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Player/player_idle_left_00.png",
+        "res://Assets/Art/Sprites/Player/player_idle_left_01.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/Player/player_idle_right_00.png",
+        "res://Assets/Art/Sprites/Player/player_idle_right_01.png"
+      ]
+    },
+    "walk": {
+      "down": [
+        "res://Assets/Art/Sprites/Player/player_walk_down_00.png",
+        "res://Assets/Art/Sprites/Player/player_walk_down_01.png",
+        "res://Assets/Art/Sprites/Player/player_walk_down_02.png",
+        "res://Assets/Art/Sprites/Player/player_walk_down_03.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/Player/player_walk_up_00.png",
+        "res://Assets/Art/Sprites/Player/player_walk_up_01.png",
+        "res://Assets/Art/Sprites/Player/player_walk_up_02.png",
+        "res://Assets/Art/Sprites/Player/player_walk_up_03.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Player/player_walk_left_00.png",
+        "res://Assets/Art/Sprites/Player/player_walk_left_01.png",
+        "res://Assets/Art/Sprites/Player/player_walk_left_02.png",
+        "res://Assets/Art/Sprites/Player/player_walk_left_03.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/Player/player_walk_right_00.png",
+        "res://Assets/Art/Sprites/Player/player_walk_right_01.png",
+        "res://Assets/Art/Sprites/Player/player_walk_right_02.png",
+        "res://Assets/Art/Sprites/Player/player_walk_right_03.png"
+      ]
     }
+  },
+  "player3d": {
+    "world_height": 1.9,
+    "shaded": false,
+    "brightness": 1.06,
+    "shadow": true,
+    "shadow_size": 0.86,
+    "shadow_alpha": 0.34,
+    "ring_radius": 0.34,
+    "ring_color": "#4fc3f7",
+    "anchor_offset_px": 24,
+    "debug_marker": false
   },
   "camera": {
     "pan_speed": 400,
     "return_key": 70
+  },
+  "camera3d": {
+    "size": 46,
+    "pan_speed": 26,
+    "zoom_min": 24,
+    "zoom_max": 150,
+    "zoom_step": 0.12,
+    "cam_distance": 120,
+    "pitch_deg": 45.5
   },
   "enemy": {
     "count": 100,
@@ -268,37 +347,49 @@
       "name": "木头",
       "rarity": "common",
       "value": 1,
-      "color": "#8a6a3f"
+      "color": "#8a6a3f",
+      "per_node": 20,
+      "harvest_time_seconds": 2.5
     },
     "stone": {
       "name": "石头",
       "rarity": "common",
       "value": 1,
-      "color": "#9a9aa0"
+      "color": "#9a9aa0",
+      "per_node": 20,
+      "harvest_time_seconds": 2.5
     },
     "iron": {
       "name": "铁",
       "rarity": "common",
       "value": 2,
-      "color": "#bfc8d4"
+      "color": "#bfc8d4",
+      "per_node": 30,
+      "harvest_time_seconds": 4.0
     },
     "gold": {
       "name": "金币",
       "rarity": "rare",
       "value": 10,
-      "color": "#d9b13b"
+      "color": "#d9b13b",
+      "per_node": 15,
+      "harvest_time_seconds": 5.0
     },
     "oil": {
       "name": "石油",
       "rarity": "rare",
       "value": 8,
-      "color": "#2a2a30"
+      "color": "#2a2a30",
+      "per_node": 40,
+      "harvest_time_seconds": 6.0
     },
     "food": {
       "name": "食物",
       "rarity": "common",
       "value": 1,
-      "color": "#5da04e"
+      "color": "#5da04e",
+      "per_node": 10,
+      "harvest_time_seconds": 3.0
     }
   },
   "meta_progression": {
@@ -378,6 +469,9 @@
     "time_scale": 20.0,
     "log_state_transitions": true,
     "map_preview": "",
-    "map_preview_cells": 56
+    "map_preview_cells": 56,
+    "main3d_capture": "",
+    "main3d_capture_delay": 3.0,
+    "main3d_capture_frames": 4
   }
 }

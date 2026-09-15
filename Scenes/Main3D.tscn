@@ -1,0 +1,19 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://Scripts/main3d.gd" id="1_main3d"]
+[ext_resource type="Script" path="res://Scripts/run_manager.gd" id="2_run"]
+[ext_resource type="Script" path="res://Scripts/hud.gd" id="3_hud"]
+
+[node name="Main3D" type="Node"]
+script = ExtResource("1_main3d")
+
+[node name="RunManager" type="Node" parent="."]
+script = ExtResource("2_run")
+
+[node name="LogicRoot" type="Node2D" parent="."]
+visible = false
+
+[node name="World3D" type="Node3D" parent="."]
+
+[node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("3_hud")
