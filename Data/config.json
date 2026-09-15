@@ -316,7 +316,7 @@
     }
   },
   "player3d": {
-    "world_height": 1.9,
+    "world_height": 2.8,
     "shaded": false,
     "brightness": 1.06,
     "shadow": true,
@@ -332,9 +332,9 @@
     "return_key": 70
   },
   "camera3d": {
-    "size": 46,
+    "size": 32.0,
     "pan_speed": 26,
-    "zoom_min": 24,
+    "zoom_min": 16.0,
     "zoom_max": 150,
     "zoom_step": 0.12,
     "zoom_smooth": 14,
@@ -344,7 +344,7 @@
     "zoom_hud": true,
     "cam_distance": 120,
     "pitch_deg": 45.5,
-    "base_size": 40
+    "base_size": 26.0
   },
   "enemy": {
     "count": 100,
