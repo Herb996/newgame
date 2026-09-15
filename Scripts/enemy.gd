@@ -291,7 +291,12 @@ func _set_path_to(target: Vector2) -> bool:
 	var to := _cell_of(target)
 	if not _in_bounds(from) or not _in_bounds(to):
 		return false
-	if _walls[from.y][from.x] or _walls[to.y][to.x]:
+	# 与玩家同一套兜底：被击退推进树/石格后也要能自己走出来，
+	# 否则敌人会永久卡在障碍格里（A* 对 solid 起点一律返回空路径）。
+	var r: int = int(Config.get_value("nav.unstick_radius_cells", 4))
+	from = MapGenerator.nearest_open_cell(_walls, from, r)
+	to = MapGenerator.nearest_open_cell(_walls, to, r)
+	if from.x < 0 or to.x < 0:
 		return false
 	var ids := _astar.get_id_path(from, to)
 	if ids.is_empty():

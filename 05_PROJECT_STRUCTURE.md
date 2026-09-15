@@ -120,6 +120,31 @@ SteamPunkExtraction/
       map.biome_edge_blend / map.decor.shadow。详见 03 文档「观感调优」一节
 - [ ] 地图观感调优 B 档（待做）：相机斜俯视（Y 压缩伪等距）、瓦片 16→32、墙体立体化
       （顶面亮 + 正面暗）、光照层（CanvasModulate + PointLight2D + 暗角）、装饰 y_sort 遮挡
+      （注：其中"相机斜俯视 + 立体墙 + 光照"已由 3D 双轨制整体解决，见下一条）
+- [x] 渲染范式切换：2D → 3D 双轨制（2026-09-15，用户选定路线 2）。**逻辑全留在 2D
+      （LogicRoot, visible=false），渲染换成 3D（World3D）**；唯一入口 = `Scenes/Main3D.tscn`
+      （`main.gd` / `Main.tscn` / `camera_controller.gd` / `fog_system.gd` 已删，
+      `select_icon.gd` 保留 —— `Player.tscn` 的 `$SelectIcon` 引用它）。
+      3D 模块：`map_render_3d`（地板 Texture2DArray 群系软混合 / 墙 MultiMesh / 装饰 GLB /
+      矿脉）、`base_render_3d`、`entity_visual_3d`（敌人/资源点/撤离点/建筑）、
+      `fog_3d`（战争迷雾，常驻跨局复用）、`player_visual_3d`（HD-2D 序列帧公告板）、
+      `iso_camera_3d`（正交等距 + 滚轮平滑缩放/光标锚点）、`view_hint`（视野提示）。
+      坐标桥接：3D 世界单位 = 2D 像素 / tile_size（**1 格 = 1 单位**），3D (x,z) ↔ 2D (x,y)。
+- [x] 修「人物卡到树里」（2026-09-15，用户报障）。三个根因，全部修掉：
+      ① **视觉穿模**：树模型矮胖（宽高比 0.73），旧版按"高度等比"缩放，6.5 高时
+      冠幅横跨 5.3~6.3 格而只阻挡 1 格 → 站在邻格就被整棵树吞掉。改为**高度与
+      水平占地分开控制**（config `map3d.model_height` / `map3d.model_footprint`，
+      树 4.0 高 / 冠幅 ≤1.5 格，半径 0.75 < 邻格距离 1.0）。
+      ② **物理与寻路不一致**：树/石格在 `walls` 里是障碍（参与 A* 与连通性），
+      但渲染成地板瓦片 → TileSet 没有碰撞体，冲刺（速度×3 持续 0.22s ≈ 6.6 格）
+      和击退能把玩家推进树格。新增 `map_generator._build_decor_collision()` 生成
+      `DecorCollision` 静态碰撞（一个 StaticBody2D 挂 N 个整格 shape），开关
+      `map.decor_collision.enabled`。
+      ③ **硬卡死**：`_query_path` 只要起点或终点是 solid 就返回空路径 → 玩家进了
+      树格后无论怎么点都走不动。改为**两端先吸附到最近可走格**
+      （`MapGenerator.nearest_open_cell()`，玩家脱困 `nav.unstick_radius_cells=4`、
+      点击吸附 `nav.snap_radius_cells=3`），敌人 `_set_path_to` 用同一份实现。
+      回归探针 `Dev/probe_stuck`（7 断言，含"身处阻挡格能走出""点树能走"），全绿。
 - [ ] 后续：手感清单四项（伤害飘字 / 命中停顿 Hit Stop / 屏幕震动 / 搜刮时减速）、
       连招派生链（输入缓冲扩展）、4 向精灵的方向切换与动画状态机（当前只接了 down 向静态帧）
 

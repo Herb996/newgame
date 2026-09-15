@@ -55,6 +55,15 @@ const ATLAS_SEED := 20260915     # 回退图集固定种子：外观稳定，不
 static func biome_count() -> int:
 	return _biomes().size()
 
+static func biome_name(i: int) -> String:          # 群系显示名（日志与断言用）
+	return str(_biome_at(i).get("name", "?"))
+
+static func biome_speed(i: int) -> float:          # 基础移速系数（雪原 < 1）
+	return clampf(float(_biome_at(i).get("speed", 1.0)), 0.05, 4.0)
+
+static func biome_weight(i: int) -> float:         # 噪声区间权重（越大越常见）
+	return maxf(0.0001, float(_biome_at(i).get("weight", 1.0)))
+
 static func atlas_wall_start() -> int:      # 墙体起始列 = 全群系地板列之后
 	return FLOOR_VARIANTS * biome_count()
 
@@ -74,14 +83,18 @@ const SRC_TILE := 16             # AI 图集原始瓦片边长（缩放前）
 #        floor_src?（AI 无缝地面纹理文件名，缺省则程序化生成）}
 # 历史默认值（config 缺失时回落，确保工程随时可跑）：
 const _DEFAULT_BIOMES := [
-	{"name": "林地", "floor": Color(0.20, 0.28, 0.15), "wall": Color(0.42, 0.30, 0.17),
-	 "tint": Color(0.93, 0.98, 0.95), "tree": 0.16, "rock": 0.03, "debris": 0.02},
-	{"name": "荒原", "floor": Color(0.33, 0.27, 0.18), "wall": Color(0.52, 0.37, 0.20),
-	 "tint": Color(1.06, 1.02, 0.96), "tree": 0.025, "rock": 0.040, "debris": 0.07},
-	{"name": "锈泽", "floor": Color(0.17, 0.22, 0.16), "wall": Color(0.46, 0.31, 0.18),
-	 "tint": Color(0.86, 0.92, 0.93), "tree": 0.05, "rock": 0.02, "debris": 0.06},
-	{"name": "石原", "floor": Color(0.31, 0.31, 0.33), "wall": Color(0.50, 0.42, 0.35),
-	 "tint": Color(0.85, 0.83, 0.82), "tree": 0.03, "rock": 0.14, "debris": 0.02},
+	{"name": "草地", "weight": 3.4, "speed": 1.0, "floor": Color(0.30, 0.36, 0.18),
+	 "wall": Color(0.50, 0.46, 0.34), "tint": Color(1.02, 1.00, 0.92),
+	 "tree": 0.030, "rock": 0.015, "debris": 0.012, "crack": 0.015},
+	{"name": "荒原", "weight": 1.05, "speed": 1.0, "floor": Color(0.33, 0.27, 0.18),
+	 "wall": Color(0.52, 0.37, 0.20), "tint": Color(1.06, 1.02, 0.96),
+	 "tree": 0.020, "rock": 0.160, "debris": 0.050, "crack": 0.070},
+	{"name": "森林", "weight": 1.25, "speed": 1.0, "floor": Color(0.20, 0.28, 0.15),
+	 "wall": Color(0.42, 0.30, 0.17), "tint": Color(0.93, 0.98, 0.95),
+	 "tree": 0.330, "rock": 0.020, "debris": 0.030, "crack": 0.010},
+	{"name": "雪原", "weight": 0.95, "speed": 0.62, "floor": Color(0.82, 0.86, 0.90),
+	 "wall": Color(0.72, 0.76, 0.80), "tint": Color(1.00, 1.01, 1.04),
+	 "tree": 0.045, "rock": 0.030, "debris": 0.012, "crack": 0.020},
 ]
 
 static var _biome_cache: Array = []
@@ -102,6 +115,8 @@ static func _load_biomes() -> Array:
 		b["floor"] = _arr_to_color(entry.get("floor", [0.30, 0.30, 0.30]))
 		b["wall"] = _arr_to_color(entry.get("wall", [0.40, 0.35, 0.30]))
 		b["tint"] = _arr_to_color(entry.get("tint", [1.0, 1.0, 1.0]))
+		b["weight"] = maxf(0.0001, float(entry.get("weight", 1.0)))
+		b["speed"] = clampf(float(entry.get("speed", 1.0)), 0.05, 4.0)
 		b["tree"] = float(entry.get("tree", 0.05))
 		b["rock"] = float(entry.get("rock", 0.03))
 		b["debris"] = float(entry.get("debris", 0.02))
@@ -114,6 +129,58 @@ static func _biome_at(i: int) -> Dictionary:
 
 static func _biome_tint(i: int) -> Color:
 	return _biome_at(i)["tint"]
+
+## 群系权重 → 归一化累积边界，供噪声分段使用。
+## 例：权重 [3.4, 1.05, 1.25, 0.95] → [0.513, 0.671, 0.859, 1.0]
+## 于是"草地"独占 51% 的噪声区间（= 大部分是平地），而不是每种群系各 25%。
+static func biome_weight_edges() -> Array:
+	var n := biome_count()
+	var edges: Array = []
+	var total := 0.0
+	for i in range(n):
+		total += float(_biome_at(i).get("weight", 1.0))
+	if total <= 0.0:
+		total = 1.0
+	var acc := 0.0
+	for i in range(n):
+		acc += float(_biome_at(i).get("weight", 1.0))
+		edges.append(acc / total)
+	return edges
+
+
+## 直接在噪声场上取分位数当群系边界：返回的 edges 满足
+## "落在第 i 段（edges[i-1] .. edges[i]）的格数 / 总格数 == 群系 i 的权重占比"。
+## 用先采样后排序实现（O(N log N)，128×128 约 1.6 万格，生成期一次性开销）。
+static func _biome_quantile_edges(width: int, height: int, biome_noise: FastNoiseLite,
+		edge_noise: FastNoiseLite, spread: float, jitter: float) -> Array:
+	var vals: Array = []
+	vals.resize(width * height)
+	var k := 0
+	for y in range(height):
+		for x in range(width):
+			# 必须与 generate 主循环里的算法**逐字一致**，否则分位数对不上
+			var bf: float = clampf(0.5 + biome_noise.get_noise_2d(x, y) * spread,
+					0.0, 1.0)
+			bf += edge_noise.get_noise_2d(x, y) * jitter
+			vals[k] = bf
+			k += 1
+	vals.sort()
+	var n := vals.size()
+	var fracs: Array = biome_weight_edges()      # 累积权重比例，末项 = 1.0
+	var edges: Array = []
+	for i in range(fracs.size()):
+		var idx: int = clampi(int(float(fracs[i]) * float(n)), 0, n - 1)
+		edges.append(float(vals[idx]))
+	return edges
+
+
+## 把 0..1 的噪声值按权重边界映射成群系 id
+static func biome_from_unit(u: float, edges: Array) -> int:
+	for i in range(edges.size()):
+		if u <= float(edges[i]):
+			return i
+	return maxi(0, edges.size() - 1)
+
 
 static func _arr_to_color(a) -> Color:
 	if a is Array and a.size() >= 3:
@@ -128,15 +195,22 @@ const C_DARK := Color(0.12, 0.09, 0.07)    # 裂纹 / 阴影
 const C_OIL := Color(0.09, 0.08, 0.09)     # 油污
 
 # ---------- 装饰物类型 ----------
+# 1~3 是"立体"物件：底边对齐格心、带落地投影，其中树/石并入 walls 阻挡通行。
+# 4~5 是"贴地"地表特征：整格居中铺、无投影、不阻挡通行 ——
+#   DECOR_CRACK 地表裂缝（纯视觉，暗示地层破碎，荒原多）
+#   DECOR_WATER 河水浅滩（可涉水通过，但降速，系数见 map.river.slow）
 const DECOR_NONE := 0
 const DECOR_TREE := 1
 const DECOR_ROCK := 2
 const DECOR_DEBRIS := 3
-
+const DECOR_CRACK := 4
+const DECOR_WATER := 5
 const DECOR_PATHS := {
 	DECOR_TREE: "res://Assets/Art/Sprites/Decor/tree_00.png",
 	DECOR_ROCK: "res://Assets/Art/Sprites/Decor/rock_00.png",
 	DECOR_DEBRIS: "res://Assets/Art/Sprites/Decor/debris_00.png",
+	DECOR_CRACK: "",
+	DECOR_WATER: "",
 }
 
 # 每类装饰物的基准亮度：石头原画偏浅，直接铺在暗色地表上会过于抢眼，压暗一档
@@ -144,7 +218,17 @@ const DECOR_BASE_TINT := {
 	DECOR_TREE: Color(1.00, 1.00, 1.00),
 	DECOR_ROCK: Color(0.80, 0.80, 0.82),
 	DECOR_DEBRIS: Color(0.95, 0.95, 0.95),
+	DECOR_CRACK: Color(1.00, 1.00, 1.00),
+	DECOR_WATER: Color(1.00, 1.00, 1.00),
 }
+
+# 阻挡通行的装饰类别：只有树与石头（裂缝、河水可走）
+const DECOR_BLOCKING := [DECOR_TREE, DECOR_ROCK]
+# 贴地类装饰：整格居中、无投影、不做随机缩放（缩放会露出格子缝）
+const DECOR_FLAT := [DECOR_CRACK, DECOR_WATER]
+# 渲染顺序：先铺地表特征（河水 → 裂缝），再放立体物件（残骸 → 树 → 石）。
+# 同层 add 顺序即绘制顺序，保证水在裂缝之下、物件在地表特征之上。
+const DECOR_RENDER_ORDER := [DECOR_WATER, DECOR_CRACK, DECOR_DEBRIS, DECOR_TREE, DECOR_ROCK]
 
 # ---------- 矿脉（地图资源节点，非装饰、不阻挡通行）----------
 const VEIN_IRON := 0
@@ -211,7 +295,12 @@ static func generate() -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = randi()
 
-	var veg_threshold: float = float(Config.get_value("map.decor.noise_threshold", 0.10))
+	# 成簇对比度：把"植被噪声"从**硬闸门**改成**均值≈1 的乘性调制**。
+	# 旧实现是 `if veg_noise <= threshold: continue`，那会在 config 密度之上
+	# 再乘掉约 0.2（实测：森林 tree 写 0.330，实际只落 9%）。改成
+	# `mul = clamp(1 + n*contrast, ...)`（n 均值 0）后，config 里的值才真的
+	# 等于目标密度，同时保留"高值区成片、低值区稀疏"的自然成簇感。
+	var veg_contrast: float = float(Config.get_value("map.decor.veg_contrast", 0.85))
 	var clear_r: int = int(Config.get_value("map.decor.clear_spawn_radius_cells", 3))
 
 	var layer := TileMapLayer.new()
@@ -219,6 +308,13 @@ static func generate() -> Dictionary:
 	layer.tile_set = _build_tileset(tile_size)
 
 	var center := Vector2i(width / 2, height / 2)
+	# 群系边界 = 噪声场的**分位数**（而不是固定阈值）。
+	# 原因：simplex 噪声近似钟形分布，固定阈值下"中间"的群系会吃掉远超权重的面积
+	#       （实测雪原 25.8% vs 权重 13%）。取分位数后每个群系的格数占比 == 它的
+	#       weight 占比，"草地 weight=3.4 → 大部分是平地" 就是字面意思。
+	#       注意 spread 从此只影响空间结构（边界锐利度），不再影响各群系面积。
+	var biome_edges: Array = _biome_quantile_edges(width, height, biome_noise,
+			edge_noise, biome_spread, border_jitter)
 
 	# ---- 第一遍：地形 + 生物群系 + 装饰选址 ----
 	var terrain: Array = []   # 渲染用：0 地板 / 1 墙
@@ -244,7 +340,7 @@ static func generate() -> Dictionary:
 			var bf: float = clampf(0.5 + biome_noise.get_noise_2d(x, y) * biome_spread,
 					0.0, 1.0)
 			bf += edge_noise.get_noise_2d(x, y) * border_jitter
-			var b: int = clampi(int(bf * biome_count()), 0, biome_count() - 1)
+			var b: int = biome_from_unit(bf, biome_edges)
 			trow.append(is_wall)
 			wrow.append(is_wall)
 			drow.append(DECOR_NONE)
@@ -268,22 +364,37 @@ static func generate() -> Dictionary:
 			blended.append(brow2)
 		biome = blended
 
+	# ---- 地表特征带：河水 / 裂缝 ----
+	# **必须在立体装饰之前画**：带子要先占住格子，后面的树/石才会自动避开。
+	# 反过来（装饰先放）的话，一棵树落在河道正中就会把河截断。
+	var river_slow: float = clampf(float(Config.get_value("map.river.slow", 0.72)), 0.1, 1.0)
+	_paint_band(DECOR_WATER, "map.river", terrain, biome, decor, walls,
+			width, height, center, rng)
+	_paint_band(DECOR_CRACK, "map.crack", terrain, biome, decor, walls,
+			width, height, center, rng)
+
 	# 装饰只落在地板上；出生区留空；树/石头并入 walls（寻路会绕开）
 	# 权重按所在生物群系取，树在"成簇噪声"高值区会被放大 → 形成树林而非均匀撒点
+	# 已被裂缝/河水占住的格子会被跳过 —— 保证地表特征带连续不被树截断。
 	for y in range(1, height - 1):
 		for x in range(1, width - 1):
 			if terrain[y][x]:
 				continue
 			if abs(x - center.x) <= clear_r and abs(y - center.y) <= clear_r:
 				continue
-			if veg.get_noise_2d(x, y) <= veg_threshold:
-				continue
+			if decor[y][x] != DECOR_NONE:
+				continue                       # 已被裂缝/河水占住，不再放立体物件
+			var veg_mul: float = clampf(1.0 + veg.get_noise_2d(x, y) * veg_contrast,
+					0.05, 1.95)
 			var b: int = biome[y][x]
 			var w: Dictionary = _biome_at(b)
 			var in_patch: bool = cluster.get_noise_2d(x, y) > cluster_threshold
-			var p_tree: float = w["tree"] * density * (3.0 if in_patch else 1.0)
-			var p_rock: float = w["rock"] * density
-			var p_debris: float = w["debris"] * density
+			# 树在"成簇噪声"高值区放大 3 倍 → 形成森林而不是均匀撒点。
+			# 立体物件受 vegetation 的**均值≈1 乘性调制**（见上面 veg_contrast）。
+			# 裂缝/河水不在这里 —— 它们是 _paint_band 画的连续带。
+			var p_tree: float = w["tree"] * density * veg_mul * (3.0 if in_patch else 1.0)
+			var p_rock: float = w["rock"] * density * veg_mul
+			var p_debris: float = w["debris"] * density * veg_mul
 			var r := rng.randf()
 			var acc := 0.0
 			var kind := DECOR_NONE
@@ -301,7 +412,7 @@ static func generate() -> Dictionary:
 			if kind == DECOR_NONE:
 				continue
 			decor[y][x] = kind
-			if kind == DECOR_TREE or kind == DECOR_ROCK:
+			if DECOR_BLOCKING.has(kind):
 				walls[y][x] = true   # 实体障碍，参与寻路与连通性
 
 	# ---- 矿脉生成：从 config.map.veins 读取 iron/gold/oil 的限定群系 + 数量 + 距出生点 ----
@@ -357,52 +468,68 @@ static func generate() -> Dictionary:
 				layer.set_cell(Vector2i(x, y), 0, Vector2i(b * FLOOR_VARIANTS + v, 0))
 
 	# ---- 装饰层 ----
+	# 按 DECOR_RENDER_ORDER 分趟绘制：先铺地表特征（河水 → 裂缝），再放立体物件
+	# （残骸 → 树 → 石）。同层 add 顺序即绘制顺序，保证水在最底、物件压在最上。
 	var decor_root := Node2D.new()
 	decor_root.name = "DecorLayer"
 	decor_root.y_sort_enabled = true   # 同层内按 y 排序，下方的树遮上方的树
-	var counts := {DECOR_TREE: 0, DECOR_ROCK: 0, DECOR_DEBRIS: 0}
-	for y in range(height):
-		for x in range(width):
-			var k: int = decor[y][x]
-			if k == DECOR_NONE:
-				continue
-			var tex := _decor_texture(k)
-			if tex == null:
-				continue
-			var tex_size := Vector2(tex.get_size())
-			# 每株装饰做随机缩放/翻转/亮度抖动，消除克隆感
-			var sc := Vector2(rng.randf_range(0.88, 1.12), rng.randf_range(0.88, 1.12))
-			# 脚底对齐格心（图片底边落在格心下方 2px，视觉上"站在"这一格）
-			var pos := Vector2(x * tile_size + tile_size * 0.5,
-							   y * tile_size + tile_size * 0.5)
-			# 落地投影：必须先添加影子再添加本体——同 y 时 y_sort 保持添加序，
-			# 影子就永远压在本体下面。残骸本来就平摊在地上，不需要投影。
-			if shadow_on and k != DECOR_DEBRIS:
-				var shadow_tex := _decor_shadow_texture(k, tex_size.x)
-				if shadow_tex != null:
-					var sh := Sprite2D.new()
-					sh.texture = shadow_tex
-					sh.centered = false
-					sh.scale = sc
-					sh.position = pos
-					sh.offset = Vector2(-shadow_tex.get_width() * 0.5, 0.0)
-					sh.z_index = 0
-					decor_root.add_child(sh)
-			var s := Sprite2D.new()
-			s.texture = tex
-			s.centered = false
-			s.scale = sc
-			s.flip_h = rng.randf() < 0.5
-			# 群系整体色调（与地表同源：地面亮的地方物件也亮）× 类别基准亮度 × 随机抖动
-			var tint: Color = _biome_tint(biome[y][x])
-			var base_tint: Color = DECOR_BASE_TINT.get(k, Color(1, 1, 1))
-			s.modulate = Color(tint.r * base_tint.r, tint.g * base_tint.g,
-					tint.b * base_tint.b) * rng.randf_range(0.90, 1.08)
-			s.position = pos
-			s.offset = Vector2(-tex_size.x * 0.5, 2.0 - tex_size.y)
-			s.z_index = 0   # 与地形同层：玩家（z=1）始终在前景，未探索区被雾盖住
-			decor_root.add_child(s)
-			counts[k] = int(counts[k]) + 1
+	var counts := {DECOR_TREE: 0, DECOR_ROCK: 0, DECOR_DEBRIS: 0, DECOR_CRACK: 0, DECOR_WATER: 0}
+	for k in DECOR_RENDER_ORDER:
+		var kk: int = int(k)
+		var tex := _decor_texture(kk)
+		if tex == null:
+			continue
+		var tex_size := Vector2(tex.get_size())
+		# 贴地类（裂缝/河水）整格居中且不缩放——缩放会让相邻水格之间露出格子缝
+		var is_flat: bool = DECOR_FLAT.has(kk)
+		for y in range(height):
+			for x in range(width):
+				if int(decor[y][x]) != kk:
+					continue
+				# 立体物件做随机缩放/翻转/亮度抖动，消除克隆感
+				var sc := Vector2.ONE
+				if is_flat:
+					# 贴地贴图按"覆盖一整格"缩放：贴图分辨率比格大（水 64 / 缝 32），
+					# 不缩就一张铺开好几格，格子对不上。
+					sc = Vector2(float(tile_size) / maxf(tex_size.x, 1.0),
+							float(tile_size) / maxf(tex_size.y, 1.0))
+				else:
+					sc = Vector2(rng.randf_range(0.88, 1.12), rng.randf_range(0.88, 1.12))
+				var pos := Vector2(x * tile_size + tile_size * 0.5,
+								   y * tile_size + tile_size * 0.5)
+				# 落地投影：必须先添加影子再添加本体——同 y 时 y_sort 保持添加序，
+				# 影子就永远压在本体下面。残骸/裂缝/河水本来就平摊在地上，不需要投影。
+				if shadow_on and not is_flat and kk != DECOR_DEBRIS:
+					var shadow_tex := _decor_shadow_texture(kk, tex_size.x)
+					if shadow_tex != null:
+						var sh := Sprite2D.new()
+						sh.texture = shadow_tex
+						sh.centered = false
+						sh.scale = sc
+						sh.position = pos
+						sh.offset = Vector2(-shadow_tex.get_width() * 0.5, 0.0)
+						sh.z_index = 0
+						decor_root.add_child(sh)
+				var s := Sprite2D.new()
+				s.texture = tex
+				s.centered = false
+				s.scale = sc
+				s.flip_h = rng.randf() < 0.5
+				# 群系整体色调（与地表同源：地面亮的地方物件也亮）× 类别基准亮度 × 随机抖动
+				var tint: Color = _biome_tint(biome[y][x])
+				var base_tint: Color = DECOR_BASE_TINT.get(kk, Color(1, 1, 1))
+				s.modulate = Color(tint.r * base_tint.r, tint.g * base_tint.g,
+						tint.b * base_tint.b) * rng.randf_range(0.90, 1.08)
+				s.position = pos
+				if is_flat:
+					# 贴地：整格居中
+					s.offset = Vector2(-tex_size.x * 0.5, -tex_size.y * 0.5)
+				else:
+					# 立体：脚底对齐格心（图片底边落在格心下方 2px，"站在"这一格）
+					s.offset = Vector2(-tex_size.x * 0.5, 2.0 - tex_size.y)
+				s.z_index = 0   # 与地形同层：玩家（z=1）始终在前景，未探索区被雾盖住
+				decor_root.add_child(s)
+				counts[kk] = int(counts[kk]) + 1
 
 	# 矿脉精灵：矿石露头，非阻挡。按类型配色，采完由 ResourceRegistry 隐藏
 	for vd in veins:
@@ -444,6 +571,17 @@ static func generate() -> Dictionary:
 	root.name = "MapRoot"
 	root.add_child(layer)
 	root.add_child(decor_root)
+
+	# ---- 阻挡型装饰的碰撞体（2026-09-15 修「人物卡到树里」）----
+	# 树/石在 walls 里是障碍（参与 A* 与连通性），但**渲染成地板瓦片**，
+	# 而 TileSet 的碰撞只加在墙变体上 —— 这些格子实际上没有碰撞体。
+	# 于是冲刺（速度×3 持续 0.22s ≈ 6.6 格）和受击击退都能把玩家推进树格，
+	# 之后 _query_path 判定"起点是 solid"直接返回空路径 → 永久走不动。
+	# 这里补上静态碰撞，让物理层与寻路层说同一套话。
+	if bool(Config.get_value("map.decor_collision.enabled", true)):
+		var coll := _build_decor_collision(walls, terrain, decor, width, height, tile_size)
+		if coll != null:
+			root.add_child(coll)
 	# 宏观明暗层：低分辨率光照图放大后乘法混合。刻意最后添加 —— 同 z_index 下
 	# 绘制在最上层，连装饰一起受光；否则会出现"地面有明暗、树却一样亮"的割裂。
 	var macro_img: Image = null
@@ -451,6 +589,19 @@ static func generate() -> Dictionary:
 		macro_img = _make_macro_light_image(width, height, macro_noise, macro_strength)
 		if macro_img != null:
 			root.add_child(_wrap_macro_light(macro_img, tile_size))
+
+	# 地形速度系数网格：基础取群系 speed（雪原 < 1 表示雪地难行），
+	# 水格再取更小者（map.river.slow）。player.follow_path 每帧按所在格查这张表。
+	var speed_mult: Array = []
+	for y in range(height):
+		var srow: Array = []
+		srow.resize(width)
+		for x in range(width):
+			var sp: float = float(_biome_at(biome[y][x]).get("speed", 1.0))
+			if decor[y][x] == DECOR_WATER:
+				sp = minf(sp, river_slow)
+			srow[x] = sp
+		speed_mult.append(srow)
 
 	var spawn := Vector2(center) * tile_size + Vector2(tile_size * 0.5, tile_size * 0.5)
 
@@ -478,8 +629,9 @@ static func generate() -> Dictionary:
 	print("[Map] 地图生成完成：%dx%d 瓦片（%dx%d 像素），地板 %d 格，可达 %d 格（%.0f%%），贴图=%s"
 		% [width, height, width * tile_size, height * tile_size, floor_count, reach_count,
 		   ratio * 100.0, "AI" if _used_ai_atlas else "程序化(回退)"])
-	print("[Map] 装饰物：树 %d / 石头 %d / 残骸 %d，出生点 %s"
-		% [int(counts[DECOR_TREE]), int(counts[DECOR_ROCK]), int(counts[DECOR_DEBRIS]), spawn])
+	print("[Map] 装饰物：树 %d / 石头 %d / 残骸 %d / 裂缝 %d / 河水 %d，出生点 %s"
+		% [int(counts[DECOR_TREE]), int(counts[DECOR_ROCK]), int(counts[DECOR_DEBRIS]),
+		   int(counts[DECOR_CRACK]), int(counts[DECOR_WATER]), spawn])
 	var biome_str := ""
 	for i in range(biome_count()):
 		if i > 0:
@@ -489,7 +641,39 @@ static func generate() -> Dictionary:
 	return {"node": root, "spawn": spawn, "spawn_cell": center,
 			"walls": walls, "reachable": reachable, "reachable_ratio": ratio,
 			"terrain": terrain, "decor": decor, "biome": biome, "tile_size": tile_size,
-			"veins": veins, "macro": macro_img}
+			"veins": veins, "macro": macro_img,
+			"speed_mult": speed_mult, "river_slow": river_slow}
+
+
+## 为"阻挡型装饰"（树/石）生成静态碰撞体，让物理层与 A* 的 walls 网格一致。
+##
+## 只覆盖 DECOR_BLOCKING（树/石）：残骸/裂缝/河水/矿脉都不阻挡，不该有碰撞。
+## 实现上用**一个 StaticBody2D 挂 N 个 CollisionShape2D**，而不是 N 个 StaticBody2D：
+## 节点数少一个量级，而 2D 宽相对静态形状的处理与地形瓦片同量级（地形还是逐格形状）。
+static func _build_decor_collision(walls: Array, terrain: Array, decor: Array,
+		width: int, height: int, tile_size: int) -> StaticBody2D:
+	var body := StaticBody2D.new()
+	body.name = "DecorCollision"
+	var n := 0
+	for y in range(height):
+		for x in range(width):
+			if not walls[y][x] or terrain[y][x]:
+				continue                              # 真墙已有瓦片碰撞；地板不管
+			if not DECOR_BLOCKING.has(int(decor[y][x])):
+				continue
+			var sh := CollisionShape2D.new()
+			var rect := RectangleShape2D.new()
+			rect.size = Vector2(tile_size, tile_size)
+			sh.shape = rect
+			sh.position = Vector2(x * tile_size + tile_size * 0.5,
+					y * tile_size + tile_size * 0.5)
+			body.add_child(sh)
+			n += 1
+	if n == 0:
+		body.free()
+		return null
+	print("[Map] 装饰碰撞体：%d 格（树/石，物理层与寻路层已对齐）" % n)
+	return body
 
 
 ## ------------------------------------------------------------
@@ -545,15 +729,19 @@ static func build_preview(result: Dictionary, cells: int) -> Image:
 			var base_tint: Color = DECOR_BASE_TINT.get(k, Color(1, 1, 1))
 			var use_tint := Color(tint.r * base_tint.r, tint.g * base_tint.g,
 					tint.b * base_tint.b)
-			# 落地投影：与运行时同序（先影后本体），残骸不投影
-			if shadow_on and k != DECOR_DEBRIS:
+			var flat: bool = DECOR_FLAT.has(k)
+			# 落地投影：与运行时同序（先影后本体）；残骸/裂缝/河水平摊在地上，不投影
+			if shadow_on and not flat and k != DECOR_DEBRIS:
 				var sw: float = maxf(6.0, src.get_width() * 0.80)
 				var shh: float = maxf(3.0, sw * 0.34)
 				_blend_shadow(out, int(x * ts + ts * 0.5),
 						int(y * ts + ts * 0.5 + shh * 0.5), sw * 0.5, shh * 0.5)
-			# 与游戏中 Sprite2D 的对齐方式一致：脚底落在格心下方 2px
+			# 与游戏中 Sprite2D 的对齐方式一致：立体物件脚底落在格心下方 2px，
+			# 贴地类（裂缝/河水）整格居中
 			var dx: int = int(x * ts + ts * 0.5 - src.get_width() * 0.5)
 			var dy: int = int(y * ts + ts * 0.5 + 2.0 - src.get_height())
+			if flat:
+				dy = int(y * ts + ts * 0.5 - src.get_height() * 0.5)
 			_blend(out, src, dx, dy, use_tint)
 
 	# 宏观明暗：等价于运行时 MacroLight 的乘法混合（先放大插值，再逐像素乘）
@@ -925,6 +1113,122 @@ static func _paint_wall(img: Image, ox: int, ts: int, variant: int,
 ## 装饰物贴图：优先 AI 生成精灵，缺失时回退程序化
 ## ------------------------------------------------------------
 
+## 地表特征带（河水 / 裂缝）的通用绘制。
+##
+## 为什么不用朴素的 `|noise| < 阈值`：那样带宽会被噪声梯度带着跑 —— 梯度小的地方
+## （噪声驻点附近）糊成一大块（实测出现过 30×27 格的水塘），梯度大的地方细成一条线。
+## 除以 |∇n| 得到的是"到零等值线的近似格距"，于是带子**等宽**：多宽只由
+## width_cells 决定，不再看噪声碰巧长成什么样。
+##
+## 本函数只决定"哪些格属于这条带"，不管纹路朝哪：贴地贴图本身做成**四向贯通**的
+## （暗纹从四条边的中点接入），所以无论带往哪个方向拐，相邻格的纹路都接得上。
+static func _paint_band(kind: int, prefix: String, terrain: Array, biome: Array,
+		decor: Array, walls: Array, w: int, h: int,
+		center: Vector2i, rng: RandomNumberGenerator) -> int:
+	if not bool(Config.get_value(prefix + ".enabled", true)):
+		return 0
+	var width_cells: float = float(Config.get_value(prefix + ".width_cells", 0.0))
+	if width_cells <= 0.0:
+		return 0
+	var freq: float = float(Config.get_value(prefix + ".frequency", 0.012))
+	var jitter: float = float(Config.get_value(prefix + ".jitter", 0.0))
+	var min_dist: int = int(Config.get_value(prefix + ".min_dist_from_spawn_cells", 0))
+	var orient: Array = Config.get_value(prefix + ".orientation", [[1.0, 1.0]])
+	var biome_scale: Array = Config.get_value(prefix + ".biome_scale", [])
+	# 每条水系/缝系 = 主噪声（定路径）+ 摆动噪声（让岸线自然扭曲）。
+	#
+	# orientation 的每一项是采样域的**线性变换矩阵 [a, b, c, d]**：
+	#     u = a*x + b*y ,  v = c*x + d*y
+	# 对噪声做各向异性变换，零等值线才会被拉长成蜿蜒的**河/缝**；不变换的话
+	# 各向同性噪声的等值线会闭合成一个个**水塘**（早期版本实测出 30×27 的大水洼）。
+	# 只给两个数时按对角阵理解（[sx, sy]，纯拉伸）；给四个数就能做旋转/错切 ——
+	# 用来让多组河道互不平行，避免出现"井字格"式的死板路网。
+	var systems: Array = []
+	for o in orient:
+		var a := 1.0
+		var b := 0.0
+		var c := 0.0
+		var d := 1.0
+		if o is Array and (o as Array).size() >= 4:
+			a = float(o[0])
+			b = float(o[1])
+			c = float(o[2])
+			d = float(o[3])
+		elif o is Array and (o as Array).size() >= 2:
+			a = float(o[0])
+			d = float(o[1])
+		# 退化阵（不可逆）会把整个采样域压成一条线，直接判为无效
+		if absf(a * d - b * c) < 1.0e-6:
+			continue
+		var n_main := FastNoiseLite.new()
+		n_main.noise_type = FastNoiseLite.TYPE_SIMPLEX
+		n_main.frequency = freq
+		n_main.seed = rng.randi()
+		var n_wob := FastNoiseLite.new()
+		n_wob.noise_type = FastNoiseLite.TYPE_SIMPLEX
+		n_wob.frequency = freq * 3.0
+		n_wob.seed = rng.randi()
+		systems.append({"main": n_main, "wob": n_wob, "a": a, "b": b, "c": c, "d": d})
+	if systems.is_empty():
+		return 0
+
+	var painted := 0
+	for y in range(1, h - 1):
+		for x in range(1, w - 1):
+			if terrain[y][x]:
+				continue                        # 不淹墙
+			if decor[y][x] != DECOR_NONE:
+				continue                        # 已被别的特征占住（带子要连续）
+			if min_dist > 0 and abs(x - center.x) + abs(y - center.y) < min_dist:
+				continue                        # 出生点附近留空
+			var b: int = int(biome[y][x])
+			var scale := 1.0
+			if b >= 0 and b < biome_scale.size():
+				scale = float(biome_scale[b])
+			var wc: float = width_cells * scale
+			if wc <= 0.0:
+				continue                        # 该群系不出这种特征（如雪原无水）
+			var best_d := 1.0e20
+			for si in systems:
+				var sd: Dictionary = si
+				# 矩阵分量用 ma/mb/mc/md 命名：本块内已有一个变量 d（到带心的距离），
+				# 且外层循环已用掉 b（群系 id）。同名会直接解析失败（同作用域重复声明）。
+				var ma: float = float(sd["a"])
+				var mb: float = float(sd["b"])
+				var mc: float = float(sd["c"])
+				var md: float = float(sd["d"])
+				var ux: float = float(x) * ma + float(y) * mb
+				var uy: float = float(x) * mc + float(y) * md
+				var sn_main: FastNoiseLite = sd["main"]
+				var sn_wob: FastNoiseLite = sd["wob"]
+				var n0: float = sn_main.get_noise_2d(ux, uy) + sn_wob.get_noise_2d(ux, uy) * jitter
+				# 沿 x 走 1 格 → u 增 ma、v 增 mc；沿 y 走 1 格 → u 增 mb、v 增 md。
+				# 这样得到的就是**每格**的噪声变化率，与变换矩阵严格对应（链式法则）。
+				var n_dx: float = sn_main.get_noise_2d(ux + ma, uy + mc)
+				n_dx += sn_wob.get_noise_2d(ux + ma, uy + mc) * jitter
+				var n_dy: float = sn_main.get_noise_2d(ux + mb, uy + md)
+				n_dy += sn_wob.get_noise_2d(ux + mb, uy + md) * jitter
+				var gx: float = n_dx - n0
+				var gy: float = n_dy - n0
+				var g: float = sqrt(gx * gx + gy * gy)
+				# g ≈ 0 是噪声驻点，|n|/g 会炸；按"离得很远"处理
+				var band_d: float = 1.0e6 if g < 1.0e-6 else absf(n0) / g
+				if band_d < best_d:
+					best_d = band_d
+			if best_d > wc:
+				continue
+			decor[y][x] = kind
+			walls[y][x] = false                 # 地表特征不阻挡通行
+			painted += 1
+	return painted
+
+
+## 共享装饰贴图入口：2D（地图生成）与 3D（MapRender3D）都从这里取，
+## 保证两个入口用的是同一张图、同一份缓存。kind 见 DECOR_*，未知类别返回 null。
+static func decor_texture(kind: int) -> Texture2D:
+	return _decor_texture(kind)
+
+
 static func _decor_texture(kind: int) -> Texture2D:
 	if _decor_tex.has(kind):
 		return _decor_tex[kind]
@@ -953,6 +1257,10 @@ static func _decor_texture(kind: int) -> Texture2D:
 			img = _make_rock()
 		DECOR_DEBRIS:
 			img = _make_debris()
+		DECOR_CRACK:
+			img = _make_crack()
+		DECOR_WATER:
+			img = _make_water()
 		_:
 			return null
 	_decor_img[kind] = img
@@ -1046,6 +1354,77 @@ static func _make_debris() -> Image:
 			_set_rgba(img, x, y, C_RUST * rng.randf_range(0.6, 0.85))
 	_ellipse(img, 12, 5, 3, 3, Color(0.42, 0.38, 0.30), rng, 0.14)
 	_ellipse(img, 12, 5, 1, 1, Color(0.16, 0.14, 0.12), rng, 0.0)
+	return img
+
+
+## 地表裂缝：32×32，**四向贯通**的碎裂纹。
+##
+## 关键设计：暗纹必须从**四条边的中点**接入（上-下、左-右各一条），这样无论带状
+## 地形往哪个方向拐，相邻两格的缝都接得上。只在格中间画一小段的话，
+## 铺出来是一地散点而不是一条裂缝（旧版就是这个毛病）。
+static func _make_crack() -> Image:
+	var n := 32
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 90210
+	var mid := n / 2
+	# 纵向主缝：从上边中点走到下边中点，沿途左右抖动
+	var px := float(mid)
+	for y in range(n):
+		var ix := clampi(int(round(px)), 1, n - 2)
+		img.set_pixel(ix, y, Color(C_DARK.r, C_DARK.g, C_DARK.b, 0.90))
+		img.set_pixel(ix + 1, y, Color(C_DARK.r, C_DARK.g, C_DARK.b, 0.44))
+		img.set_pixel(ix - 1, y, Color(C_STONE.r, C_STONE.g, C_STONE.b, 0.20))
+		px += rng.randf_range(-1.25, 1.25)
+		px = clampf(px, 4.0, float(n) - 5.0)
+	# 横向副缝：同上，但细一档、断断续续（避免每格都是整齐的十字）
+	var py := float(mid)
+	for x in range(n):
+		if rng.randf() < 0.22:
+			py += rng.randf_range(-0.8, 0.8)
+			py = clampf(py, 4.0, float(n) - 5.0)
+			continue
+		var iy := clampi(int(round(py)), 1, n - 2)
+		var c0: Color = img.get_pixel(x, iy)
+		img.set_pixel(x, iy, c0.lerp(Color(C_DARK.r, C_DARK.g, C_DARK.b, 0.78), 1.0))
+		var c1: Color = img.get_pixel(x, iy + 1)
+		img.set_pixel(x, iy + 1, c1.lerp(Color(C_DARK.r, C_DARK.g, C_DARK.b, 0.32), 1.0))
+	# 缝口两侧的崩碎颗粒
+	for _i in range(14):
+		var sx := rng.randi_range(0, n - 1)
+		var sy := rng.randi_range(0, n - 1)
+		var cp: Color = img.get_pixel(sx, sy)
+		img.set_pixel(sx, sy, cp.lerp(Color(C_STONE.r, C_STONE.g, C_STONE.b, 0.18), 1.0))
+	return img
+
+
+## 河水：64×64，整格平铺的浅水 + 波纹高光。
+##
+## 分辨率必须比 16px 的瓦片高：3D 里这张贴图铺满 1 个世界单位（≈40 屏幕像素），
+## 16×16 放大后是一片糊，与旁边的地面（1024² 铺 4.5 单位）档次差太远。
+## 波纹用**整数周期**的正弦算，保证上下左右平铺无缝 —— 否则相邻水格之间会露出缝线。
+## 刻意"整格不透明"，相邻水格拼起来才是连续水面，而不是一颗颗水方块。
+static func _make_water() -> Image:
+	var n := 64
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var deep := Color(0.09, 0.19, 0.27)
+	var mid := Color(0.16, 0.31, 0.40)
+	var hi := Color(0.36, 0.56, 0.64)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4711
+	for y in range(n):
+		for x in range(n):
+			var u := float(x) / float(n)
+			var v := float(y) / float(n)
+			var a: float = sin(TAU * (u * 2.0 + sin(TAU * v) * 0.10))
+			var b: float = sin(TAU * (v * 3.0 + sin(TAU * u * 2.0) * 0.08))
+			var wave: float = clampf((a * 0.6 + b * 0.4) * 0.5 + 0.5, 0.0, 1.0)
+			var c: Color = deep.lerp(mid, wave)
+			c = c.lerp(hi, clampf(wave * wave * 0.60, 0.0, 1.0))
+			c = c.lerp(hi, rng.randf() * 0.10)          # 细碎波光
+			c.a = 0.90
+			img.set_pixel(x, y, c)
 	return img
 
 
@@ -1208,6 +1587,31 @@ static func ids_to_centers(ids: Array, tile_size: int) -> PackedVector2Array:
 		var c: Vector2i = ids[i]
 		path[i] = Vector2(c.x * tile_size + half, c.y * tile_size + half)
 	return path
+
+
+## 以 cell 为中心按**环**向外找最近的可通行格（含自身）；找不到返回 (-1,-1)。
+##
+## 寻路兜底用（玩家与敌人共用，避免两套实现各说各话）：
+## AStarGrid2D 对 solid 点一律返回空路径，所以只要起点或终点落在障碍格
+## （击退/冲刺把人推进树里、或点击点正好在树上）就"永远走不动"。
+## 出发前先把两端吸附到最近的可走格，行为就稳定了。
+## 半径写死成小值：太大会让"点树"变成"绕到很远的地方去"，反而迷惑。
+static func nearest_open_cell(walls: Array, cell: Vector2i, radius: int) -> Vector2i:
+	var h: int = walls.size()
+	if h == 0:
+		return Vector2i(-1, -1)
+	var w: int = walls[0].size()
+	for r in range(0, radius + 1):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dy)) != r:
+					continue                       # 只扫当前环；内圈上一轮已扫过
+				var c := Vector2i(cell.x + dx, cell.y + dy)
+				if c.x < 0 or c.y < 0 or c.x >= w or c.y >= h:
+					continue
+				if not walls[c.y][c.x]:
+					return c
+	return Vector2i(-1, -1)
 
 
 ## 一次性"构建+查询"封装（低频调用；高频寻路请用 build_astar 缓存网格）

@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bprobestuck001"]
+
+[ext_resource type="Script" path="res://Dev/probe_stuck.gd" id="1_probe"]
+
+[node name="ProbeStuck" type="Node"]
+script = ExtResource("1_probe")

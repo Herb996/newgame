@@ -46,6 +46,9 @@ var guard_remaining := 0.0           # 剩余时长（秒）
 var _walls: Array = []
 var _tile_size: int = 16
 var _astar: AStarGrid2D              # 缓存网格（每张地图构建一次）
+# 地形速度系数网格（宽×高，每格 0.05~4.0）：雪原 <1、水格再取更小者。
+# 空数组 = 全地形 1.0（基地就是这种，平地无减速）。
+var _speed_mult: Array = []
 
 var _final_target := Vector2.ZERO    # 用户点击的最终目标点
 var _has_target := false
@@ -504,7 +507,15 @@ func follow_path() -> void:
 
 	var old_pos := global_position
 	var my_cell := _cell_of(global_position)
-	var end_cell := _cell_of(_final_target)
+	# 目标格先吸附一次：3D 里点地面是用射线打 y=0 平面，点中树/石头是家常便饭，
+	# 直接拿原始格去查 A* 会因为"终点 solid"拿到空路径，表现为点了没反应。
+	var end_cell := _goal_cell(_cell_of(_final_target))
+	if end_cell.x < 0:
+		# 目标格连同邻域全是障碍（比如点了密林正中央）→ 放弃，避免每帧无效重算
+		velocity = Vector2.ZERO
+		move_and_slide()
+		clear_move_target()
+		return
 
 	# 已进入目标所在格 → 视为到达。
 	# （不用"距点击点 <6px"判定：路径终点是格心，点击格边缘时会永远差几像素、抖动）
@@ -547,7 +558,8 @@ func follow_path() -> void:
 	if dir.length() < 1.0:
 		velocity = Vector2.ZERO
 	else:
-		velocity = dir.normalized() * speed
+		# 地形减速：雪原（biome.speed）与河水（river.slow）都落在这张表里。
+		velocity = dir.normalized() * speed * terrain_speed_at(my_cell)
 	move_and_slide()
 
 	# 卡住检测：本想移动却几乎没挪动（被墙/实体挡住）→ 计数触发重算
@@ -561,9 +573,13 @@ func follow_path() -> void:
 # 导航 / 寻路
 # ------------------------------------------------------------
 
-func setup_navigation(walls: Array, tile_size: int) -> void:
+## walls：通行阻挡网格；tile_size：格宽（像素）
+## speed_mult：可选的地形速度系数网格（与 walls 同尺寸）。不传 = 全 1.0。
+##             MapGenerator.generate() 的 result["speed_mult"] 直接传进来即可。
+func setup_navigation(walls: Array, tile_size: int, speed_mult: Array = []) -> void:
 	_walls = walls
 	_tile_size = tile_size
+	_speed_mult = speed_mult
 	# A* 网格只在这里构建一次（O(宽×高)，切图级频率）
 	_astar = MapGenerator.build_astar(walls, tile_size)
 	_has_target = false
@@ -581,6 +597,24 @@ func _cell_of(pos: Vector2) -> Vector2i:
 	return Vector2i(int(pos.x / _tile_size), int(pos.y / _tile_size))
 
 
+## 该格的地形速度系数（1.0 = 正常）。越界或无速度表都返回 1.0。
+## 供 follow_path 与调试/探针复用：雪原 0.62、河水取 map.river.slow。
+func terrain_speed_at(cell: Vector2i) -> float:
+	if _speed_mult.is_empty():
+		return 1.0
+	if cell.y < 0 or cell.y >= _speed_mult.size():
+		return 1.0
+	var row: Array = _speed_mult[cell.y]
+	if cell.x < 0 or cell.x >= row.size():
+		return 1.0
+	return clampf(float(row[cell.x]), 0.05, 4.0)
+
+
+## 当前所站格的速度系数（HUD/调试显示用）
+func current_terrain_speed() -> float:
+	return terrain_speed_at(_cell_of(global_position))
+
+
 func _in_bounds(cell: Vector2i) -> bool:
 	var h: int = _walls.size()
 	if h == 0:
@@ -592,12 +626,39 @@ func _in_bounds(cell: Vector2i) -> bool:
 ## 查询路径（起点=玩家所在格，终点=目标格）。不可达返回空数组。
 ## 不用 get_point_path：它返回格子左上角（偏半格），路径会贴墙角导致卡死；
 ## 用 get_id_path 拿格子坐标，再用 MapGenerator.ids_to_centers 换算格心。
+##
+## 【2026-09-15 修「人物卡到树里」】两端都先吸附到最近的可通行格。
+## 旧版只要起点或终点是 solid 就返回空 —— 玩家一旦被击退/冲刺推进树格，
+## 起点永远是 solid，之后无论怎么点都走不动，就是"卡死在里面"。
 func _query_path(from_cell: Vector2i, to_cell: Vector2i) -> PackedVector2Array:
 	if _astar == null or not _in_bounds(from_cell) or not _in_bounds(to_cell):
 		return PackedVector2Array()
-	if _walls[from_cell.y][from_cell.x] or _walls[to_cell.y][to_cell.x]:
+	var start_cell := _nearest_open_cell(from_cell, _unstick_radius())
+	var goal_cell := _nearest_open_cell(to_cell, _snap_radius())
+	if start_cell.x < 0 or goal_cell.x < 0:
 		return PackedVector2Array()
-	return MapGenerator.ids_to_centers(_astar.get_id_path(from_cell, to_cell), _tile_size)
+	return MapGenerator.ids_to_centers(_astar.get_id_path(start_cell, goal_cell), _tile_size)
+
+
+## 目标格吸附：点在树/石头上时改走旁边最近的可走格（而不是原地不动）
+func _goal_cell(cell: Vector2i) -> Vector2i:
+	return _nearest_open_cell(cell, _snap_radius())
+
+
+## 以 cell 为中心按环向外找最近的可通行格（含自身）；找不到返回 (-1,-1)。
+## 实现放在 MapGenerator，敌人寻路用的是同一份（避免两套逻辑各说各话）。
+func _nearest_open_cell(cell: Vector2i, radius: int) -> Vector2i:
+	return MapGenerator.nearest_open_cell(_walls, cell, radius)
+
+
+## 点击目标落在障碍格时的搜索半径（格）
+func _snap_radius() -> int:
+	return maxi(1, int(Config.get_value("nav.snap_radius_cells", 3)))
+
+
+## 玩家已经身处障碍格时的脱困搜索半径（格）
+func _unstick_radius() -> int:
+	return maxi(1, int(Config.get_value("nav.unstick_radius_cells", 4)))
 
 
 # ------------------------------------------------------------

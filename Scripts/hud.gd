@@ -5,6 +5,8 @@ extends CanvasLayer
 ## - 倒计时下方：阶段提示（搜刮期 / 撤离点开放数量）
 ## - 局结束：中央结算面板（撤离成功带回 / 死亡 / 超时）
 ## 数值全部来自 RunManager 与 Data/config.json。
+## 注意：视野提示（滚轮缩放）**不在这一层**，见 Scripts/view_hint.gd ——
+## 本 HUD 在基地模式整体隐藏，而缩放提示两种模式都要可见。
 ## ============================================================
 
 var _run: Node
@@ -32,27 +34,22 @@ func _ready() -> void:
 	_phase_label.add_theme_color_override("font_color", Color(0.75, 0.73, 0.68))
 	_result_label = _make_label(30, Control.PRESET_CENTER)
 	# 背包栏：左下角常驻显示（种类数/容量 + 明细）
-	_bag_label = _make_label(15, Control.PRESET_BOTTOM_LEFT)
+	_bag_label = _bottom_label(15, 12.0, Control.PRESET_BOTTOM_LEFT)
 	_bag_label.offset_left = 12
-	_bag_label.offset_bottom = -12
 	_bag_label.add_theme_color_override("font_color", Color(0.91, 0.90, 0.86))
 	# 血量：左下角，背包栏上方
-	_hp_label = _make_label(16, Control.PRESET_BOTTOM_LEFT)
+	_hp_label = _bottom_label(16, 36.0, Control.PRESET_BOTTOM_LEFT)
 	_hp_label.offset_left = 12
-	_hp_label.offset_bottom = -36
 	_hp_label.add_theme_color_override("font_color", Color(0.95, 0.55, 0.4))
 	# 体力条：底部居中（技能资源，读 player.stamina）
-	_stamina_label = _make_label(16, Control.PRESET_CENTER_BOTTOM)
-	_stamina_label.offset_bottom = -38
+	_stamina_label = _bottom_label(16, 38.0, Control.PRESET_CENTER_BOTTOM)
 	_stamina_label.add_theme_color_override("font_color", Color(0.55, 0.85, 0.95))
 	# 技能栏：体力条下方，显示 序号/名称/消耗/冷却
-	_skill_label = _make_label(15, Control.PRESET_CENTER_BOTTOM)
-	_skill_label.offset_bottom = -12
+	_skill_label = _bottom_label(15, 12.0, Control.PRESET_CENTER_BOTTOM)
 	_skill_label.add_theme_color_override("font_color", Color(0.82, 0.80, 0.74))
 	# 生存栏：左下角，血量上方（食物数量 + 下次进食倒计时 + 饥饿警告）
-	_survival_label = _make_label(15, Control.PRESET_BOTTOM_LEFT)
+	_survival_label = _bottom_label(15, 60.0, Control.PRESET_BOTTOM_LEFT)
 	_survival_label.offset_left = 12
-	_survival_label.offset_bottom = -60
 	_survival_label.add_theme_color_override("font_color", Color(0.55, 0.78, 0.45))
 
 
@@ -61,6 +58,21 @@ func _make_label(size: int, preset: int) -> Label:
 	l.add_theme_font_size_override("font_size", size)
 	l.set_anchors_and_offsets_preset(preset)
 	add_child(l)
+	return l
+
+
+## 底部标签：以「距屏幕底 margin 像素」定位。
+## Label 默认是**顶对齐**，只改 offset_bottom 只会把矩形压扁、文字仍停在
+## preset 算出的 offset_top 上 —— 几个标签就会画在同一 y 上互相叠字。
+## 所以这里给足矩形高度并改成底对齐，margin 才真的是离底边距离。
+const _BOTTOM_BOX := 64.0
+
+
+func _bottom_label(size: int, margin: float, preset: int) -> Label:
+	var l := _make_label(size, preset)
+	l.offset_top = -margin - _BOTTOM_BOX
+	l.offset_bottom = -margin
+	l.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	return l
 
 
