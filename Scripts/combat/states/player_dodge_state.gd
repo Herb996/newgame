@@ -2,7 +2,7 @@ class_name PlayerDodgeState
 extends State
 ## ============================================================
 ## PlayerDodgeState — 冲刺 / 闪避（含无敌帧 i-frames）
-## 对应 00_GAME_DESIGN.md 手感清单第 1 项"冲刺短暂无敌"。
+## 对应 DESIGN.md 手感清单第 1 项"冲刺短暂无敌"。
 ## 进入：朝鼠标方向冲刺（速度 × combat.dodge.speed_multiplier），期间无敌。
 ## 退出：关闭无敌 + 进入冷却（combat.dodge.cooldown_seconds）。
 ## 硬直/攻击期间不可冲刺（由 Player.can_dodge 判定）。
@@ -23,7 +23,7 @@ func enter(_msg: Dictionary = {}) -> void:
 	_timer = 0.0
 	if bool(Config.get_value("combat.dodge.invincible", true)):
 		actor.set_invincible(true)
-	# 冲刺发声：比走路更响（02_TECH_BUILD.md 第二部分 噪音机制）
+	# 冲刺发声：比走路更响（DESIGN.md 第二部分 噪音机制）
 	NoiseSystem.emit(actor.global_position,
 			float(Config.get_value("noise.sources.dodge", 28.0)))
 

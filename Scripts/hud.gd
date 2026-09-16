@@ -16,8 +16,6 @@ var _phase_label: Label
 var _result_label: Label
 var _bag_label: Label
 var _hp_label: Label
-var _stamina_label: Label
-var _skill_label: Label
 var _survival_label: Label
 var _survival: Node = null
 
@@ -41,12 +39,6 @@ func _ready() -> void:
 	_hp_label = _bottom_label(16, 36.0, Control.PRESET_BOTTOM_LEFT)
 	_hp_label.offset_left = 12
 	_hp_label.add_theme_color_override("font_color", Color(0.95, 0.55, 0.4))
-	# 体力条：底部居中（技能资源，读 player.stamina）
-	_stamina_label = _bottom_label(16, 38.0, Control.PRESET_CENTER_BOTTOM)
-	_stamina_label.add_theme_color_override("font_color", Color(0.55, 0.85, 0.95))
-	# 技能栏：体力条下方，显示 序号/名称/消耗/冷却
-	_skill_label = _bottom_label(15, 12.0, Control.PRESET_CENTER_BOTTOM)
-	_skill_label.add_theme_color_override("font_color", Color(0.82, 0.80, 0.74))
 	# 生存栏：左下角，血量上方（食物数量 + 下次进食倒计时 + 饥饿警告）
 	_survival_label = _bottom_label(15, 60.0, Control.PRESET_BOTTOM_LEFT)
 	_survival_label.offset_left = 12
@@ -83,8 +75,6 @@ func _process(_delta: float) -> void:
 		_phase_label.text = _phase_text()
 		_refresh_bag()
 		_refresh_hp()
-		_refresh_stamina()
-		_refresh_skills()
 		_refresh_survival()
 
 
@@ -97,38 +87,6 @@ func _refresh_hp() -> void:
 		_hp_label.text = ""
 		return
 	_hp_label.text = "HP %d/%d" % [int(_player.hp), int(_player.max_hp)]
-
-
-## 体力条："体力 [##########] 100/100"（技能资源）
-func _refresh_stamina() -> void:
-	if _player == null or not is_instance_valid(_player):
-		_stamina_label.text = ""
-		return
-	var cur := float(_player.stamina)
-	var mx := float(_player.max_stamina)
-	var filled := clampi(int(round(cur / maxf(mx, 1.0) * 10.0)), 0, 10)
-	var bar := "[%s%s]" % ["#".repeat(filled), "-".repeat(10 - filled)]
-	var guard := ""
-	if float(_player.guard_remaining) > 0.0:
-		guard = "   护盾 %.1fs" % float(_player.guard_remaining)
-	_stamina_label.text = "体力 %s %d/%d%s" % [bar, int(cur), int(mx), guard]
-
-
-## 技能栏："1 蒸汽爆发(25体力) 就绪 | 2 钩爪突进(20体力) CD 2.4s | ..."
-func _refresh_skills() -> void:
-	if _player == null or not is_instance_valid(_player) or _player.skill_system == null:
-		_skill_label.text = ""
-		return
-	var parts: Array = []
-	var idx := 1
-	for sid in _player.skill_system.ids():
-		var sk: Skill = _player.skill_system.get_skill(sid)
-		if sk == null:
-			continue
-		var state := "就绪" if sk.is_ready() else "CD %.1fs" % sk.cooldown_remaining
-		parts.append("%d %s(%d体力) %s" % [idx, sk.display_name(), sk.stamina_cost(), state])
-		idx += 1
-	_skill_label.text = "   |   ".join(parts)
 
 
 ## 生存栏："食物 x30   下次进食 42s"（饥饿时标红并提示持续掉血）

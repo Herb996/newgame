@@ -292,7 +292,7 @@ func take_damage(amount: int) -> void:
 		_die()
 
 
-## 被技能击退（蒸汽爆发）：与 enemy.gd 同接口，便于玩家技能统一处理
+## 被击退：与 enemy.gd 同接口
 func apply_knockback(impulse: Vector2) -> void:
 	if impulse.length() < 1.0:
 		return

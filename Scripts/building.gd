@@ -86,7 +86,7 @@ func _layout_labels() -> void:
 		hint_label.offset_bottom = top + 16.0
 
 
-## 建筑配色（01_ART_GUIDE.md 色调）。
+## 建筑配色（DESIGN.md 色调）。
 ## 2D 现在用 Tiny Swords 建筑贴图，不再靠纯色块；这张表保留给
 ## 「贴图缺失时的兜底色」与 3D 视觉层（entity_visual_3d.gd）共用。
 func _color_for(id: String) -> Color:

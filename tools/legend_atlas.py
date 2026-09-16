@@ -33,7 +33,7 @@ def load_rows():
 
 
 def main() -> int:
-    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "_atlas_legend.png")
+    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "generated_images", "atlas", "_atlas_legend.png")
     rows = load_rows()
 
     blob_w = 4 * SRC_TILE * ZOOM          # 右侧 4x4 blob 区块放大

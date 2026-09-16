@@ -51,7 +51,7 @@ var _attack_timer := 0.0           # >0 表示正在播攻击动作，播完回 
 var _hit_flash := 0.0              # 受击泛红剩余秒数
 var _dying := false                # 已进入死亡淡出，不再参与 AI/受伤
 
-# --- 噪音警觉度（02_TECH_BUILD.md 第二部分 噪音机制）---
+# --- 噪音警觉度（DESIGN.md 第二部分 噪音机制）---
 var noise_alertness := 0.0
 var _noise_source := Vector2.ZERO   # 最后听到的声源位置（调查状态前往这里）
 
@@ -227,7 +227,7 @@ func remember_player_position() -> void:
 
 
 # ------------------------------------------------------------
-# 噪音感知（02_TECH_BUILD.md 第二部分 噪音机制）
+# 噪音感知（DESIGN.md 第二部分 噪音机制）
 # ------------------------------------------------------------
 
 ## 听到一次噪音：累加警觉度并记录声源（阈值驱动状态切换在 enemy_*_state 里）
@@ -483,7 +483,7 @@ func _pick_drop_resource() -> String:
 	return str(pool[randi() % pool.size()])
 
 
-## 被技能击退（蒸汽爆发）：按冲量做一段位移；接 AI 后可改为速度冲量
+## 被击退：按冲量做一段位移
 func apply_knockback(impulse: Vector2) -> void:
 	if impulse.length() < 1.0:
 		return

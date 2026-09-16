@@ -1,0 +1,133 @@
+{
+  "note": "美术需求核对清单：从 00/01/MISSING 三份 MD 提取的『应有』，逐条到环境核对『实有』。status 由生成器按 check 解析文件 + verdict 覆盖计算。",
+  "tree": [
+    {"name": "🎨 美术系统", "children": [
+      {"name": "1 地形", "children": [
+        {"name": "1.1 地表瓦片（01§79：4群系×12变体图集）", "children": [
+          {"key": "t_grass", "name": "草地", "expect": "64px blob 图集（01§79）", "actual": "tilemap_color1.png 已接入", "check": ["Assets/Art/Tiles/TS/tilemap_color1.png"]},
+          {"key": "t_wasteland", "name": "荒原", "expect": "同上", "actual": "tilemap_color4.png 已接入", "check": ["Assets/Art/Tiles/TS/tilemap_color4.png"]},
+          {"key": "t_forest", "name": "森林", "expect": "同上", "actual": "tilemap_color3.png 已接入", "check": ["Assets/Art/Tiles/TS/tilemap_color3.png"]},
+          {"key": "t_swamp", "name": "沼泽", "expect": "00§173 叫「雪原」，config 叫「沼泽」", "actual": "tilemap_color5.png 已接入，命名冲突待拍板", "check": ["Assets/Art/Tiles/TS/tilemap_color5.png"], "verdict": "warn"},
+          {"key": "t_blend", "name": "群系过渡瓦片", "expect": "过渡带（01§121 自认遗留）", "actual": "无", "check": [], "verdict": "missing"}
+        ]},
+        {"name": "1.2 墙体", "children": [
+          {"key": "w_wall", "name": "墙体图集", "expect": "4群系×6变体（01§81）", "actual": "atlas_wall.png", "check": ["Assets/Art/Tiles/atlas_wall.png"]},
+          {"key": "w_top", "name": "墙顶受光面", "expect": "程序派生（01§82）", "actual": "代码生成，无需素材", "check": [], "verdict": "code"},
+          {"key": "w_3d", "name": "3D 立体墙", "expect": "范式级待做（01§106）", "actual": "无", "check": [], "verdict": "missing"}
+        ]},
+        {"name": "1.3 水体", "children": [
+          {"key": "wa_deep", "name": "深水", "expect": "不可通行水域（00§176）", "actual": "water_bg.png 纯色硬边", "check": ["Assets/Art/Tiles/TS/water_bg.png"], "verdict": "warn", "req": "A-14"},
+          {"key": "wa_shallow", "name": "浅滩（可涉水）", "expect": "0.72 减速涉水域（00§176）", "actual": "深水提亮顶替", "check": [], "verdict": "warn", "req": "A-13"},
+          {"key": "wa_foam", "name": "浪花动画", "expect": "岸边动效", "actual": "water_foam.png 24帧未接线", "check": ["Assets/Art/Tiles/TS/water_foam.png"], "verdict": "warn", "req": "A-13"},
+          {"key": "wa_bridge", "name": "桥 / 渡口 / 踏脚石", "expect": "过河点视觉引导", "actual": "无", "check": [], "verdict": "missing", "req": "A-15"}
+        ]},
+        {"name": "1.4 裂缝", "children": [
+          {"key": "crack", "name": "裂缝素材", "expect": "阻断通行需绕行（00§177）", "actual": "无（代码也未实现）", "check": [], "verdict": "missing"}
+        ]},
+        {"name": "1.5 天气（00§179 待做，MD 无美术规格）", "children": [
+          {"key": "wx_rain", "name": "雨天表现", "expect": "降低声音传播", "actual": "无", "check": [], "verdict": "missing"},
+          {"key": "wx_thunder", "name": "雷电表现", "expect": "提高噪音阈值", "actual": "无", "check": [], "verdict": "missing"}
+        ]},
+        {"name": "1.6 装饰物", "children": [
+          {"key": "d_tree", "name": "树", "expect": "48×36 透明精灵（01§91）", "actual": "tree_00..15 共16变体", "check": ["Assets/Art/Sprites/Decor/tree_*.png"]},
+          {"key": "d_rock", "name": "石头", "expect": "30×22", "actual": "rock_00..03", "check": ["Assets/Art/Sprites/Decor/rock_*.png"]},
+          {"key": "d_stump", "name": "树桩", "expect": "同上", "actual": "stump_00..03", "check": ["Assets/Art/Sprites/Decor/stump_*.png"]},
+          {"key": "d_bush", "name": "灌木", "expect": "同上", "actual": "bush_00..15", "check": ["Assets/Art/Sprites/Decor/bush_*.png"]},
+          {"key": "d_pebble", "name": "碎石", "expect": "同上", "actual": "pebble_00..15", "check": ["Assets/Art/Sprites/Decor/pebble_*.png"]},
+          {"key": "d_debris", "name": "残骸", "expect": "26×22", "actual": "debris", "check": ["Assets/Art/Sprites/Decor/debris*.png"]},
+          {"key": "d_ore_gold", "name": "金矿", "expect": "矿脉节点（00§178）", "actual": "ore_gold_00..05", "check": ["Assets/Art/Sprites/Decor/ore_gold*.png", "Assets/Art/Sprites/Decor/gold_stone*.png"]},
+          {"key": "d_ore_iron", "name": "铁矿", "expect": "与金矿形状明显不同的铁矿堆", "actual": "有文件但是金矿染灰顶替，玩家会认错", "check": ["Assets/Art/Sprites/Decor/ore_iron*.png"], "verdict": "warn", "req": "A-07"},
+          {"key": "d_ore_oil", "name": "油田", "expect": "冒泡魔法油潭+石砌泉口", "actual": "有 1 张但为程序糊的紫黑圆斑", "check": ["Assets/Art/Sprites/Decor/ore_oil*.png"], "verdict": "warn", "req": "A-08"},
+          {"key": "d_ruins", "name": "奇幻废墟道具", "expect": "断柱/符文石/雕像/营火/断剑/墓碑/水晶（MISSING§10）", "actual": "完全没有", "check": [], "verdict": "missing", "req": "A-16"}
+        ]},
+        {"name": "1.7 POI / 巢穴（00§181 待做，MD 无美术规格）", "children": [
+          {"key": "poi_nest", "name": "巢穴建筑", "expect": "产不同怪+拆除奖励", "actual": "无", "check": [], "verdict": "missing"},
+          {"key": "poi_landmark", "name": "POI 地标", "expect": "同上", "actual": "无", "check": [], "verdict": "missing"}
+        ]}
+      ]},
+      {"name": "2 怪物（每个角色一套独立动画，不通用）", "children": [
+        {"name": "2.1 劫掠者（现 red_pawn 顶替）", "children": [
+          {"key": "m_raid_base", "name": "idle / run / attack", "expect": "192×192 各一套", "actual": "red_pawn 帧齐全，但是人形兵顶替", "check": ["Assets/Art/Sprites/Units/red_pawn/*.png"], "verdict": "warn", "req": "A-19"},
+          {"key": "m_raid_dir", "name": "四向帧", "expect": "4 向（01§50）", "actual": "仅正面 billboard", "check": [], "verdict": "missing"},
+          {"key": "m_raid_dead", "name": "死亡帧", "expect": "6~8 帧倒地", "actual": "缩小淡出顶替", "check": ["Assets/Art/Sprites/Units/red_pawn/dead_*.png"], "verdict": "missing", "req": "A-10"},
+          {"key": "m_raid_hit", "name": "受击帧", "expect": "3~4 帧后仰", "actual": "泛红 0.18s 顶替", "check": [], "verdict": "missing", "req": "A-11"}
+        ]},
+        {"name": "2.2 弓手（现 red_archer 顶替）", "children": [
+          {"key": "m_arch_base", "name": "idle / run / attack", "expect": "192×192 各一套", "actual": "red_archer 帧齐，顶替", "check": ["Assets/Art/Sprites/Units/red_archer/*.png"], "verdict": "warn", "req": "A-19"},
+          {"key": "m_arch_dir", "name": "四向帧", "expect": "4 向", "actual": "仅正面", "check": [], "verdict": "missing"},
+          {"key": "m_arch_dead", "name": "死亡帧", "expect": "独立一套", "actual": "淡出顶替", "check": [], "verdict": "missing", "req": "A-10"},
+          {"key": "m_arch_hit", "name": "受击帧", "expect": "独立一套", "actual": "泛红顶替", "check": [], "verdict": "missing", "req": "A-11"}
+        ]},
+        {"name": "2.3 邪术师（现 red_monk 顶替）", "children": [
+          {"key": "m_monk_base", "name": "idle / run / attack", "expect": "192×192 各一套", "actual": "red_monk 帧齐，顶替", "check": ["Assets/Art/Sprites/Units/red_monk/*.png"], "verdict": "warn", "req": "A-19"},
+          {"key": "m_monk_dir", "name": "四向帧", "expect": "4 向", "actual": "仅正面", "check": [], "verdict": "missing"},
+          {"key": "m_monk_dead", "name": "死亡帧", "expect": "独立一套", "actual": "淡出顶替", "check": [], "verdict": "missing", "req": "A-10"},
+          {"key": "m_monk_hit", "name": "受击帧", "expect": "独立一套", "actual": "泛红顶替", "check": [], "verdict": "missing", "req": "A-11"}
+        ]},
+        {"name": "2.4 掠夺者（现 yellow_pawn 顶替）", "children": [
+          {"key": "m_yel_base", "name": "idle / run / attack", "expect": "192×192 各一套", "actual": "yellow_pawn 帧齐，顶替", "check": ["Assets/Art/Sprites/Units/yellow_pawn/*.png"], "verdict": "warn", "req": "A-19"},
+          {"key": "m_yel_dir", "name": "四向帧", "expect": "4 向", "actual": "仅正面", "check": [], "verdict": "missing"},
+          {"key": "m_yel_dead", "name": "死亡帧", "expect": "独立一套", "actual": "淡出顶替", "check": [], "verdict": "missing", "req": "A-10"},
+          {"key": "m_yel_hit", "name": "受击帧", "expect": "独立一套", "actual": "泛红顶替", "check": [], "verdict": "missing", "req": "A-11"}
+        ]},
+        {"name": "2.5 骷髅兵（正式怪，MISSING§13）", "children": [
+          {"key": "m_skel", "name": "idle8 + run6 + attack4", "expect": "192×192 全套", "actual": "无", "check": [], "verdict": "missing", "req": "A-19"}
+        ]},
+        {"name": "2.6 巨型蜘蛛（正式怪）", "children": [
+          {"key": "m_spider", "name": "idle8 + run6 + attack4", "expect": "192×192 全套", "actual": "无", "check": [], "verdict": "missing", "req": "A-19"}
+        ]},
+        {"name": "2.7 森林巨魔（正式怪）", "children": [
+          {"key": "m_troll", "name": "idle8 + run6 + attack4", "expect": "192×192 全套", "actual": "无", "check": [], "verdict": "missing", "req": "A-19"}
+        ]},
+        {"name": "2.8 精英怪（01§130 只有标题，MD 无细节）", "children": [
+          {"key": "m_elite", "name": "精英怪全套", "expect": "需先定设计", "actual": "无", "check": [], "verdict": "missing"}
+        ]},
+        {"name": "2.9 羊（中立动物）", "children": [
+          {"key": "m_sheep_base", "name": "idle / run / grass", "expect": "128×128", "actual": "sheep 帧齐", "check": ["Assets/Art/Sprites/Units/sheep/*.png"]},
+          {"key": "m_sheep_dead", "name": "死亡帧", "expect": "独立一套（128 画布）", "actual": "淡出顶替", "check": [], "verdict": "missing", "req": "A-10"}
+        ]}
+      ]},
+      {"name": "3 玩家（01§48 帧数规格）", "children": [
+        {"key": "p_idle", "name": "待机", "expect": "四向×4帧起", "actual": "PlayerTS idle 8帧×4向", "check": ["Assets/Art/Sprites/PlayerTS/warrior_idle_*.png"]},
+        {"key": "p_walk", "name": "移动", "expect": "四向×4帧起", "actual": "PlayerTS walk 6帧×4向", "check": ["Assets/Art/Sprites/PlayerTS/warrior_walk_*.png"]},
+        {"key": "p_attack", "name": "攻击", "expect": "3帧×4向（01§48）", "actual": "PlayerTS 里有 attack 帧但未接线，现程序化形变", "check": ["Assets/Art/Sprites/PlayerTS/warrior_attack_*.png"], "verdict": "warn", "req": "A-24"},
+        {"key": "p_hit", "name": "受击", "expect": "1帧×4向", "actual": "抖动泛红顶替", "check": [], "verdict": "missing", "req": "A-11"},
+        {"key": "p_dead", "name": "死亡", "expect": "1帧基准", "actual": "倾倒变暗程序顶替", "check": [], "verdict": "missing", "req": "A-10"},
+        {"key": "p_dash", "name": "冲刺", "expect": "1帧基准", "actual": "拉伸+半透明程序顶替，可暂不补", "check": [], "verdict": "warn"}
+      ]},
+      {"name": "4 资源点（00§193：木/石/铁/金/油/食物）", "children": [
+        {"key": "i_wood", "name": "木头图标", "expect": "64×64 手绘风", "actual": "item_wood.png", "check": ["Assets/Art/Sprites/Items/item_wood.png"]},
+        {"key": "i_stone", "name": "石头图标", "expect": "同上", "actual": "item_stone.png", "check": ["Assets/Art/Sprites/Items/item_stone.png"]},
+        {"key": "i_iron", "name": "铁图标", "expect": "同上", "actual": "item_iron.png", "check": ["Assets/Art/Sprites/Items/item_iron.png"]},
+        {"key": "i_gold", "name": "金币图标", "expect": "同上", "actual": "item_gold.png", "check": ["Assets/Art/Sprites/Items/item_gold.png"]},
+        {"key": "i_oil", "name": "石油图标", "expect": "与其余同一画风", "actual": "item_oil.png 有文件，但是程序画的，画风突兀", "check": ["Assets/Art/Sprites/Items/item_oil.png"], "verdict": "warn", "req": "A-09"},
+        {"key": "i_food", "name": "食物图标", "expect": "64×64", "actual": "item_food.png", "check": ["Assets/Art/Sprites/Items/item_food.png"]},
+        {"key": "i_harvest", "name": "采集动作帧", "expect": "树/石/矿可反复采集（00§188）", "actual": "无（玩法待做）", "check": [], "verdict": "missing"}
+      ]},
+      {"name": "5 撤离点（01§132：三主题随机）", "children": [
+        {"key": "e_portal", "name": "魔法传送门", "expect": "192×192 发光循环", "actual": "_draw 圆环顶替", "check": [], "verdict": "missing", "req": "A-18"},
+        {"key": "e_circle", "name": "召唤法阵", "expect": "同上", "actual": "无", "check": [], "verdict": "missing", "req": "A-18"},
+        {"key": "e_harpy", "name": "鹰身女妖雕像", "expect": "MD 提了名字但无规格", "actual": "无", "check": [], "verdict": "missing"}
+      ]},
+      {"name": "6 建筑与基地（00§233）", "children": [
+        {"key": "b_house", "name": "仓库", "expect": "基地三建筑", "actual": "house_large.png 借用", "check": ["Assets/Art/Sprites/Buildings/house_large.png"]},
+        {"key": "b_statue", "name": "升级雕像", "expect": "同上", "actual": "monastery.png 借用", "check": ["Assets/Art/Sprites/Buildings/monastery.png"]},
+        {"key": "b_gate", "name": "出发大门", "expect": "同上", "actual": "castle.png 借用", "check": ["Assets/Art/Sprites/Buildings/castle.png"]},
+        {"key": "b_cartoon", "name": "卡通化提质 3 张", "expect": "工坊/石像/城门（MISSING§11）", "actual": "无", "check": [], "verdict": "missing", "req": "A-17"},
+        {"key": "b_floor", "name": "基地地板/墙体", "expect": "正式美术", "actual": "无", "check": [], "verdict": "missing", "req": "A-23"}
+      ]},
+      {"name": "7 UI", "children": [
+        {"key": "u_skill", "name": "技能图标 ×3", "expect": "64×64（MISSING§14）", "actual": "纯文字", "check": [], "verdict": "missing", "req": "A-20"},
+        {"key": "u_res", "name": "资源/状态图标 ×10", "expect": "32×32（MISSING§15）", "actual": "纯文字", "check": [], "verdict": "missing", "req": "A-21"},
+        {"key": "u_mini", "name": "小地图图例", "expect": "12×12（MISSING§16）", "actual": "纯色点", "check": [], "verdict": "missing", "req": "A-22"},
+        {"key": "u_upgrade", "name": "升级界面", "expect": "01§135 列了但无规格", "actual": "无", "check": [], "verdict": "missing"}
+      ]},
+      {"name": "8 MD 未提及、但项目需要（反馈区）", "children": [
+        {"key": "x_sfx", "name": "音效 / BGM 素材清单", "expect": "游戏必需（S-01~06 有需求无清单）", "actual": "无", "check": [], "verdict": "missing"},
+        {"key": "x_drop", "name": "敌人掉落物图标", "expect": "00§202 掉落待做", "actual": "无", "check": [], "verdict": "missing"},
+        {"key": "x_preloot", "name": "局前携带界面素材", "expect": "F-12 需要", "actual": "无", "check": [], "verdict": "missing"},
+        {"key": "x_spec", "name": "瓦片规格冲突", "expect": "01§56 写 16px，现状 64px TS 基线", "actual": "两套并存，需拍板哪套作准", "check": [], "verdict": "warn"}
+      ]}
+    ]}
+  ]
+}

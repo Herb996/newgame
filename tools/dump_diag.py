@@ -58,10 +58,10 @@ def main() -> int:
     io.open(log_path, "w", encoding="utf-8", newline="").write("")
     rc = 0
     if do_atlas:
-        p = "%s/_dump_atlas.png" % d
+        p = "%s/generated_images/atlas/_dump_atlas.png" % d
         rc |= run("atlas", p, ["--dump-atlas", p, "--zoom", str(args.zoom)], log_path)
     if do_biome:
-        p = "%s/_dump_biome.png" % d
+        p = "%s/generated_images/terrain/_dump_biome.png" % d
         rc |= run("biome", p, ["--dump-biome", p, "--zoom", str(args.zoom),
                                "--seed", str(args.seed)], log_path)
     return rc

@@ -1,6 +1,6 @@
 extends Node
 ## ============================================================
-## NoiseSystem — 噪音系统（02_TECH_BUILD.md 第二部分 噪音机制）
+## NoiseSystem — 噪音系统（DESIGN.md 第二部分 噪音机制）
 ##
 ## 全局噪音广播中心（autoload，见 project.godot）。
 ##   NoiseSystem.emit(source_pos, intensity)

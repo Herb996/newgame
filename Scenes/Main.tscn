@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://Scripts/base_system.gd" id="8_base"]
 [ext_resource type="Script" path="res://Scripts/warehouse_panel.gd" id="9_wh"]
 [ext_resource type="Script" path="res://Scripts/statue_panel.gd" id="10_st"]
+[ext_resource type="Script" path="res://Scripts/character_select_panel.gd" id="15_char"]
 [ext_resource type="Script" path="res://Scripts/loot_system.gd" id="11_loot"]
 [ext_resource type="Script" path="res://Scripts/survival_system.gd" id="12_surv"]
 [ext_resource type="Script" path="res://Scripts/animal_system.gd" id="13_animal"]
@@ -55,6 +56,9 @@ script = ExtResource("9_wh")
 
 [node name="StatuePanel" type="CanvasLayer" parent="."]
 script = ExtResource("10_st")
+
+[node name="CharacterPanel" type="CanvasLayer" parent="."]
+script = ExtResource("15_char")
 
 [node name="ViewHint" type="CanvasLayer" parent="."]
 script = ExtResource("14_hint")

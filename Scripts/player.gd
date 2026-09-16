@@ -2,7 +2,7 @@ extends CharacterBody2D
 ## ============================================================
 ## Player — 玩家（功能组件层）
 ##
-## 分层（见 02_TECH_BUILD.md 核心架构原则）：
+## 分层（见 DESIGN.md 核心架构原则）：
 ##   · 本文件 = 功能组件层：只提供能力（移动/寻路/战斗/选中），不含行为决策
 ##   · Scripts/combat/state_machine.gd + states/ = 行为决策层：决定何时动、何时打
 ##   状态机通过下列公开接口驱动本组件，二者解耦：
@@ -47,14 +47,6 @@ var _run: Node = null
 # 空 = 不启用武器表，一切走 combat.attack 全局值（改造前的行为）。
 var current_weapon: StringName = &""
 
-# --- 体力（技能资源，蓝图 Phase 2 资源循环） ---
-var stamina := 0.0
-var max_stamina := 0.0
-var _stamina_regen_delay := 0.0      # 消耗后的回复延迟
-
-# --- 增益：齿轮护盾限时减伤 ---
-var guard_reduction := 0.0           # 0~0.9，当前减伤比例
-var guard_remaining := 0.0           # 剩余时长（秒）
 
 # 导航数据：由 main.gd 注入
 var _walls: Array = []
@@ -84,7 +76,6 @@ var _stall_repaths := 0                     # 连续无效重算次数（走动�
 const WAYPOINT_REACH_DIST := 4.0            # 距路点小于此值视为已通过该路点
 
 var state_machine: StateMachine
-var skill_system: SkillSystem
 
 @onready var _select_area: Area2D = $SelectArea
 @onready var _select_icon: Node2D = $SelectIcon
@@ -109,7 +100,6 @@ func _current_anim() -> int:
 		&"hitstun": return PlayerAnimator.Anim.HIT
 		&"attack": return PlayerAnimator.Anim.ATTACK
 		&"dodge": return PlayerAnimator.Anim.DODGE
-		&"skill": return PlayerAnimator.Anim.ATTACK
 		&"move": return PlayerAnimator.Anim.WALK
 		_: return PlayerAnimator.Anim.IDLE
 
@@ -219,7 +209,6 @@ func _init_state_machine() -> void:
 	state_machine.add_state(PlayerAttackState.new(self))
 	state_machine.add_state(PlayerHitStunState.new(self))
 	state_machine.add_state(PlayerDodgeState.new(self))
-	state_machine.add_state(PlayerSkillState.new(self))
 	state_machine.add_state(PlayerDeadState.new(self))
 	state_machine.start()
 
@@ -248,10 +237,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.physical_keycode == dodge_key:
 			push_input(&"dodge")
-			return
-		var skill_id := _skill_id_for_key(event.physical_keycode)
-		if skill_id != &"":
-			push_input(StringName("skill_%s" % str(skill_id)))
 			return
 	state_machine.handle_input(event)
 	if not selected:
@@ -390,22 +375,11 @@ func _init_combat() -> void:
 		max_hp = meta_hp
 	hp = max_hp
 	print("[Combat] 本局生命上限 %d（含局外养成）" % max_hp)
-	max_stamina = float(Config.get_value("combat.stamina.max", 100.0))
-	stamina = max_stamina
 	_run = get_tree().get_first_node_in_group("run_manager")
-	_init_skill_system()
 	if hitbox != null:
 		hitbox.monitoring = false   # 只在判定帧窗口开启
 		hitbox.monitorable = false
 		_apply_hitbox_radius()      # 半径由当前武器决定（可换武器时重设）
-
-
-## 技能系统：从 config 装配技能表，之后由 SkillSystem 自己做冷却 tick 与释放校验
-func _init_skill_system() -> void:
-	skill_system = SkillSystem.new()
-	skill_system.name = "SkillSystem"
-	add_child(skill_system)
-	skill_system.setup(self)
 
 
 func _tick_combat_timers(delta: float) -> void:
@@ -413,20 +387,6 @@ func _tick_combat_timers(delta: float) -> void:
 		_invincible_timer -= delta
 	if _dodge_cooldown > 0.0:
 		_dodge_cooldown -= delta
-	# 体力：消耗后停 regen_delay 秒再回复（资源循环：消耗 → 延迟 → 缓慢回满）
-	if _stamina_regen_delay > 0.0:
-		_stamina_regen_delay -= delta
-	elif stamina < max_stamina:
-		stamina = minf(stamina
-				+ float(Config.get_value("combat.stamina.regen_per_second", 16.0)) * delta,
-				max_stamina)
-	# 护盾增益计时
-	if guard_remaining > 0.0:
-		guard_remaining -= delta
-		if guard_remaining <= 0.0:
-			guard_remaining = 0.0
-			guard_reduction = 0.0
-			print("[Skill] 齿轮护盾结束")
 	# 输入缓冲：超时的指令自然过期
 	var life := float(Config.get_value("combat.input.buffer_seconds", 0.25))
 	for i in range(_input_buffer.size() - 1, -1, -1):
@@ -458,82 +418,6 @@ func has_input(action: StringName) -> bool:
 	return false
 
 
-## 缓冲里最早的一条技能指令（返回技能 id；没有返回空）
-func next_skill_input() -> StringName:
-	if skill_system == null:
-		return &""
-	for sid in skill_system.ids():
-		if has_input(StringName("skill_%s" % str(sid))):
-			return sid
-	return &""
-
-
-## 尝试释放缓冲里最早的一条技能指令；成功（已切到 skill 状态）返回 true
-## 资源不足/冷却中时保留指令，下一帧继续尝试，直到缓冲过期
-func try_cast_buffered_skill() -> bool:
-	var sid := next_skill_input()
-	if sid == &"":
-		return false
-	if not skill_system.try_cast(sid):
-		return false
-	consume_input(StringName("skill_%s" % str(sid)))
-	return true
-
-
-## 按键码 → 技能 id（键位写在 config 的 combat.skills.<id>.key）
-func _skill_id_for_key(keycode: int) -> StringName:
-	if skill_system == null or keycode <= 0:
-		return &""
-	for sid in skill_system.ids():
-		if int(skill_system.get_skill(sid).data.get("key", 0)) == keycode:
-			return sid
-	return &""
-
-
-# --- 体力（技能资源） ---
-
-func spend_stamina(cost: int) -> void:
-	stamina = maxf(stamina - float(cost), 0.0)
-	_stamina_regen_delay = float(Config.get_value("combat.stamina.regen_delay_seconds", 0.8))
-
-
-# --- 增益 ---
-
-## 齿轮护盾：限时减伤（reduction 0~1，duration 秒）
-func apply_guard(reduction: float, duration: float) -> void:
-	guard_reduction = clampf(reduction, 0.0, 0.9)
-	guard_remaining = duration
-	print("[Skill] 齿轮护盾：减伤 %.0f%%，持续 %.1f 秒" % [guard_reduction * 100.0, duration])
-
-
-# --- 技能效果（功能组件层，供 PlayerSkillState 调用） ---
-
-## 圆形范围伤害 + 击退（蒸汽爆发）。
-## 直接遍历 enemies 组按距离判定：100 个敌人量级，比物理查询更省。
-func skill_aoe_hit(radius: float, damage: int, knockback_speed: float) -> void:
-	var hits := 0
-	for e in _damageable_nodes():
-		var to_enemy: Vector2 = e.global_position - global_position
-		if to_enemy.length() > radius:
-			continue
-		e.take_damage(damage)
-		if e.has_method("apply_knockback"):
-			e.apply_knockback(to_enemy.normalized() * knockback_speed)
-		hits += 1
-	print("[Skill] 范围命中 %d 个目标，每个 %d 伤害" % [hits, damage])
-
-
-## 突进沿途伤害（钩爪突进）：同一目标只命中一次，去重表由调用方持有
-func skill_dash_hit(radius: float, damage: int, hit_targets: Dictionary) -> void:
-	for e in _damageable_nodes():
-		if hit_targets.has(e):
-			continue
-		if e.global_position.distance_to(global_position) > radius:
-			continue
-		hit_targets[e] = true
-		e.take_damage(damage)
-
-
 ## 场上所有可受伤目标（敌人 + 中立生物），已滤掉失效实例
 func _damageable_nodes() -> Array:
 	var out: Array = []
@@ -542,13 +426,6 @@ func _damageable_nodes() -> Array:
 			if is_instance_valid(n):
 				out.append(n)
 	return out
-
-
-## 生成冲击波圆环（灰盒视觉反馈，播完自毁）
-func spawn_impact_ring(radius: float, color: Color) -> void:
-	var ring: Node2D = FX_RING.new()
-	ring.setup(radius, 0.35, color)
-	add_child(ring)
 
 
 func can_dodge() -> bool:
@@ -712,7 +589,7 @@ func _spawn_tracer(from: Vector2, to: Vector2, cfg: Dictionary) -> void:
 
 
 ## 冲击环（复用 fx_ring），但**挂在世界层并定位到任意点**——
-## spawn_impact_ring 只能相对玩家（AOE 用），狙击命中点在远处，必须全局定位。
+## 冲击波圆环挂在世界上（全局坐标），狙击命中点在远处也要能定位。
 func _spawn_ring_at(pos: Vector2, radius: float, color: Color) -> void:
 	var parent := get_parent()
 	if parent == null:
@@ -735,21 +612,13 @@ static func _is_damageable(node: Node) -> bool:
 func take_damage(amount: int, source_pos: Vector2 = Vector2.ZERO) -> bool:
 	if _dead or is_invincible():
 		return false
-	# 护盾减伤（齿轮护盾）：按比例削减后取整
-	var final_damage := amount
-	if guard_remaining > 0.0 and guard_reduction > 0.0:
-		final_damage = int(round(float(amount) * (1.0 - guard_reduction)))
-	hp = maxi(hp - final_damage, 0)
+	hp = maxi(hp - amount, 0)
 	_invincible_timer = float(Config.get_value("combat.player.invincible_after_hit_seconds", 0.4))
 	var knockback := Vector2.ZERO
 	if source_pos != Vector2.ZERO:
 		knockback = (global_position - source_pos).normalized() \
 				* float(Config.get_value("combat.player.knockback_speed", 140.0))
-	if final_damage != amount:
-		print("[Combat] 玩家受到 %d 伤害（护盾减伤后 %d），剩余 HP %d/%d" % [
-			amount, final_damage, hp, max_hp])
-	else:
-		print("[Combat] 玩家受到 %d 伤害，剩余 HP %d/%d" % [amount, hp, max_hp])
+	print("[Combat] 玩家受到 %d 伤害，剩余 HP %d/%d" % [amount, hp, max_hp])
 	if hp <= 0:
 		state_machine.force_transition(&"dead")
 		return true

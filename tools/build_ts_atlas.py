@@ -198,7 +198,7 @@ def main() -> int:
     prev.paste(atlas_f.convert("RGB"), (0, 0))
     prev.paste(atlas_w.convert("RGB"), (0, T + 6))
     prev.resize((prev.size[0] * 4, prev.size[1] * 4), Image.NEAREST).save(
-        os.path.join(ROOT, "_atlas_preview.png"))
+        os.path.join(ROOT, "generated_images", "atlas", "_atlas_preview.png"))
     print("预览 -> _atlas_preview.png")
     return 0
 

@@ -379,6 +379,7 @@ func _same(a, b) -> bool:
 func _make_schema() -> Array:
 	return [
 		{"name": "画面", "entries": _schema_display()},
+		{"name": "性能", "entries": _schema_performance()},
 		{"name": "音频", "entries": _schema_audio()},
 		{"name": "玩法", "entries": _schema_gameplay()},
 		{"name": "操作", "entries": _schema_controls()},
@@ -401,9 +402,10 @@ func _schema_display() -> Array:
 		{"path": "display.vsync", "label": "垂直同步", "type": "enum", "live": true,
 			"items": [["关闭", "disabled"], ["开启", "enabled"], ["自适应", "adaptive"]],
 			"note": "撕裂就开，输入延迟高就关。上限与「帧率上限」冲突时取较小者。"},
-		{"path": "display.max_fps", "label": "帧率上限", "type": "number", "live": true,
-			"min": 0, "max": 240, "step": 1,
-			"note": "0 = 不限帧。笔记本上降到 60 能明显降温省电。"},
+		{"path": "display.max_fps", "label": "帧率上限", "type": "enum", "live": true,
+			"items": [["不限（默认）", 0], ["30", 30], ["60", 60], ["75", 75], ["90", 90],
+				["120", 120], ["144", 144], ["165", 165], ["240", 240]],
+			"note": "默认「不限」。笔记本想降温省电选 60。改成下拉是为了不再出现「拖到 1 帧把游戏卡死」的情况。上限与垂直同步冲突时取较小者。"},
 
 		{"type": "divider", "label": "画面缩放"},
 		{"path": "display.stretch_mode", "label": "缩放模式", "type": "enum", "live": true,
@@ -483,6 +485,85 @@ func _schema_display() -> Array:
 		{"path": "map.grade.saturation", "label": "饱和度", "type": "number",
 			"min": 0.0, "max": 2.0, "step": 0.02, "fmt": "times"},
 	]
+
+
+## 「性能优先」预设一次性写入的一组用户层覆盖（键 → 流畅档取值）。
+## 只写用户层，不碰 Data/config.json；「恢复均衡」逐项清掉即回到出厂值。
+const _PERF_BUNDLE: Dictionary = {
+	"map.decor.shadow": false,
+	"map.decor.density": 0.6,
+	"map.macro_light.enabled": false,
+	"map.grade.enabled": false,
+	"player.vision_radius_cells": 8,
+	"enemy.ai_active_radius_cells": 16,
+	"enemy.los_step_cells": 0.6,
+	"enemy.count": 60,
+	"animals.count": 30,
+	"loot.density": 0.02,
+	"display.max_fps": 60,
+}
+
+
+func _schema_performance() -> Array:
+	return [
+		{"type": "info", "label": "这一页是「降配提速」的开关。生效时机各不同：AI 活跃半径、视线步长每帧读取，"
+			+ "改完下一帧即见效；视野半径、资源点/装饰/敌人数量、投影、明暗调色要在设置里改完后重新进一局 / 重新生成地图才读到。"},
+
+		{"type": "divider", "label": "一键预设（只写用户层，可随时用「恢复均衡」或底部「恢复默认」撤销）"},
+		{"type": "action", "label": "性能优先", "button": "应用 · 降配流畅",
+			"handler": Callable(self, "_apply_perf_preset"),
+			"note": "把资源点/装饰/敌人数量与视野等一次性降到流畅档。开局明显掉帧时用；会改变本局体感，但不动出厂配置。"},
+		{"type": "action", "label": "恢复均衡", "button": "清除降配",
+			"handler": Callable(self, "_clear_perf_preset"),
+			"note": "清掉「性能优先」写下的全部用户层覆盖，回到 Data/config.json 的出厂值。"},
+
+		{"type": "divider", "label": "AI 开销（每帧读取 · 即时生效）"},
+		{"path": "enemy.ai_active_radius_cells", "label": "敌人 AI 活跃半径（格）", "type": "number",
+			"min": 8, "max": 48, "step": 1,
+			"note": "超出此半径的敌人休眠，不跑状态机与视线检测 —— 地图大、敌人多时最省 CPU 的一档（默认 32）。调小远处敌人反应会变迟钝。"},
+		{"path": "enemy.los_step_cells", "label": "视线采样步长（格）", "type": "number",
+			"min": 0.2, "max": 1.5, "step": 0.05,
+			"note": "敌人判断能否看见玩家时，沿视线每隔多远采一个墙格。越大越省、越粗糙（默认 0.35）。墙后视野判定会变松。"},
+
+		{"type": "divider", "label": "视野与迷雾（下次进局生效）"},
+		{"path": "player.vision_radius_cells", "label": "玩家视野半径（格）", "type": "number",
+			"min": 5, "max": 20, "step": 1,
+			"note": "迷雾揭示半径，也是敌人 / 资源点的可见范围。每帧揭示面积随半径平方增长，调小可减负，但缩短可视距离（默认 10，硬核向不建议太小）。"},
+
+		{"type": "divider", "label": "地图生成开销（下次生成地图生效）"},
+		{"path": "map.decor.shadow", "label": "装饰投影", "type": "bool",
+			"note": "关掉后每棵树 / 石少画一个投影 Sprite2D，装饰密的地图能明显减负（默认开）。"},
+		{"type": "info", "label": "更多降配项已在各页：资源点密度、敌人 / 中立数量、装饰密度在「玩法」页；"
+			+ "宏观明暗层、画面调色、帧率上限、垂直同步在「画面」页顶部。"},
+	]
+
+
+func _apply_perf_preset() -> void:
+	var lines := ""
+	for k in _PERF_BUNDLE.keys():
+		lines += "%s → %s\n" % [k, str(_PERF_BUNDLE[k])]
+	_confirm("性能优先",
+			"将把以下参数写入用户层（可随时用「恢复均衡」或底部「恢复默认」撤销）：\n\n"
+			+ lines + "\n多数项要重新进一局 / 重新生成地图才生效。确定？",
+			"应用",
+			func():
+				for k in _PERF_BUNDLE.keys():
+					Config.set_user_value(k, _PERF_BUNDLE[k], false)
+				Config.save_user_settings()
+				DisplaySettings.apply_all()
+				_show_tab(_active))
+
+
+func _clear_perf_preset() -> void:
+	_confirm("恢复均衡",
+			"清除「性能优先」写下的全部用户层覆盖，回到出厂值？",
+			"清除",
+			func():
+				for k in _PERF_BUNDLE.keys():
+					Config.clear_user_setting(k, false)
+				Config.save_user_settings()
+				DisplaySettings.apply_all()
+				_show_tab(_active))
 
 
 func _schema_audio() -> Array:
@@ -582,10 +663,6 @@ func _schema_controls() -> Array:
 		{"path": "camera.return_key", "label": "相机回到玩家", "type": "key"},
 		{"path": "combat.input.attack_mouse_button", "label": "攻击鼠标键", "type": "enum",
 			"items": [["鼠标左键", 1], ["鼠标右键", 2], ["鼠标中键", 3]]},
-		{"type": "divider", "label": "技能"},
-		{"path": "combat.skills.steam_burst.key", "label": "蒸汽爆发", "type": "key"},
-		{"path": "combat.skills.grapple_dash.key", "label": "钩爪突进", "type": "key"},
-		{"path": "combat.skills.gear_guard.key", "label": "齿轮护盾", "type": "key"},
 	]
 
 

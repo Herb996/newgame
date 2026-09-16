@@ -151,7 +151,7 @@ func _make_entries() -> Array:
 			"plan": "美术资源署名。注意这份清单是「许可合规」的一部分，不能省："
 					+ "Tiny Swords (Free Pack) — Pixel Frog，CC0。后续每引入一份 CC0/CC-BY 素材都要登记。",
 			"impl": "新建 Data/credits.md 或直接做成静态多页文本；"
-					+ "素材来源同时记在 docs/MISSING_ASSETS.md 的「已就位」表里。",
+					+ "素材来源同时记在 docs/DESIGN.md 的「缺失素材清单」章里。",
 		},
 		{
 			"name": "语言（占位）",

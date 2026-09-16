@@ -10,6 +10,9 @@
         "biome_border_jitter": 0.06,
         "biome_spread": 1.35,
         "biome_edge_blend": 0.45,
+        "biome_smooth_iterations": 3,
+        "biome_remove_islands": true,
+        "biome_min_region_cells": 40,
         "biomes": [
             {
                 "id": 0,
@@ -120,27 +123,22 @@
                 "pebble": 0.04
             }
         ],
-        "veins": {
-            "iron": {
-                "biomes": [
-                    1
-                ],
-                "count": 22,
-                "min_distance_from_spawn_cells": 10
+        "resource_clusters": {
+            "tree": {
+                "count": 18,
+                "weight": {"0": 3, "1": 1, "2": 6, "3": 0}
             },
-            "gold": {
-                "biomes": [
-                    1
-                ],
-                "count": 9,
-                "min_distance_from_spawn_cells": 14
+            "rock": {
+                "count": 12,
+                "weight": {"0": 2, "1": 6, "2": 2, "3": 0}
+            },
+            "iron": {
+                "count": 6,
+                "weight": {"0": 1, "1": 8, "2": 1, "3": 0}
             },
             "oil": {
-                "biomes": [
-                    1
-                ],
-                "count": 10,
-                "min_distance_from_spawn_cells": 10
+                "count": 5,
+                "weight": {"0": 1, "1": 1, "2": 1, "3": 0}
             }
         },
         "cluster_noise_frequency": 0.05,
@@ -148,35 +146,10 @@
         "min_reachable_ratio": 0.3,
         "max_regen_attempts": 10,
         "river": {
-            "enabled": true,
-            "frequency": 0.045,
-            "width_cells": 1.3,
-            "jitter": 0.01,
-            "slow": 0.72,
-            "min_dist_from_spawn_cells": 8,
-            "orientation": [
-                [
-                    0.4,
-                    -0.22,
-                    0.0,
-                    1.0
-                ],
-                [
-                    1.0,
-                    0.0,
-                    0.22,
-                    0.4
-                ]
-            ],
-            "biome_scale": [
-                1.0,
-                0.7,
-                1.25,
-                0.0
-            ]
+            "slow": 0.72
         },
         "crack": {
-            "enabled": true,
+            "enabled": false,
             "frequency": 0.028,
             "width_cells": 0.75,
             "jitter": 0.006,
@@ -248,6 +221,24 @@
         "sprite_scale": 0.6,
         "sprite_offset_y": -38.0,
         "sprite_pixel_unit": 10.0
+    },
+    "characters": {
+        "_comment": "出发大门的角色选择表（靠近大门按 E 弹面板，选中后才进局）。weapon 指向 combat.weapons 的 id —— 贴图集跟着武器走（sword → player.sprite_set = sprites_lancer 8 向；bow → 锁 sprites_archer），所以角色 = 选武器/打法。default 是面板未做选择时的预选项；选择本身只存会话内存（Config override player.weapon），不落盘，下次打开面板默认回到 default。新增角色往 list 里加即可，面板自动多一行。",
+        "default": "lancer",
+        "list": [
+            {
+                "id": "lancer",
+                "name": "枪剑士",
+                "desc": "近战 · 扇形 200° 最多命中 3 目标 · 伤害 25 · 噪音大",
+                "weapon": "sword"
+            },
+            {
+                "id": "archer",
+                "name": "弓手",
+                "desc": "远程 · 弓箭弹道 射程 640px · 伤害 20 · 噪音小",
+                "weapon": "bow"
+            }
+        ]
     },
     "sprites": {
         "view": {
@@ -406,9 +397,6 @@
             "dodge": 40,
             "attack": 120,
             "shout": 160,
-            "skill_steam_burst": 90,
-            "skill_grapple_dash": 60,
-            "skill_gear_guard": 45,
             "sniper_shot": 240
         },
         "ring_duration_seconds": 0.7,
@@ -518,54 +506,6 @@
             "speed_multiplier": 3.0,
             "invincible": true,
             "cooldown_seconds": 0.8
-        },
-        "stamina": {
-            "max": 100,
-            "regen_per_second": 16,
-            "regen_delay_seconds": 0.8
-        },
-        "skills": {
-            "steam_burst": {
-                "name": "蒸汽爆发",
-                "key": 49,
-                "type": "aoe_self",
-                "stamina_cost": 25,
-                "cooldown_seconds": 4.0,
-                "windup_seconds": 0.15,
-                "active_seconds": 0.12,
-                "recovery_seconds": 0.25,
-                "damage": 30,
-                "radius_px": 288.0,
-                "knockback_speed": 880.0,
-                "noise": 45
-            },
-            "grapple_dash": {
-                "name": "钩爪突进",
-                "key": 50,
-                "type": "dash",
-                "stamina_cost": 20,
-                "cooldown_seconds": 5.0,
-                "windup_seconds": 0.08,
-                "active_seconds": 0.18,
-                "recovery_seconds": 0.2,
-                "damage": 20,
-                "dash_speed": 3600.0,
-                "hit_radius_px": 104.0,
-                "noise": 35
-            },
-            "gear_guard": {
-                "name": "齿轮护盾",
-                "key": 51,
-                "type": "buff",
-                "stamina_cost": 30,
-                "cooldown_seconds": 8.0,
-                "windup_seconds": 0.05,
-                "active_seconds": 0.15,
-                "recovery_seconds": 0.15,
-                "damage_reduction": 0.6,
-                "buff_duration_seconds": 2.5,
-                "noise": 30
-            }
         }
     },
     "loot": {
@@ -650,7 +590,7 @@
                     30,
                     42
                 ],
-                "hint": "按 E 出发进入废墟",
+                "hint": "按 E 选择角色出发",
                 "h3d": 2.2,
                 "sprite": "res://Assets/Art/Sprites/Buildings/castle.png"
             }
@@ -793,7 +733,7 @@
     },
     "menu": {
         "_comment": "开始菜单。game_scene = 新建/历史存档后进入的场景，**本项目只做 2D 线**，所以固定指 res://Scenes/Main.tscn（3D 场景不在计划内，保留只为随时 F6 回看）；save_slots = 存档槽位数（user://saves/slot_NN.json）。",
-        "title": "蒸汽朋克：废墟提取",
+        "title": "王国废墟：拾荒撤离",
         "subtitle": "SteamPunk Extraction",
         "version_label": "开发版 · Tiny Swords 2D 线",
         "game_scene": "res://Scenes/Main.tscn",
@@ -852,7 +792,7 @@
         "auto_enter_run": true,
         "main3d_start": "base",
         "time_scale": 20.0,
-        "log_state_transitions": true,
+        "log_state_transitions": false,
         "map_preview": "",
         "map_preview_cells": 128,
         "main3d_capture": "",

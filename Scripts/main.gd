@@ -51,10 +51,17 @@ var _last_map: Dictionary = {}     # 最近一次生成的地图结果（供 Soa
 @onready var base_system: Node = $BaseSystem
 @onready var warehouse_panel: CanvasLayer = $WarehousePanel
 @onready var statue_panel: CanvasLayer = $StatuePanel
+@onready var character_panel: CanvasLayer = $CharacterPanel
+
+## 本次会话里最近一次选中的角色 id（供大门面板标注「上次选择」）。
+## 选中的角色只存会话内存（Config override player.weapon），不落盘：
+## 每次从大门出发都要过一遍选人面板，重开游戏回到 config 的 characters.default。
+var _selected_character_id := ""
 
 
 func _ready() -> void:
 	base_system.building_interacted.connect(_on_building_interacted)
+	character_panel.character_selected.connect(_on_character_selected)
 	if Config.get_value("debug.smoke_test", false):
 		_smoke_test()
 		return
@@ -339,6 +346,7 @@ func _enter_base() -> void:
 	get_tree().paused = false
 	warehouse_panel.close()
 	statue_panel.close()
+	character_panel.close()
 	_clear_game_root()
 	var spawn: Vector2 = base_system.setup(game_root)
 	var tile_size: int = int(Config.get_value("map.tile_size", 16))
@@ -421,7 +429,10 @@ func _enter_run() -> void:
 func _on_building_interacted(building_id: String) -> void:
 	match building_id:
 		"gate":
-			_enter_run()
+			# 出发前先选角色：面板「出击」→ _on_character_selected 才进局；
+			# E/ESC 取消则留在基地。交互立刻复位，取消后可再按 E 重开面板。
+			character_panel.open(_selected_character_id)
+			base_system.reset_interaction(building_id)
 		"warehouse":
 			warehouse_panel.open()
 			base_system.reset_interaction(building_id)
@@ -431,6 +442,20 @@ func _on_building_interacted(building_id: String) -> void:
 		_:
 			push_warning("[Main] 未知建筑：%s" % building_id)
 			base_system.reset_interaction(building_id)
+
+
+## 大门面板「出击」回调：记住选择 → 应用武器覆盖 → 进局。
+## 角色的武器走 Config override（player.weapon）而不是直接 switch_weapon：
+## 这样玩家 _ready 解析初始武器时就已拿到所选角色（含贴图集绑定，
+## 弓自动切 sprites_archer），回基地重建玩家也保持所选外观。
+## 命令行 --weapon 优先级仍更高：_enter_run 里会再 switch_weapon 压回去。
+func _on_character_selected(character: Dictionary) -> void:
+	_selected_character_id = str(character.get("id", ""))
+	var weapon := str(character.get("weapon", ""))
+	if weapon != "":
+		Config.set_override("player.weapon", weapon)
+	print("[Main] 已选择角色 %s（武器 %s），出发进局" % [_selected_character_id, weapon])
+	_enter_run()
 
 
 # ------------------------------------------------------------

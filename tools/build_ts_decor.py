@@ -75,7 +75,7 @@ def main() -> int:
         t = Image.open(os.path.join(OUT, name)).convert("RGBA")
         prev.paste(t, (x, 170 - t.size[1]), t)
         x += t.size[0] + 30
-    prev.save(os.path.join(ROOT, "_decor_preview.png"))
+    prev.save(os.path.join(ROOT, "generated_images", "terrain", "_decor_preview.png"))
     print("预览 -> _decor_preview.png")
     return 0
 

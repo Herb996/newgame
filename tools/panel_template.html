@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Keep Quiet — 需求面板</title>
+<style>
+:root{--bg:#f4eee1;--panel:#fbf7ee;--ink:#2b2318;--sub:#7a6a52;--line:#d9cbae;--acc:#b06a2b;
+--done:#2e9e5b;--doing:#3a7bd5;--planned:#d9a520;--design:#8e5bb5;--blocked:#d97b2e;--p0:#cc3333;--paused:#9aa0a6}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+header{position:sticky;top:0;z-index:30;background:linear-gradient(180deg,#3a2d1c,#2b2318);color:#f0e6d2;
+ padding:9px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;letter-spacing:1px}
+nav{display:flex;gap:6px}
+nav button{background:transparent;border:1px solid #6b5836;color:#e8dcc0;padding:5px 16px;border-radius:16px;cursor:pointer;font-size:13px}
+nav button.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:bold}
+.hbtn{background:#5b4a2c;border:1px solid #7d6742;color:#f0e6d2;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px}
+.hbtn:hover{background:var(--acc)}
+.hbtn.warn{background:#7a2f2f;border-color:#a04a4a}
+.gen{font-size:11px;color:#b9a87c;margin-left:auto}
+main{padding:14px 16px;max-width:1500px;margin:0 auto}
+.view{display:none}.view.on{display:block}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+input[type=search]{padding:6px 12px;border:1px solid var(--line);border-radius:16px;background:var(--panel);outline:none;width:220px}
+select{padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+label.ck{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:4px;cursor:pointer}
+.cat{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.cat>h2{margin:0;padding:11px 16px;background:#efe4cb;font-size:16px;cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none}
+.cat>h2 .rt{margin-left:auto;font-size:12px;font-weight:normal;color:var(--sub);display:flex;gap:10px;align-items:center}
+.grp{border-top:1px solid var(--line)}
+.grp>h3{margin:0;padding:8px 16px;background:#f7f0e0;font-size:13px;color:var(--acc);cursor:pointer;user-select:none;display:flex;gap:8px;align-items:center}
+.grp>h3 .rt{margin-left:auto;font-weight:normal;font-size:11px;color:var(--sub)}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+th{background:#f3ead8;color:var(--sub);font-weight:normal;font-size:11px;text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);position:sticky;top:0}
+td{padding:6px 8px;border-bottom:1px solid #eee2ca;vertical-align:top;word-break:break-word}
+tr:hover td{background:#f8f2e2}
+tr.done td.t{text-decoration:line-through;color:var(--sub)}
+.id{font-weight:bold;color:var(--acc);white-space:nowrap;font-size:12px}
+.badge{display:inline-block;padding:1px 8px;border-radius:9px;color:#fff;font-size:11px;cursor:pointer;border:none;white-space:nowrap}
+.pr{padding:1px 7px;border-radius:4px;font-size:11px;border:1px solid;cursor:pointer;background:transparent;font-weight:bold}
+.P0{color:#cc3333;border-color:#cc3333}.P1{color:#b06a2b;border-color:#b06a2b}
+.P2{color:#5b7f5e;border-color:#5b7f5e}.P3{color:#8a8a8a;border-color:#8a8a8a}
+code{background:#eadfc8;border-radius:3px;padding:0 4px;font-size:11px;display:inline-block;margin:1px 0}
+.dep{color:var(--acc);cursor:pointer;text-decoration:underline;font-size:12px}
+.old{color:#b0a48c;font-size:11px}
+.note{color:#8a5a2b;font-size:12px;margin-top:2px}
+.wl{text-align:right;white-space:nowrap;font-size:12px;color:var(--sub)}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+.stat h3{margin:0 0 9px;font-size:14px;color:var(--acc)}
+.grid{display:flex;gap:10px;flex-wrap:wrap}
+.card{flex:1;min-width:120px;background:#f7f0e0;border:1px solid var(--line);border-radius:8px;padding:9px;text-align:center}
+.card .n{font-size:22px;font-weight:bold}.card .t{font-size:11px;color:var(--sub)}
+.warn{background:#fdeaea;border:1px solid #e5b8b8;border-radius:10px;padding:11px 14px;margin-bottom:12px}
+.ok{background:#eaf6ec;border:1px solid #bfe0c4;border-radius:10px;padding:11px 14px;margin-bottom:12px}
+.prio-row{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border-bottom:1px solid #eee2ca}
+.prio-row:last-child{border:none}
+.prio-row .n{flex:1}
+.prio-row .m{font-size:11px;color:var(--sub);white-space:nowrap}
+.legend{display:flex;gap:8px;flex-wrap:wrap;font-size:12px;align-items:center}
+.legend b{color:var(--sub);font-weight:normal}
+/* ===== 素材核对清单 ===== */
+.cl-grp{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:8px 0;overflow:hidden}
+.cl-head{padding:8px 12px;font-size:14px;color:var(--ink);cursor:pointer;user-select:none;display:flex;gap:8px;align-items:center}
+.cl-head .rt{margin-left:auto;font-size:11px;color:var(--sub);display:flex;gap:8px}
+.cl-leaf{border-top:1px solid #eee2ca;padding:8px 12px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;background:#fffdf8}
+.cl-leaf.missing{background:#fdf1f0}
+.cl-leaf.warn{background:#fdf8e8}
+.cl-vd{font-size:11px;font-weight:bold;white-space:nowrap;border-radius:9px;padding:1px 8px;color:#fff}
+.cl-leaf.ok .cl-vd{background:var(--done)}
+.cl-leaf.warn .cl-vd{background:var(--planned)}
+.cl-leaf.missing .cl-vd{background:var(--p0)}
+.cl-leaf.code .cl-vd{background:var(--doing)}
+.cl-name{font-weight:bold;font-size:13px;min-width:120px}
+.cl-col{font-size:12px;color:var(--sub)}
+.cl-col b{color:var(--acc);font-weight:normal}
+.cl-leaf .files{width:100%;font-size:11px}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.tcell{width:150px;border:1px solid var(--line);border-radius:8px;background:#fff;overflow:hidden;cursor:zoom-in}
+.tcell img{display:block;width:100%;height:112px;object-fit:contain;background:
+ repeating-conic-gradient(#efe8d8 0% 25%, #fbf7ee 0% 50%) 0 0/16px 16px;image-rendering:pixelated}
+.tcell .cap{font-size:10px;color:var(--sub);padding:3px 6px;line-height:1.35;border-top:1px solid #eee2ca;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tcell .cap b{color:var(--acc)}
+.gap{margin-top:8px;background:#fdf3e3;border:1px dashed #d9a520;border-radius:8px;padding:8px 10px}
+.gap summary{cursor:pointer;font-size:12px;color:#8a5a2b;font-weight:bold}
+.gap pre{white-space:pre-wrap;font-size:11px;background:#fff;border:1px solid #eadfc8;border-radius:5px;padding:8px;margin:8px 0 6px;font-family:Consolas,monospace;color:#5b4a2c}
+.gap .copy{padding:3px 10px;border-radius:5px;border:1px solid var(--line);background:#efe4cb;cursor:pointer;font-size:11px}
+#lightbox{position:fixed;inset:0;background:rgba(30,22,10,.82);z-index:80;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;padding:24px}
+#lightbox.on{display:flex}
+#lightbox img{max-width:92vw;max-height:78vh;image-rendering:pixelated;background:
+ repeating-conic-gradient(#efe8d8 0% 25%, #fbf7ee 0% 50%) 0 0/24px 24px;border-radius:10px;border:2px solid #b06a2b}
+#lightbox .lb-cap{color:#f0e6d2;font-size:13px;text-align:center}
+#lightbox .lb-files{color:#b9a87c;font-size:11px;max-width:90vw;text-align:center;line-height:1.7}
+/* ===== 依赖路线图 ===== */
+#dagWrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:auto}
+#dag{display:block}
+.dag-lane{fill:#efe4cb;opacity:.45}
+.dag-lane-alt{fill:#f7f0e0;opacity:.45}
+.dag-lane-label{font-size:12px;fill:#7a6a52;font-weight:bold}
+.dag-col-label{font-size:11px;fill:#b06a2b;font-weight:bold}
+.dnode rect{stroke-width:1.4;rx:7;cursor:pointer}
+.dnode text{font-size:11px;fill:#2b2318;pointer-events:none}
+.dnode .did{font-weight:bold;font-size:10px;fill:#fff}
+.dedge{fill:none;stroke:#b9a87c;stroke-width:1.4;marker-end:url(#arr)}
+.dedge.crit{stroke:#cc3333;stroke-width:2.4;marker-end:url(#arrc)}
+.dnode.dim{opacity:.22}
+.dedge.dim{opacity:.12}
+#edit{position:fixed;right:-460px;top:0;bottom:0;width:440px;background:var(--panel);border-left:2px solid var(--acc);
+ z-index:60;padding:16px;overflow:auto;transition:right .18s;box-shadow:-4px 0 18px rgba(60,40,10,.18)}
+#edit.on{right:0}
+#edit h3{margin:0 0 12px;color:var(--acc);font-size:15px}
+#edit label{display:block;font-size:11px;color:var(--sub);margin:10px 0 3px}
+#edit input,#edit select,#edit textarea{width:100%;padding:6px;border:1px solid var(--line);border-radius:5px;background:#fff;font-size:13px;font-family:inherit}
+#edit textarea{height:62px;resize:vertical}
+#edit .btns{display:flex;gap:8px;margin-top:16px}
+#edit .btns button{flex:1;padding:8px;border-radius:6px;border:1px solid var(--line);cursor:pointer;background:#efe4cb}
+#edit .btns .save{background:var(--done);color:#fff;border-color:var(--done);font-weight:bold}
+#edit .btns .del{background:#fff;color:var(--p0);border-color:var(--p0)}
+.foot{color:var(--sub);font-size:12px;text-align:center;margin:16px 0}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#2b2318;color:#f0e6d2;padding:9px 20px;
+ border-radius:20px;font-size:13px;opacity:0;transition:.25s;z-index:90;pointer-events:none}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚙ Keep Quiet · 需求面板</h1>
+  <nav id="nav"></nav>
+  <button class="hbtn" id="btnAdd">＋ 新增需求</button>
+  <button class="hbtn" id="btnExport">⬇ 导出 JSON</button>
+  <button class="hbtn" id="btnExportMd">⬇ 导出 MD</button>
+  <button class="hbtn warn" id="btnReset">↺ 还原</button>
+  <span class="gen" id="gen"></span>
+</header>
+
+<main>
+  <section class="view" id="v-tree">
+    <div class="bar">
+      <input type="search" id="q" placeholder="搜索需求 / ID / 代码文件…">
+      <select id="fs"><option value="">全部状态</option></select>
+      <select id="fp"><option value="">全部优先级</option></select>
+      <select id="fc"><option value="">全部代码目录</option></select>
+      <button class="hbtn" id="btnOpen">展开全部</button>
+      <button class="hbtn" id="btnClose">收拢全部</button>
+      <span id="cnt" style="color:var(--sub);font-size:12px"></span>
+    </div>
+    <div id="tree"></div>
+  </section>
+
+  <section class="view" id="v-assets">
+    <div class="bar">
+      <input type="search" id="aq" placeholder="搜索清单项 / 应有 / 实有…">
+      <select id="af"><option value="">全部判定</option><option value="ok">✅ 已有</option><option value="warn">⚠️ 顶替/存疑</option><option value="missing">❌ 缺口</option><option value="code">🔧 代码生成</option></select>
+      <button class="hbtn" id="abOpen">展开全部</button>
+      <button class="hbtn" id="abClose">收拢全部</button>
+      <span id="acnt" style="color:var(--sub);font-size:12px"></span>
+    </div>
+    <div id="aStat"></div>
+    <div id="aTree"></div>
+    <details class="stat" style="padding:0"><summary style="padding:11px 14px;font-size:14px;color:var(--acc);cursor:pointer;font-weight:bold">🗃 参考拼片总库（磁盘全量 30 组，点开看）</summary><div style="padding:0 14px 12px"><div class="thumbs" id="aRest"></div></div></details>
+  </section>
+
+  <section class="view" id="v-dag">
+    <div class="bar">
+      <label class="ck"><input type="checkbox" id="dHideDone">隐藏已完成</label>
+      <label class="ck"><input type="checkbox" id="dCrit" checked>高亮关键路径</label>
+      <span style="color:var(--sub);font-size:12px">箭头方向 = 依赖流向（左边先做完，右边才能做）。点击节点打开编辑。</span>
+    </div>
+    <div class="legend" id="dLegend" style="margin-bottom:10px"></div>
+    <div id="dagWrap"></div>
+  </section>
+
+  <section class="view" id="v-sum">
+    <div id="sumP0"></div>
+    <div class="stat"><h3>📊 全局进度</h3><div class="grid" id="sumStats"></div></div>
+    <div class="stat"><h3>🎯 高优先级任务排行（P0 → P1 → P2 → P3，同级按工作量小→大：先摘低垂果实）</h3><div id="sumPrio"></div></div>
+    <div class="stat"><h3>📦 六大系统进度与工作量</h3><div id="sumCat"></div></div>
+    <div class="stat"><h3>❓ 待拍板清单（决策阻塞项）</h3><div id="sumOq"></div></div>
+    <div class="stat"><h3>🗂 按状态汇总</h3><div class="grid" id="sumStatus"></div></div>
+  </section>
+</main>
+
+<div id="edit"></div>
+<div id="lightbox" onclick="this.classList.remove('on')"><img id="lbImg" src="" alt=""><div class="lb-cap" id="lbCap"></div><div class="lb-files" id="lbFiles"></div></div>
+<div id="toast"></div>
+<div class="foot">事实源：<code>docs/requirements.json</code> + <code>docs/assets.json</code>（跑 <code>tools/gen_asset_gallery.py</code> 重扫素材） · 网页编辑后点「导出 JSON」覆盖该文件，再跑 <code>python tools/gen_requirements_html.py</code> 重新生成页面与 03 文档</div>
+
+<script>
+const DATA = /*__DATA__*/;
+const AGAL = /*__ASSETS__*/;
+const CHK = /*__CHECKLIST__*/;
+const SM = {done:{l:"已完成",c:"#2e9e5b"},doing:{l:"进行中",c:"#3a7bd5"},planned:{l:"已拍板未做",c:"#d9a520"},
+ design:{l:"待设计",c:"#8e5bb5"},blocked:{l:"素材阻塞",c:"#d97b2e"},p0:{l:"P0阻塞",c:"#cc3333"},paused:{l:"暂缓",c:"#9aa0a6"}};
+const ORDER = ["p0","doing","planned","design","blocked","paused","done"];
+const PRIO = ["P0","P1","P2","P3"];
+let state = JSON.parse(JSON.stringify(DATA)), dirty = false, open = {};
+const ALL = () => state.categories.flatMap(c=>c.groups.flatMap(g=>g.items)) ;
+const AMAP = {}; (AGAL.assets||[]).forEach(a=>AMAP[a.key]=a);
+function esc(s){return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("on");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("on"),2200);}
+function mark(){dirty=true;}
+function renderAll(){renderTree();renderAssets();renderDag();renderSum();}
+
+/* tabs */
+const nav=document.getElementById("nav");
+[["tree","① 需求层级"],["assets","② 素材核对清单"],["dag","③ 依赖路线图"],["sum","④ 汇总与优先级"]].forEach(([k,t],i)=>{
+  const b=document.createElement("button");b.textContent=t;b.dataset.v=k;if(!i)b.classList.add("on");
+  b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x===b));
+    document.querySelectorAll(".view").forEach(s=>s.classList.toggle("on",s.id==="v-"+k));};nav.appendChild(b);});
+
+/* filters */
+function fillFilters(){
+  const cnt={};ALL().forEach(i=>cnt[i.s]=(cnt[i.s]||0)+1);
+  document.getElementById("fs").innerHTML='<option value="">全部状态</option>'+
+    ORDER.filter(k=>cnt[k]).map(k=>`<option value="${k}">${SM[k].l} (${cnt[k]})</option>`).join("");
+  const pc={};ALL().forEach(i=>{if(i.p)pc[i.p]=(pc[i.p]||0)+1;});
+  document.getElementById("fp").innerHTML='<option value="">全部优先级</option>'+
+    PRIO.filter(p=>pc[p]).map(p=>`<option value="${p}">${p} (${pc[p]})</option>`).join("");
+  const dirs=new Set();ALL().forEach(i=>(i.c||[]).forEach(p=>dirs.add(p.split("/").slice(0,2).join("/"))));
+  document.getElementById("fc").innerHTML='<option value="">全部代码目录</option>'+
+    [...dirs].sort().map(d=>`<option value="${d}">${esc(d)}</option>`).join("");
+}
+function match(i){
+  const q=document.getElementById("q").value.trim().toLowerCase();
+  const s=document.getElementById("fs").value,p=document.getElementById("fp").value,c=document.getElementById("fc").value;
+  if(s&&i.s!==s)return false;
+  if(p&&(i.p||"")!==p)return false;
+  if(c&&!(i.c||[]).some(x=>x.startsWith(c)))return false;
+  if(q&&!((i.id+" "+i.t+" "+(i.c||[]).join(" ")+" "+(i.src||"")+" "+(i.n||"")+" "+(i.o||[]).join(" ")).toLowerCase().includes(q)))return false;
+  return true;}
+
+/* tree */
+function renderTree(){
+  fillFilters();
+  const filtering=["q","fs","fp","fc"].some(k=>document.getElementById(k).value.trim());
+  let shown=0;
+  document.getElementById("tree").innerHTML=state.categories.map(c=>{
+    const items=c.groups.flatMap(g=>g.items);
+    const d=items.filter(i=>i.s==="done").length, w=items.filter(i=>i.s!=="done").reduce((a,b)=>a+(b.w||0),0);
+    const gHtml=c.groups.map(g=>{
+      const vis=g.items.filter(match);
+      if(filtering&&!vis.length)return "";
+      shown+=vis.length;
+      const key=c.key+"/"+g.key, o=open[key]!==false;
+      return `<div class="grp"><h3 data-t="${key}">${o?"▾":"▸"} ${esc(g.name)} <span class="rt">${vis.length} 项 · 剩余 ${g.items.filter(i=>i.s!=="done").reduce((a,b)=>a+(b.w||0),0)} 人天</span></h3>`+
+        (o?`<table><colgroup><col style="width:62px"><col><col style="width:86px"><col style="width:52px"><col style="width:52px"><col style="width:210px"><col style="width:74px"></colgroup>`+
+        `<thead><tr><th>ID</th><th>需求</th><th>状态</th><th>优先</th><th>人天</th><th>相关代码文件</th><th>依赖</th></tr></thead><tbody>`+
+        vis.map(row).join("")+`</tbody></table>`:"")+`</div>`;}).join("");
+    const ck=c.key, co=open[ck]!==false;
+    return `<div class="cat"><h2 data-t="${ck}">${co?"▾":"▸"} ${c.icon} ${esc(c.name)}
+      <span class="rt"><span>${d}/${items.length} 完成</span><span>${Math.round(d/items.length*100)}%</span><span>剩余 ${w} 人天</span></span></h2>`+
+      (co?gHtml:"")+`</div>`;}).join("");
+  document.getElementById("cnt").textContent=`显示 ${shown} / ${ALL().length} 条`;
+  document.querySelectorAll("[data-t]").forEach(h=>h.onclick=e=>{if(e.target.closest("button"))return;
+    const k=h.dataset.t;open[k]=open[k]===false;renderTree();});
+}
+function row(i){
+  const st=SM[i.s];
+  return `<tr class="${i.s}">
+   <td><span class="id" data-e="${i.id}" style="cursor:pointer">${i.id}</span></td>
+   <td><span class="t" data-e="${i.id}" style="cursor:pointer">${esc(i.t)}</span>
+     ${(i.o&&i.o.length)?`<div class="old">旧 ${i.o.join(" ")}</div>`:""}
+     ${i.n?`<div class="note">✎ ${esc(i.n)}</div>`:""}
+     ${i.src?`<div class="old">${esc(i.src)}</div>`:""}</td>
+   <td><button class="badge" style="background:${st.c}" data-s="${i.id}">${st.l}</button></td>
+   <td>${i.p?`<button class="pr ${i.p}" data-p="${i.id}">${i.p}</button>`:`<button class="pr" data-p="${i.id}" style="color:#bbb;border-color:#ddd">—</button>`}</td>
+   <td class="wl">${i.w?i.w:"—"}</td>
+   <td>${(i.c||[]).map(x=>`<code>${esc(x)}</code>`).join(" ")||"—"}</td>
+   <td>${(i.d||[]).map(x=>`<span class="dep" data-j="${x}">${x}</span>`).join(" ")||"—"}</td></tr>`;
+}
+document.getElementById("tree").addEventListener("click",e=>{
+  const s=e.target.closest("[data-s]");if(s){cycleStatus(s.dataset.s);return;}
+  const p=e.target.closest("[data-p]");if(p){cyclePrio(p.dataset.p);return;}
+  const j=e.target.closest("[data-j]");if(j){jump(j.dataset.j);return;}
+  const ed=e.target.closest("[data-e]");if(ed){openEdit(ed.dataset.e);return;}
+});
+function find(id){for(const c of state.categories)for(const g of c.groups)for(const i of g.items)if(i.id===id)return i;return null;}
+function cycleStatus(id){const i=find(id);if(!i)return;const k=Object.keys(SM);i.s=k[(k.indexOf(i.s)+1)%k.length];mark();renderAll();toast(`${id} → ${SM[i.s].l}`);}
+function cyclePrio(id){const i=find(id);if(!i)return;const cur=i.p||"";const idx=PRIO.indexOf(cur);i.p=idx<PRIO.length-1?PRIO[idx+1]:"";if(i.p==="P0"&&i.s!=="done")i.s="p0";if(i.p!=="P0"&&i.s==="p0")i.s="planned";mark();renderAll();toast(`${id} 优先级 → ${i.p||"无"}`);}
+function jump(id){const i=find(id);if(!i)return;document.getElementById("q").value="";["fs","fp","fc"].forEach(k=>document.getElementById(k).value="");
+  renderTree();openEdit(id);}
+
+/* ===== 素材核对清单（清单驱动：MD应有 → 环境实有 → 判定） ===== */
+const VD={ok:{l:"✅ 已有",c:"#2e9e5b"},warn:{l:"⚠️ 顶替/存疑",c:"#d9a520"},missing:{l:"❌ 缺口",c:"#cc3333"},code:{l:"🔧 代码生成",c:"#3a7bd5"}};
+const VORDER=["ok","warn","missing","code"];
+const leafV=l=>({v:l.verdict,f:l.found||[]});
+function thumbCell(a){
+  if(!a||!a.thumb)return "";
+  return `<div class="tcell" data-lb="${a.key}"><img src="${a.thumb}" loading="lazy" alt="${esc(a.label)}">
+    <div class="cap"><b>${esc(a.label)}</b> · ${a.count} 张<br>${esc(a.dir)}${a.note?" · "+esc(a.note):""}</div></div>`;
+}
+function fileCells(files){
+  return files.slice(0,6).map(p=>`<div class="tcell" data-lbf="${p}"><img src="../${p}" loading="lazy" alt="${esc(p)}">
+    <div class="cap">${esc(p.split("/").pop())}</div></div>`).join("")+
+    (files.length>6?`<span class="old">…共 ${files.length} 个文件</span>`:"");
+}
+function reqPrompt(rid){const i=find(rid);return i&&i.prompt?i.prompt:"";}
+function renderAssets(){
+  const q=document.getElementById("aq").value.trim().toLowerCase();
+  const f=document.getElementById("af").value;
+  const cnt={ok:0,warn:0,missing:0,code:0};let total=0;
+  function leafMatch(l){const {v}=leafV(l);cnt[v]=(cnt[v]||0)+1;total++;
+    if(f&&v!==f)return false;
+    if(q&&!((l.name+" "+(l.expect||"")+" "+(l.actual||"")).toLowerCase().includes(q)))return false;
+    return true;}
+  function nodeVis(n){if("children" in n)return n.children.some(nodeVis);return leafMatch(n);}
+  let shown=0;
+  function renderNode(n,depth,path){
+    if("children" in n){
+      const vis=n.children.filter(nodeVis);
+      if(!vis.length)return "";
+      const o=aopen[path]!==false;
+      const sub={ok:0,warn:0,missing:0,code:0};
+      (function count(x){if("children" in x)x.children.forEach(count);else{const{v}=leafV(x);sub[v]++;}})(n);
+      return `<div class="cl-grp" style="margin-left:${depth?18:0}px">
+        <div class="cl-head" data-ap="${path}" style="background:${depth===0?"#e8dcc0":depth===1?"#efe4cb":"#f3ead8"}">
+          ${o?"▾":"▸"} <b>${esc(n.name)}</b>
+          <span class="rt">${VORDER.filter(k=>sub[k]).map(k=>`<i style="color:${VD[k].c};font-style:normal">${VD[k].l.split(" ")[0]}${sub[k]}</i>`).join(" ")}</span></div>
+        ${o?vis.map((c,i2)=>renderNode(c,depth+1,path+"/"+i2)).join(""):""}</div>`;
+    }
+    shown++;
+    const {v,f:found}=leafV(n);
+    const pr=n.req?reqPrompt(n.req):"";
+    const showImg=n.img!==false&&found.length;
+    return `<div class="cl-leaf ${v}" style="margin-left:${depth*18}px">
+      <span class="cl-vd">${VD[v].l}</span>
+      ${n.req||!n.img?`<span class="id">${esc(n.key)}</span>`:""}
+      <span class="cl-name">${esc(n.name)}</span>
+      <span class="cl-col"><b>应有</b> ${esc(n.expect||"")}</span>
+      <span class="cl-col"><b>实有</b> ${esc(n.actual||"")}${found.length?` <span class="old">（${found.length} 个文件）</span>`:""}</span>
+      ${n.req?`<span class="cl-col"><span class="dep" data-j3="${n.req}">→ ${n.req}</span></span>`:""}
+      ${showImg?`<div class="thumbs">${fileCells(found)}</div>`:found.length?`<div class="files">${found.map(f=>`<code>${esc(f)}</code>`).join(" ")}</div>`:""}
+      ${pr?`<details class="gap"><summary>🎨 缺口 · AI 出图提示词（复制后投给出图工具）</summary>
+        <pre id="p_${n.key}">${esc(pr)}</pre><button class="copy" data-copy="${n.key}">📋 复制提示词</button></details>`:""}</div>`;
+  }
+  document.getElementById("aTree").innerHTML=(CHK.tree||[]).map((t,i)=>renderNode(t,0,String(i))).join("");
+  document.getElementById("acnt").textContent=`显示 ${shown} / ${total} 个核对点`;
+  document.getElementById("aStat").innerHTML=
+    `<div class="ok" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+      <span>📋 核对方式：先从 <code>00 / 01 / MISSING</code> 三份 MD 提取「应有」<b>${total}</b> 点，再逐点到磁盘核对「实有」</span>
+      ${VORDER.map(k=>`<span style="color:${VD[k].c}"><b>${VD[k].l}</b> ${cnt[k]||0}</span>`).join("")}
+    </div>`;
+  document.getElementById("aRest").innerHTML=(AGAL.assets||[]).map(a=>thumbCell(a)).join("");
+}
+let aopen={};
+document.getElementById("aTree").addEventListener("click",e=>{
+  const h=e.target.closest("[data-ap]");
+  if(h){aopen[h.dataset.ap]=aopen[h.dataset.ap]===false;renderAssets();return;}
+  const c=e.target.closest("[data-copy]");
+  if(c){const t=document.getElementById("p_"+c.dataset.copy).textContent;
+    (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast("提示词已复制")).catch(()=>{toast("请手动选择复制");});return;}
+  const lb=e.target.closest("[data-lbf]");
+  if(lb){document.getElementById("lbImg").src="../"+lb.dataset.lbf;
+    document.getElementById("lbCap").textContent=lb.dataset.lbf;document.getElementById("lbFiles").textContent="";
+    document.getElementById("lightbox").classList.add("on");return;}
+  const lb2=e.target.closest("[data-lb]");
+  if(lb2){const a=AMAP[lb2.dataset.lb];document.getElementById("lbImg").src=a.thumb;
+    document.getElementById("lbCap").textContent=`${a.label} · ${a.count} 张 · ${a.dir}${a.note?" · "+a.note:""}`;
+    document.getElementById("lbFiles").textContent=a.files.join("  ·  ");
+    document.getElementById("lightbox").classList.add("on");return;}
+  const j=e.target.closest("[data-j3]");
+  if(j){jump(j.dataset.j3);document.querySelector('nav button[data-v=tree]').click();return;}
+});
+document.getElementById("abOpen").onclick=()=>{aopen={};renderAssets();};
+document.getElementById("abClose").onclick=()=>{aopen={};
+  (function fs(n,p){if("children" in n){aopen[p]=false;n.children.forEach((c,i)=>fs(c,p+"/"+i));}})({children:CHK.tree},"");
+  renderAssets();};
+["aq","af"].forEach(k=>document.getElementById(k).addEventListener("input",renderAssets));
+
+/* ===== 依赖路线图（分层 DAG） ===== */
+const LANE_H=46, NODE_W=210, NODE_H=34, COL_W=250, PAD_L=150, PAD_T=44;
+function renderDag(){
+  const items=ALL(), ids=new Set(items.map(i=>i.id));
+  const hideDone=document.getElementById("dHideDone").checked;
+  const showCrit=document.getElementById("dCrit").checked;
+  // 只画有依赖关系的节点
+  const refs=new Set();
+  items.forEach(i=>(i.d||[]).forEach(d=>{if(ids.has(d))refs.add(d);}));
+  let nodes=items.filter(i=>(i.d&&i.d.some(d=>ids.has(d)))||refs.has(i.id));
+  if(hideDone)nodes=nodes.filter(i=>i.s!=="done");
+  const nset=new Set(nodes.map(i=>i.id));
+  const edges=[];
+  nodes.forEach(i=>(i.d||[]).forEach(d=>{if(nset.has(d))edges.push([d,i.id]);}));
+  // 分层：depth = 1 + max(dep depth)
+  const memo={};
+  function depth(id,seen){if(memo[id]!=null)return memo[id];if(seen.has(id))return 0;seen.add(id);
+    const it=find(id);const ds=(it.d||[]).filter(d=>nset.has(d));
+    const r=ds.length?1+Math.max(...ds.map(d=>depth(d,seen))):0;memo[id]=r;return r;}
+  nodes.forEach(i=>depth(i.id,new Set()));
+  function nodeCat(c,id){const i=find(id);if(!i)return false;return c.groups.some(g=>g.items.includes(i));}
+  // 泳道 = 有节点的类目
+  const lanes=state.categories.filter(c=>nodes.some(i=>nodeCat(c,i.id)));
+  // 排布：lane 内按 depth 分列，列内按 id 排序堆叠；泳道纵向游标累加
+  const pos={};let cursorY=PAD_T;
+  lanes.forEach(c=>{
+    const cols={};
+    nodes.filter(i=>nodeCat(c,i.id)).sort((a,b)=>a.id<b.id?-1:1).forEach(i=>{
+      const d=memo[i.id];(cols[d]=cols[d]||[]).push(i);});
+    const rows=Math.max(...Object.values(cols).map(v=>v.length),1);
+    Object.entries(cols).forEach(([d,arr])=>arr.forEach((i,k)=>{
+      pos[i.id]={x:PAD_L+d*COL_W,y:cursorY+k*LANE_H};}));
+    cursorY+=rows*LANE_H+14;
+  });
+  const maxY=cursorY;
+  const maxD=Math.max(...Object.values(memo),0);
+  // 关键路径：从最深节点回溯 depth-1 的依赖
+  const critE=new Set();
+  if(showCrit){
+    const deepest=nodes.filter(i=>memo[i.id]===maxD);
+    function trace(id,prev){const it=find(id);
+      (it.d||[]).filter(d=>nset.has(d)&&memo[d]===memo[id]-1).forEach(d=>{
+        critE.add(d+">"+id);trace(d,id);});}
+    deepest.forEach(i=>trace(i.id,null));
+  }
+  const W=PAD_L+(maxD+1)*COL_W+40, H=maxY+20;
+  let svg=`<svg id="dag" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L8,4L0,8z" fill="#b9a87c"/></marker>
+    <marker id="arrc" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L8,4L0,8z" fill="#cc3333"/></marker></defs>`;
+  // 泳道背景（按 lane 内节点 y 范围）
+  lanes.forEach((c,li)=>{
+    const ys=Object.entries(pos).filter(([id])=>nodeCat(c,id)).map(([,p])=>p.y);
+    const y0=Math.min(...ys)-8,y1=Math.max(...ys)+NODE_H+8;
+    svg+=`<rect class="${li%2?"dag-lane-alt":"dag-lane"}" x="4" y="${y0}" width="${W-8}" height="${y1-y0}" rx="8"/>
+      <text class="dag-lane-label" x="14" y="${y0+16}">${c.icon} ${c.name}</text>`;});
+  for(let d=0;d<=maxD;d++)svg+=`<text class="dag-col-label" x="${PAD_L+d*COL_W+NODE_W/2}" y="20" text-anchor="middle">第 ${d} 层${d===0?"（无前置）":""}</text>`;
+  edges.forEach(([a,b])=>{
+    const pa=pos[a],pb=pos[b];if(!pa||!pb)return;
+    const x1=pa.x+NODE_W,y1=pa.y+NODE_H/2,x2=pb.x,y2=pb.y+NODE_H/2;
+    const mx=(x1+x2)/2;
+    const crit=critE.has(a+">"+b);
+    svg+=`<path class="dedge${crit?" crit":""}" data-edge="${a} ${b}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2-6},${y2}"/>`;});
+  nodes.forEach(i=>{
+    const p=pos[i.id];if(!p)return;
+    const st=SM[i.s];
+    const title=i.t.length>16?i.t.slice(0,16)+"…":i.t;
+    svg+=`<g class="dnode" data-nid="${i.id}"><title>${esc(i.id)} ${esc(i.t)}（${st.l}）</title>
+      <rect x="${p.x}" y="${p.y}" width="${NODE_W}" height="${NODE_H}" rx="7" fill="${st.c}22" stroke="${st.c}"/>
+      <rect x="${p.x}" y="${p.y}" width="34" height="${NODE_H}" rx="7" fill="${st.c}"/>
+      <text class="did" x="${p.x+17}" y="${p.y+14}" text-anchor="middle" fill="#fff" font-weight="bold">${i.id.split("-")[0]}</text>
+      <text x="${p.x+40}" y="${p.y+14}" font-weight="bold" font-size="11">${i.id.split("-")[1]}</text>
+      <text x="${p.x+40}" y="${p.y+27}" font-size="10.5" fill="#5b4a2c">${esc(title)}</text></g>`;});
+  svg+=`</svg>`;
+  document.getElementById("dagWrap").innerHTML=svg;
+  document.getElementById("dLegend").innerHTML=
+    ORDER.filter(k=>nodes.some(i=>i.s===k)).map(k=>`<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${SM[k].c};vertical-align:-1px"></i> ${SM[k].l}</span>`).join("")+
+    (showCrit?`<span style="color:#cc3333">— 红线 = 最长依赖链（关键路径，共 ${critE.size} 段）</span>`:"");
+  const wrap=document.getElementById("dagWrap");
+  wrap.querySelectorAll(".dnode").forEach(g=>{
+    g.addEventListener("click",()=>openEdit(g.dataset.nid));
+    g.addEventListener("mouseenter",()=>{const id=g.dataset.nid;
+      wrap.querySelectorAll(".dedge,.dnode").forEach(el=>{
+        const hit=el.classList.contains("dedge")?el.dataset.edge.split(" ").includes(id):(el.dataset.nid===id||el.dataset.nid&&(find(el.dataset.nid).d||[]).includes(id)||(find(id).d||[]).includes(el.dataset.nid));
+        el.classList.toggle("dim",!hit);});});
+    g.addEventListener("mouseleave",()=>wrap.querySelectorAll(".dim").forEach(el=>el.classList.remove("dim")));
+  });
+}
+document.getElementById("dHideDone").addEventListener("change",renderDag);
+document.getElementById("dCrit").addEventListener("change",renderDag);
+
+/* edit drawer */
+function openEdit(id){
+  const i=find(id);if(!i)return;
+  const c=state.categories.find(x=>x.groups.some(g=>g.items.includes(i)));
+  const g=c.groups.find(x=>x.items.includes(i));
+  const box=document.getElementById("edit");
+  box.innerHTML=`<h3>编辑 ${i.id}</h3>
+   <label>需求标题</label><input id="e_t" value="${esc(i.t)}">
+   <label>所属系统 / 分组</label>
+   <select id="e_cat">${state.categories.map(x=>`<option value="${x.key}" ${x===c?"selected":""}>${x.icon} ${x.name}</option>`).join("")}</select>
+   <select id="e_grp" style="margin-top:6px">${c.groups.map(x=>`<option value="${x.key}" ${x===g?"selected":""}>${esc(x.name)}</option>`).join("")}</select>
+   <label>状态</label><select id="e_s">${Object.keys(SM).map(k=>`<option value="${k}" ${k===i.s?"selected":""}>${SM[k].l}</option>`).join("")}</select>
+   <label>优先级</label><select id="e_p"><option value="">无</option>${PRIO.map(p=>`<option ${p===i.p?"selected":""}>${p}</option>`).join("")}</select>
+   <label>工作量（人天）</label><input id="e_w" type="number" step="0.5" min="0" value="${i.w||0}">
+   <label>相关代码文件（逗号或换行分隔）</label><textarea id="e_c">${esc((i.c||[]).join("\n"))}</textarea>
+   <label>依赖的 ID（逗号分隔）</label><input id="e_d" value="${esc((i.d||[]).join(", "))}">
+   ${c.key==="art"?`<label>关联素材拼片（逗号分隔 key，见素材库）</label><input id="e_a" value="${esc((i.assets||[]).join(", "))}">
+   <label>缺口出图提示词（英文，可空）</label><textarea id="e_prompt" style="height:70px">${esc(i.prompt||"")}</textarea>`:""}
+   <label>备注</label><input id="e_n" value="${esc(i.n||"")}">
+   <label>来源</label><input id="e_src" value="${esc(i.src||"")}">
+   <div class="btns"><button class="save" id="e_save">保存</button><button id="e_cancel">取消</button><button class="del" id="e_del">删除</button></div>`;
+  box.classList.add("on");
+  const catSel=box.querySelector("#e_cat"), grpSel=box.querySelector("#e_grp");
+  catSel.onchange=()=>{const nc=state.categories.find(x=>x.key===catSel.value);
+    grpSel.innerHTML=nc.groups.map(x=>`<option value="${x.key}">${esc(x.name)}</option>`).join("");};
+  box.querySelector("#e_cancel").onclick=()=>box.classList.remove("on");
+  box.querySelector("#e_save").onclick=()=>{
+    const nc=state.categories.find(x=>x.key===catSel.value);
+    const ng=nc.groups.find(x=>x.key===grpSel.value)||nc.groups[0];
+    i.t=box.querySelector("#e_t").value.trim()||i.t;
+    i.s=box.querySelector("#e_s").value; i.p=box.querySelector("#e_p").value;
+    i.w=parseFloat(box.querySelector("#e_w").value)||0;
+    i.c=box.querySelector("#e_c").value.split(/[,\n]/).map(x=>x.trim()).filter(Boolean);
+    i.d=box.querySelector("#e_d").value.split(/[,\n]/).map(x=>x.trim()).filter(Boolean);
+    if(box.querySelector("#e_a")){i.assets=box.querySelector("#e_a").value.split(/[,\n]/).map(x=>x.trim()).filter(Boolean);
+      const pv=box.querySelector("#e_prompt").value.trim(); if(pv)i.prompt=pv; else delete i.prompt;}
+    i.n=box.querySelector("#e_n").value.trim(); i.src=box.querySelector("#e_src").value.trim();
+    if(!ng.items.includes(i)){const oc=c.groups.find(x=>x===g);oc.items.splice(oc.items.indexOf(i),1);}
+    mark();box.classList.remove("on");renderAll();toast("已保存 "+i.id);};
+  box.querySelector("#e_del").onclick=()=>{
+    if(!confirm(`确认删除 ${i.id} ${i.t}？`))return;
+    g.items.splice(g.items.indexOf(i),1);mark();box.classList.remove("on");renderAll();toast("已删除 "+i.id);};
+}
+document.getElementById("btnAdd").onclick=()=>{
+  const c=state.categories[0];
+  const id=prompt("新需求 ID（如 A-25）","");if(!id)return;
+  if(find(id)){toast("ID 已存在");return;}
+  const g=c.groups[0];
+  g.items.push({id:id,t:"（新需求，请编辑标题）",s:"planned",p:"",w:0,c:[],d:[],o:[],src:"手动新增"});
+  mark();renderAll();openEdit(id);};
+
+/* summary */
+function renderSum(){
+  const items=ALL(), total=items.length, done=items.filter(i=>i.s==="done").length;
+  const w=items.filter(i=>i.s!=="done").reduce((a,b)=>a+(b.w||0),0);
+  const p0=items.filter(i=>i.s==="p0"||(i.p==="P0"&&i.s!=="done"));
+  document.getElementById("sumP0").innerHTML=p0.length?
+    `<div class="warn"><b>⚠️ P0 阻塞项 ${p0.length} 个</b>：`+p0.map(i=>`<span class="dep" data-j2="${i.id}">${i.id}</span> ${esc(i.t)}`).join("　")+"</div>":
+    `<div class="ok"><b>✓ 无 P0 阻塞项</b></div>`;
+  document.getElementById("sumStats").innerHTML=
+    `<div class="card"><div class="n">${total}</div><div class="t">需求总数</div></div>`+
+    `<div class="card"><div class="n" style="color:var(--done)">${done}</div><div class="t">已完成 ${Math.round(done/total*100)}%</div></div>`+
+    `<div class="card"><div class="n" style="color:var(--p0)">${total-done}</div><div class="t">未完成</div></div>`+
+    `<div class="card"><div class="n">${w}</div><div class="t">剩余人天</div></div>`+
+    PRIO.map(p=>{const n=items.filter(i=>i.p===p&&i.s!=="done").length;
+      return `<div class="card"><div class="n" style="color:${{P0:"#cc3333",P1:"#b06a2b",P2:"#5b7f5e",P3:"#8a8a8a"}[p]}">${n}</div><div class="t">${p} 待做</div></div>`;}).join("");
+  const todo=items.filter(i=>i.s!=="done"&&i.s!=="paused").sort((a,b)=>{
+    const pa=(a.p||"P9"),pb=(b.p||"P9");if(pa!==pb)return pa<pb?-1:1;return (a.w||0)-(b.w||0);});
+  document.getElementById("sumPrio").innerHTML=todo.slice(0,40).map((i,n)=>{
+    const cat=state.categories.find(c=>c.groups.some(g=>g.items.includes(i)));
+    const blocked=i.d.filter(d=>{const x=find(d);return x&&x.s!=="done";});
+    return `<div class="prio-row"><b style="color:var(--sub);width:24px">${n+1}</b>
+      <span class="pr ${i.p||""}" style="min-width:32px;text-align:center">${i.p||"—"}</span>
+      <span class="n"><span class="dep" data-j2="${i.id}">${i.id}</span> ${esc(i.t)}
+        ${blocked.length?`<span class="old">（等待 ${blocked.join(" ")}）</span>`:""}</span>
+      <span class="m">${cat.icon}${cat.name} · ${i.w||0}天 · <button class="badge" style="background:${SM[i.s].c}" data-s2="${i.id}">${SM[i.s].l}</button></span></div>`;}).join("")+
+    (todo.length>40?`<div style="padding:8px;color:var(--sub);font-size:12px">…另有 ${todo.length-40} 条，见第一页</div>`:"");
+  document.getElementById("sumCat").innerHTML=state.categories.map(c=>{
+    const it=c.groups.flatMap(g=>g.items), d=it.filter(i=>i.s==="done").length, w2=it.filter(i=>i.s!=="done").reduce((a,b)=>a+(b.w||0),0);
+    const seg=ORDER.filter(k=>it.some(i=>i.s===k)).map(k=>{const n=it.filter(i=>i.s===k).length;
+      return `<div style="width:${n/it.length*100}%;background:${SM[k].c}" title="${SM[k].l} ${n}"></div>`;}).join("");
+    return `<div style="display:flex;align-items:center;gap:10px;margin:6px 0">
+      <div style="width:130px;font-size:13px">${c.icon} ${c.name}</div>
+      <div style="flex:1;height:16px;border-radius:8px;overflow:hidden;display:flex;background:#eadfc8">${seg}</div>
+      <div style="width:118px;font-size:12px;color:var(--sub)">${d}/${it.length} · ${w2}人天</div></div>`;}).join("");
+  document.getElementById("sumOq").innerHTML=state.meta.open_questions.map(o=>
+    `<div style="padding:7px 0;border-bottom:1px solid #eee2ca"><b style="color:var(--design)">#${o.no}</b> ${esc(o.q)}
+     <div class="old">阻塞：${o.blocks.map(b=>`<span class="dep" data-j2="${b}">${b}</span>`).join(" ")}</div></div>`).join("");
+  const cnt={};items.forEach(i=>cnt[i.s]=(cnt[i.s]||0)+1);
+  document.getElementById("sumStatus").innerHTML=ORDER.filter(k=>cnt[k]).map(k=>
+    `<div class="card"><div class="n" style="color:${SM[k].c}">${cnt[k]}</div><div class="t">${SM[k].l}</div></div>`).join("");
+}
+document.getElementById("v-sum").addEventListener("click",e=>{
+  const j=e.target.closest("[data-j2]");if(j){jump(j.dataset.j2);document.querySelector('nav button[data-v=tree]').click();return;}
+  const s=e.target.closest("[data-s2]");if(s)cycleStatus(s.dataset.s2);});
+
+/* export */
+function dl(name,text,type){const b=new Blob([text],{type:type||"application/json;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+document.getElementById("btnExport").onclick=()=>{
+  state.meta.updated=new Date().toISOString().slice(0,10);
+  dl("requirements.json",JSON.stringify(state,null,2));
+  dirty=false;toast("已导出 requirements.json — 覆盖 docs/ 后运行生成脚本");};
+document.getElementById("btnExportMd").onclick=()=>{
+  let md="# requirements.md（网页导出）\n\n";
+  state.categories.forEach(c=>{md+=`\n# ${c.icon} ${c.name}\n`;
+    c.groups.forEach(g=>{if(!g.items.length)return;md+=`\n## ${g.name}\n\n| ID | 需求 | 状态 | 优先级 | 人天 | 代码 | 依赖 |\n|---|---|---|---|---|---|---|\n`;
+      g.items.forEach(i=>{md+=`| ${i.id} | ${i.t} | ${SM[i.s].l} | ${i.p||"—"} | ${i.w||"—"} | ${(i.c||[]).join(" ")||"—"} | ${(i.d||[]).join(" ")||"—"} |\n`;});});});
+  dl("requirements.md",md,"text/markdown;charset=utf-8");toast("已导出 MD");};
+document.getElementById("btnReset").onclick=()=>{if(dirty&&!confirm("有未导出的修改，确认还原？"))return;
+  state=JSON.parse(JSON.stringify(DATA));dirty=false;renderAll();toast("已还原为文件内容");};
+window.addEventListener("beforeunload",e=>{if(dirty){e.preventDefault();e.returnValue="";}});
+document.getElementById("btnOpen").onclick=()=>{state.categories.forEach(c=>{open[c.key]=true;c.groups.forEach(g=>open[c.key+"/"+g.key]=true);});renderTree();};
+document.getElementById("btnClose").onclick=()=>{state.categories.forEach(c=>{open[c.key]=false;c.groups.forEach(g=>open[c.key+"/"+g.key]=false);});renderTree();};
+["q","fs","fp","fc"].forEach(k=>document.getElementById(k).addEventListener("input",renderTree));
+document.getElementById("gen").textContent="数据更新 "+state.meta.updated+" · 页面生成 "+state.meta.generated;
+renderAll();
+</script>
+</body>
+</html>

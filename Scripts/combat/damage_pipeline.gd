@@ -1,7 +1,7 @@
 class_name DamagePipeline
 extends RefCounted
 ## ============================================================
-## DamagePipeline — 伤害结算管线（02_TECH_BUILD.md 第二部分 伤害与判定）
+## DamagePipeline — 伤害结算管线（DESIGN.md 第二部分 伤害与判定）
 ##
 ## 采用修饰器模式：基础伤害依次经过若干乘算修饰器（暴击/背刺/难度系数…），
 ## 再减防御，最后叠随机浮动。调用方只需传 multipliers 数组。

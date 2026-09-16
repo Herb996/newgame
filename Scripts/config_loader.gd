@@ -3,7 +3,7 @@ extends Node
 ## ConfigLoader — 自动加载单例（在脚本里用 `Config` 访问）
 ## 职责：启动时读取 Data/config.json，向全游戏提供数值查询。
 ##
-## 铁律（见 00_GAME_DESIGN.md）：
+## 铁律（见 DESIGN.md）：
 ##   所有数值配置写入 Data/*.json，任何脚本不得硬编码数值。
 ##   其他脚本一律通过 Config.get_value("路径.键") 取值。
 ##

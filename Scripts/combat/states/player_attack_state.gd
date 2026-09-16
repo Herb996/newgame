@@ -65,7 +65,7 @@ func physics_update(delta: float) -> void:
 					actor.fire_hitscan()
 				else:
 					actor.begin_attack_hit()
-				# 出招发声：惊动附近敌人（02_TECH_BUILD.md 第二部分 噪音机制）
+				# 出招发声：惊动附近敌人（DESIGN.md 第二部分 噪音机制）
 				# 取武器自己的噪音值 —— 弓比剑安静、狙击枪震天响，潜行时的可利用差异
 				NoiseSystem.emit(actor.global_position, actor.attack_noise())
 		Phase.ACTIVE:

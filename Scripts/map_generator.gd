@@ -3,7 +3,7 @@ extends RefCounted
 ## ============================================================
 ## MapGenerator — 程序化地图生成
 ##
-## 三层渲染（2026-09-16 改版，见 docs/MISSING_ASSETS.md 与 tools/build_ts_assets.py）：
+## 三层渲染（2026-09-16 改版，见 docs/DESIGN.md 的「缺失素材清单」章与 tools/build_ts_assets.py）：
 ##   1. 地形层 TileMapLayer：生物群系分区（数量由 config.json 的 map.biomes 决定）
 ##      × 每群系 16 个 blob 自动拼接瓦片。**直接用 Tiny Swords 官方 64px 图集原样
 ##      切片**，四邻连通性决定用哪一块，岸线/崖壁由素材自带的描边自然生成。
@@ -349,7 +349,7 @@ const VEIN_GOLD := 1
 const VEIN_OIL := 2
 const VEIN_RES := {"iron": VEIN_IRON, "gold": VEIN_GOLD, "oil": VEIN_OIL}
 # 每种矿脉一组贴图（金矿用官方 Gold Stone 1~6；铁矿由金矿去色派生；油田为程序化占位）。
-# 官方免费包里只有金矿，铁矿/油田见 docs/MISSING_ASSETS.md 的补图清单。
+# 官方免费包里只有金矿，铁矿/油田见 docs/DESIGN.md 的「缺失素材清单」章。
 const ORE_PATH_LISTS := {
 	VEIN_IRON: [
 		"res://Assets/Art/Sprites/Decor/ore_iron_00.png",
@@ -503,14 +503,23 @@ static func generate() -> Dictionary:
 			blended.append(brow2)
 		biome = blended
 
-	# ---- 地表特征带：河水 / 裂缝 ----
-	# **必须在立体装饰之前画**：带子要先占住格子，后面的树/石才会自动避开。
-	# 反过来（装饰先放）的话，一棵树落在河道正中就会把河截断。
+	# 群系聚合：多数投票 N 次，把「东一块西一块」的孤立小岛并入周围同类。
+	var smooth_iters: int = int(Config.get_value("map.biome_smooth_iterations", 3))
+	if smooth_iters > 0:
+		for _it in range(smooth_iters):
+			biome = _consolidate_biome(biome, width, height)
+
+	# 去飞地：任何不接地图边缘、被别的群系整个包住的孤立块，并入周围主导群系。
+	# 保证「一个地形不会包含另一个地形」。反复到稳定（最多 8 遍）。
+	if bool(Config.get_value("map.biome_remove_islands", true)):
+		var min_region: int = int(Config.get_value("map.biome_min_region_cells", 40))
+		var _isl_guard := 0
+		while _isl_guard < 8 and _remove_biome_islands(biome, width, height, min_region):
+			_isl_guard += 1
+
+	# 河流与裂缝均已按需求移除，地图不再产生任何水格。
+	# river_slow 仅保留给下方减速表兜底（无 DECOR_WATER 时该分支不触发）。
 	var river_slow: float = clampf(float(Config.get_value("map.river.slow", 0.72)), 0.1, 1.0)
-	_paint_band(DECOR_WATER, "map.river", terrain, biome, decor, walls,
-			width, height, center, rng)
-	_paint_band(DECOR_CRACK, "map.crack", terrain, biome, decor, walls,
-			width, height, center, rng)
 
 	# 装饰只落在地板上；出生区留空；树/石头并入 walls（寻路会绕开）
 	# 权重按所在生物群系取，树在"成簇噪声"高值区会被放大 → 形成树林而非均匀撒点
@@ -528,75 +537,24 @@ static func generate() -> Dictionary:
 			var b: int = biome[y][x]
 			var w: Dictionary = _biome_at(b)
 			var in_patch: bool = cluster.get_noise_2d(x, y) > cluster_threshold
-			# 树在"成簇噪声"高值区放大 3 倍 → 形成森林而不是均匀撒点。
-			# 立体物件受 vegetation 的**均值≈1 乘性调制**（见上面 veg_contrast）。
-			# 裂缝/河水不在这里 —— 它们是 _paint_band 画的连续带。
-			var p_tree: float = w["tree"] * density * veg_mul * (3.0 if in_patch else 1.0)
-			var p_rock: float = w["rock"] * density * veg_mul
+			# 树/石/铁/油改由 _place_clustered_resources 成簇放置；这里只留灌木/碎石点缀。
 			var p_bush: float = w["bush"] * density * veg_mul * (1.6 if in_patch else 1.0)
 			var p_debris: float = w["pebble"] * density * veg_mul
 			var r := rng.randf()
-			var acc := 0.0
 			var kind := DECOR_NONE
-			# 判定顺序 = 绘制优先级：阻挡物（树/石）先占格，再考虑可走的灌木/碎石。
-			acc += p_tree
-			if r < acc:
-				kind = DECOR_TREE
-			else:
-				acc += p_rock
-				if r < acc:
-					kind = DECOR_ROCK
-				else:
-					acc += p_bush
-					if r < acc:
-						kind = DECOR_BUSH
-					else:
-						acc += p_debris
-						if r < acc:
-							kind = DECOR_DEBRIS
+			if r < p_bush:
+				kind = DECOR_BUSH
+			elif r < p_bush + p_debris:
+				kind = DECOR_DEBRIS
 			if kind == DECOR_NONE:
 				continue
 			decor[y][x] = kind
-			if DECOR_BLOCKING.has(kind):
-				walls[y][x] = true   # 实体障碍，参与寻路与连通性
 
-	# ---- 矿脉生成：从 config.map.veins 读取 iron/gold/oil 的限定群系 + 数量 + 距出生点 ----
-	# 矿脉落在地板格（非墙、非装饰、限定群系内、距出生点足够远），不阻挡通行；
-	# 视觉上是一块矿石露头精灵，数据上登记进 ResourceRegistry 供采集。
-	var veins: Array = []
-	var vein_occ: Dictionary = {}   # "x,y" -> true，避免矿脉互相重叠
-	var vein_cfg: Dictionary = Config.get_value("map.veins", {})
-	for res_key in vein_cfg.keys():
-		var vc: Dictionary = vein_cfg[res_key]
-		# JSON 数值默认解析为 float，而 biome 数组存的是 int；两侧都转 int，
-		# 避免 [3.0].has(3) 在本版 GDScript 下返回 false 导致矿脉一个都生成不出来。
-		var v_allowed_raw: Array = vc.get("biomes", [])
-		var v_allowed: Array = []
-		for bid in v_allowed_raw:
-			v_allowed.append(int(bid))
-		var v_wanted: int = int(vc.get("count", 0))
-		var v_min_dist: int = int(vc.get("min_distance_from_spawn_cells", 8))
-		for _n in range(v_wanted):
-			var tries := 0
-			while tries < 250:
-				tries += 1
-				var gx: int = rng.randi_range(2, width - 3)
-				var gy: int = rng.randi_range(2, height - 3)
-				if terrain[gy][gx]:
-					continue                       # 不能压在墙上
-				if decor[gy][gx] != DECOR_NONE:
-					continue                       # 不与树/石重叠
-				if not v_allowed.has(int(biome[gy][gx])):
-					continue                       # 只在限定群系出矿
-				var d: int = abs(gx - center.x) + abs(gy - center.y)
-				if d < v_min_dist:
-					continue                       # 离出生点太近
-				var vkey: String = "%d,%d" % [gx, gy]
-				if vein_occ.has(vkey):
-					continue
-				vein_occ[vkey] = true
-				veins.append({"res_id": str(res_key), "gx": gx, "gy": gy})
-				break
+	# ---- 地图资源成簇放置：树/石（阻挡 decor）+ 铁/油（可采集 vein）----
+	# 每种资源在每个群系放 count 个相连簇，每簇格数 = weight[群系]，
+	# 于是「最小聚合单位」和「各群系总量比例」都由 weight 一个数决定。
+	var veins: Array = _place_clustered_resources(
+			decor, terrain, biome, walls, width, height, center, rng)
 
 	# ---- 第二遍：按四邻连通性反查官方 blob 瓦片（自动描出岸线/崖壁）----
 	for y in range(height):
@@ -1008,6 +966,91 @@ static func _blended_biome(biome: Array, x: int, y: int, blend: float) -> int:
 	if float(_hash_xy(x, y, 91) % 1000) >= blend * 1000.0:
 		return b
 	return cand[_hash_xy(x, y, 53) % cand.size()]
+
+
+## 群系聚合：对整张 biome 网格做一遍「3×3 多数投票」(mode filter)。
+## 每格改成邻域(含自身)内出现次数最多的群系 id；平票时保留自身。
+## 目的：把边界抖动 / 渗透留下的孤立小岛并入周围同类，让「同样的东西在一起」。
+## 双缓冲：读旧网格、写新网格，避免同一遍里边算边改造成级联漂移。
+static func _consolidate_biome(biome: Array, width: int, height: int) -> Array:
+	var out: Array = []
+	for y in range(height):
+		out.append((biome[y] as Array).duplicate())
+	for y in range(height):
+		for x in range(width):
+			var counts := {}
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					var nx: int = x + dx
+					var ny: int = y + dy
+					if nx < 0 or ny < 0 or nx >= width or ny >= height:
+						continue
+					var b: int = int(biome[ny][nx])
+					counts[b] = int(counts.get(b, 0)) + 1
+			var self_b: int = int(biome[y][x])
+			var best_id: int = self_b
+			var best_cnt: int = int(counts.get(self_b, 0))
+			for k in counts.keys():
+				var cnt: int = int(counts[k])
+				if cnt > best_cnt:
+					best_cnt = cnt
+					best_id = int(k)
+			out[y][x] = best_id
+	return out
+
+
+## 去飞地：把「不接地图边缘、被别的群系整个包住」的孤立群系块并入周围主导群系。
+## 一遍扫完当前所有飞地并原地改 biome；返回是否有改动（调用方循环到稳定）。
+## 效果：每个群系的每块区域都接地图边缘 → 不存在「一个地形包含另一个地形」。
+static func _remove_biome_islands(biome: Array, w: int, h: int, min_region: int) -> bool:
+	var visited: Array = []
+	for y in range(h):
+		var row: Array = []
+		row.resize(w)
+		row.fill(0)
+		visited.append(row)
+	var changed := false
+	var d4: Array = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	for y in range(h):
+		for x in range(w):
+			if int(visited[y][x]) == 1:
+				continue
+			var b: int = int(biome[y][x])
+			var stack: Array = [Vector2i(x, y)]
+			visited[y][x] = 1
+			var cells: Array = []
+			var touches_border := false
+			var neigh := {}
+			while not stack.is_empty():
+				var c: Vector2i = stack.pop_back()
+				cells.append(c)
+				if c.x == 0 or c.y == 0 or c.x == w - 1 or c.y == h - 1:
+					touches_border = true
+				for d in d4:
+					var nx: int = c.x + d.x
+					var ny: int = c.y + d.y
+					if nx < 0 or ny < 0 or nx >= w or ny >= h:
+						continue
+					var nb: int = int(biome[ny][nx])
+					if nb == b:
+						if int(visited[ny][nx]) == 0:
+							visited[ny][nx] = 1
+							stack.append(Vector2i(nx, ny))
+					else:
+						neigh[nb] = int(neigh.get(nb, 0)) + 1
+			if touches_border or neigh.is_empty() or cells.size() >= min_region:
+				continue
+			var best: int = -1
+			var bestc: int = -1
+			for k in neigh.keys():
+				if int(neigh[k]) > bestc:
+					bestc = int(neigh[k])
+					best = int(k)
+			for cc in cells:
+				var p: Vector2i = cc
+				biome[p.y][p.x] = best
+			changed = true
+	return changed
 
 
 ## 读出 PNG 的 Image（未导入的 PNG 会返回 null，交给调用方回退）。

@@ -8,8 +8,8 @@
   3. 由 Python 统一落盘 UTF-8 日志、自己恒返回 0，日志才是唯一真相。
 
 用法：
-    python tools/shot_menu.py _menu_main.png
-    python tools/shot_menu.py _menu_settings.png --panel settings
+    python tools/shot_menu.py generated_images/menu/_menu_main.png
+    python tools/shot_menu.py generated_images/menu/_menu_settings.png --panel settings
     python tools/shot_menu.py _menu_slots.png --panel new --delay 2.0
 
 --panel 取值：new | load | settings | misc（截图前先打开对应面板）

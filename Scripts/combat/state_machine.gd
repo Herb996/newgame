@@ -1,7 +1,7 @@
 class_name StateMachine
 extends Node
 ## ============================================================
-## StateMachine — 有限状态机（02_TECH_BUILD.md 第二部分 角色控制与 FSM）
+## StateMachine — 有限状态机（DESIGN.md 第二部分 角色控制与 FSM）
 ##
 ## 职责：持有并驱动状态，处理状态切换请求。本身不含任何玩法逻辑。
 ##

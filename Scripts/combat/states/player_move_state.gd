@@ -24,9 +24,6 @@ func physics_update(delta: float) -> void:
 		_footstep = 0.0
 		NoiseSystem.emit(actor.global_position,
 				float(Config.get_value("noise.sources.walk", 10.0)))
-	# 技能可以打断移动（进入 skill 状态时会 stop_moving）
-	if actor.try_cast_buffered_skill():
-		return
 	# 攻击 / 冲刺可以打断移动（进入对应状态时会 stop_moving）
 	if actor.consume_input(&"attack"):
 		request_transition(&"attack")
