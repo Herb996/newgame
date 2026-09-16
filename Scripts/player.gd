@@ -17,6 +17,16 @@ extends CharacterBody2D
 ## ============================================================
 
 const FX_RING := preload("res://Scripts/combat/fx_ring.gd")
+const PROJECTILE := preload("res://Scripts/combat/projectile.gd")
+
+## 玩家能打到的目标分组：敌人 + 中立生物（羊，打死掉食物）。
+## 集中成一张表，避免"普攻只认 enemies、技能也只认 enemies"这种漏改。
+## 注意：projectile.gd 里有一份同名副本（player.gd 没有 class_name，对方引用不到），
+## 改这里时两处都要动。
+const DAMAGEABLE_GROUPS := ["enemies", "animals"]
+
+## 武器表里不是武器 id 的键（说明性字段），遍历时跳过。
+const WEAPON_META_KEYS := ["_comment"]
 
 var speed := 0.0
 var selected := false
@@ -32,6 +42,10 @@ var _dodge_cooldown := 0.0
 var _input_buffer: Array = []        # 输入缓冲：[{action, age}]
 var _hit_targets: Dictionary = {}    # 同一次挥击已命中的目标（去重）
 var _run: Node = null
+
+# --- 当前武器（config: combat.weapons.<id>）---
+# 空 = 不启用武器表，一切走 combat.attack 全局值（改造前的行为）。
+var current_weapon: StringName = &""
 
 # --- 体力（技能资源，蓝图 Phase 2 资源循环） ---
 var stamina := 0.0
@@ -59,6 +73,14 @@ var _path_index := 0                        # 当前追踪的路点下标（只�
 var _path_cell := Vector2i(-9999, -9999)   # 上次计算路径时玩家所在格
 var _stall_frames := 0                      # 连续被挡住的帧数（卡住检测）
 const STALL_REPATH_FRAMES := 20             # 卡住约 1/3 秒后强制重算路径
+## 连续"重算路径但仍然没挪动"的次数上限。
+## 为什么必须有：一旦物理碰撞和寻路网格不一致（例如瓦片碰撞偏半格），
+## 从同一个格子重算出来的路径第一步方向完全一样 —— 重算 N 次也是撞同一堵墙。
+## 没有预算兜底的话，角色会顶着墙原地站到天荒地老，而且状态机还认为自己"在移动"
+## （表现就是：点地面没反应、人物原地踏步）。到上限就干脆放弃这条目标，
+## 让玩家重新点一次，并且打一条 warning 方便定位是地图哪一格有问题。
+const STALL_GIVE_UP_REPATHS := 5
+var _stall_repaths := 0                     # 连续无效重算次数（走动了就清零）
 const WAYPOINT_REACH_DIST := 4.0            # 距路点小于此值视为已通过该路点
 
 var state_machine: StateMachine
@@ -72,6 +94,9 @@ var _path_line: Line2D
 
 # 表现层动画状态机（4 向精灵方向切换 + 程序化动画），详见 player_animator.gd
 var _animator: PlayerAnimator
+
+# 枪械挂点贴图（武器表 rifle 段有配置才存在；无枪武器自动回收）
+var _rifle: Sprite2D = null
 
 
 
@@ -99,7 +124,19 @@ func _ready() -> void:
 	add_to_group("player")
 	z_index = 1
 	_animator = PlayerAnimator.new(_sprite)
-	_animator.load_from_config(Config.get_value("sprites", {}))
+	# 武器要先解析：武器可以强制指定贴图集（弓必须用弓手素材 —— 拉弓动作只存在于
+	# Archer，拿枪兵素材去射箭是画不出来的）。武器没指定才回落到 player.sprite_set。
+	_resolve_initial_weapon()
+	# 帧序列来自哪个节点：武器优先，其次 player.sprite_set
+	# （"sprites" = 旧程序化四向帧，"sprites_ts" = Tiny Swords 官方单位帧，
+	#  "sprites_lancer" = 8 向枪兵，"sprites_archer" = 弓手）。
+	# 切美术只改 config，不动代码。
+	var set_name := _sprite_set_for_weapon()
+	var sprite_cfg: Dictionary = Config.get_value(set_name, {})
+	if sprite_cfg.is_empty():
+		push_warning("[Player] 精灵集为空：%s，回退 sprites" % set_name)
+		sprite_cfg = Config.get_value("sprites", {})
+	_animator.load_from_config(sprite_cfg, _view_cfg_for(sprite_cfg))
 	facing = Vector2(0, 1)   # 出生默认朝下方（标准俯视）
 	speed = float(Config.get_value("player.speed", 160.0))
 	var select_radius := float(Config.get_value("player.select_radius_px", 16.0))
@@ -115,7 +152,56 @@ func _ready() -> void:
 	_path_line.visible = false
 	add_child(_path_line)
 	_init_combat()
+	_setup_rifle()
 	_init_state_machine()
+
+
+## 枪械挂点：武器表 rifle 段（texture/offset_px/scale）。
+## 为什么用挂点而不是换精灵集：免费包没有任何「持枪」动作帧，换精灵集无图可换；
+## 挂点跟着 facing 旋转即可，角色动画（含 Lancer 8 向）原样保留。
+## offset = 抓握点（机匣）锚在 offset_px 指的位置，旋转围绕握把转才自然。
+func _setup_rifle() -> void:
+	var rc = weapon_data().get("rifle", null)
+	if not (rc is Dictionary) or (rc as Dictionary).is_empty():
+		if _rifle != null and is_instance_valid(_rifle):
+			_rifle.queue_free()
+		_rifle = null
+		return
+	var cfg: Dictionary = rc
+	var tex_path := str(cfg.get("texture", ""))
+	if tex_path == "" or not ResourceLoader.exists(tex_path):
+		push_warning("[Weapon] 枪械贴图缺失：%s（贴图文件要先跑 godot_import.py）" % tex_path)
+		return
+	if _rifle == null:
+		_rifle = Sprite2D.new()
+		_rifle.name = "Rifle"
+		_rifle.centered = false
+		add_child(_rifle)
+	_rifle.texture = load(tex_path)
+	var off: Array = cfg.get("offset_px", [8.0, -20.0])
+	_rifle.position = Vector2(float(off[0]), float(off[1]))
+	_rifle.offset = Vector2(-22, -15)   # 抓握点 = 机匣中心（画布 72x24）
+	_rifle.scale = Vector2.ONE * float(cfg.get("scale", 1.0))
+	_rifle.z_index = 2                  # 画在角色身体之上
+
+
+func _process(_delta: float) -> void:
+	if _rifle != null and is_instance_valid(_rifle):
+		_rifle.rotation = facing.angle()
+		_rifle.flip_v = facing.x < 0.0   # 朝左持枪不倒持
+
+
+## 画布参数（缩放 / 脚底偏移 / 程序化位移单位）是**按画布尺寸算出来的**，
+## 而各精灵集的画布并不一样（sprites 48px、sprites_ts 192px、sprites_lancer 320px），
+## 所以优先取精灵集自带的 view，缺了才回退 player 段的全局值。
+## 不这么做的话，在设置里切换贴图集会让角色突然变大变小、或者浮空 / 陷地。
+func _view_cfg_for(sprite_cfg: Dictionary) -> Dictionary:
+	var view: Dictionary = (Config.get_value("player", {}) as Dictionary).duplicate()
+	var own = sprite_cfg.get("view", null)
+	if own is Dictionary:
+		for k in own:
+			view[k] = own[k]
+	return view
 
 
 # ------------------------------------------------------------
@@ -177,8 +263,123 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 # ------------------------------------------------------------
-# 功能组件层：战斗能力
+# 功能组件层：武器（近战 / 远程由武器表分型）
 # ------------------------------------------------------------
+
+## 武器总表（config: combat.weapons）。缺失或写错类型 → 整套退化成改造前的单一行为。
+func _weapons() -> Dictionary:
+	var t = Config.get_value("combat.weapons", {})
+	return t if t is Dictionary else {}
+
+
+## 所有可用武器 id（保持 config 里的书写顺序，跳过 _comment 之类的说明键）
+func weapon_ids() -> Array:
+	var out: Array = []
+	var table := _weapons()
+	for k in table.keys():
+		var key := str(k)
+		if WEAPON_META_KEYS.has(key) or key.begins_with("_"):
+			continue
+		var v = table[k]
+		if v is Dictionary and not (v as Dictionary).is_empty():
+			out.append(key)
+	return out
+
+
+## 指定武器（省略 = 当前武器）的配置字典；查不到返回空字典
+func weapon_data(id: StringName = &"") -> Dictionary:
+	var wid := str(id)
+	if wid == "":
+		wid = str(current_weapon)
+	if wid == "":
+		return {}
+	var v = _weapons().get(wid, null)
+	return v if v is Dictionary else {}
+
+
+## 当前武器的分型："melee" = 原来的扇形 Hitbox；"ranged" = 判定帧发射弹道
+func attack_kind() -> String:
+	return str(weapon_data().get("kind", "melee"))
+
+
+## 按武器覆盖 combat.attack 的同名键；武器没写该键就回落到全局值。
+## 这条回退链是「不填 weapons 也完全保持旧行为」的保证。
+func attack_param(key: String, fallback: float) -> float:
+	var w := weapon_data()
+	if w.has(key):
+		return float(w[key])
+	return float(Config.get_value("combat.attack." + key, fallback))
+
+
+## 当前武器的挥击噪音；武器没写就回落到 noise.sources.attack
+func attack_noise() -> float:
+	var w := weapon_data()
+	if w.has("noise"):
+		return float(w["noise"])
+	return float(Config.get_value("noise.sources.attack", 120.0))
+
+
+## 该武器该用哪套贴图集；空字符串 = 跟随 player.sprite_set
+func _sprite_set_for_weapon() -> String:
+	var s := str(weapon_data().get("sprite_set", ""))
+	if s != "":
+		return s
+	return str(Config.get_value("player.sprite_set", "sprites"))
+
+
+## 进局时按 config 的 player.weapon 选武器；值非法则保持"无武器"并告警。
+func _resolve_initial_weapon() -> void:
+	var want := str(Config.get_value("player.weapon", ""))
+	if want == "":
+		return
+	if weapon_ids().has(want):
+		current_weapon = StringName(want)
+	else:
+		push_warning("[Weapon] player.weapon=%s 不在武器表 %s 中，忽略并退回全局 combat.attack"
+				% [want, str(weapon_ids())])
+
+
+## 换武器：切贴图集 + 重设判定框半径。返回是否成功（id 不存在则不动）。
+func switch_weapon(id: StringName) -> bool:
+	if not weapon_ids().has(str(id)):
+		push_warning("[Weapon] 未知武器：%s（可选 %s）" % [str(id), str(weapon_ids())])
+		return false
+	if str(id) == str(current_weapon):
+		return true
+	current_weapon = id
+	_reload_animator()
+	_apply_hitbox_radius()
+	_setup_rifle()
+	print("[Weapon] 切换武器 -> %s（%s）贴图集=%s"
+			% [str(weapon_data().get("name", id)), attack_kind(), _sprite_set_for_weapon()])
+	return true
+
+
+## 按当前武器重新装载帧序列。
+## 之所以能"运行时换集"：PlayerAnimator.load_from_config() 内部本来就 clear + reload，
+## 换精灵集是它的内置行为，引擎层零改动（做 Lancer 时验证过）。
+func _reload_animator() -> void:
+	if _animator == null:
+		return
+	var set_name := _sprite_set_for_weapon()
+	var sprite_cfg: Dictionary = Config.get_value(set_name, {})
+	if sprite_cfg.is_empty():
+		push_warning("[Weapon] 精灵集为空：%s，保持当前贴图" % set_name)
+		return
+	_animator.load_from_config(sprite_cfg, _view_cfg_for(sprite_cfg))
+
+
+## 判定框半径跟着武器走，且**必须能重复调用**。
+## _init_combat() 里的半径只设一次，换武器不重设的话判定框还是旧武器的
+## —— 远程武器这里给 0（它的判定在弹道上，不在玩家身上）。
+func _apply_hitbox_radius() -> void:
+	if hitbox == null:
+		return
+	var shape := hitbox.get_node("CollisionShape2D").shape as CircleShape2D
+	if shape == null:
+		return
+	shape.radius = maxf(attack_param("range_px", 30.0), 0.0)
+
 
 func _init_combat() -> void:
 	max_hp = int(Config.get_value("combat.player.max_hp", 100))
@@ -194,10 +395,9 @@ func _init_combat() -> void:
 	_run = get_tree().get_first_node_in_group("run_manager")
 	_init_skill_system()
 	if hitbox != null:
-		var radius := float(Config.get_value("combat.attack.range_px", 30.0))
-		(hitbox.get_node("CollisionShape2D").shape as CircleShape2D).radius = radius
 		hitbox.monitoring = false   # 只在判定帧窗口开启
 		hitbox.monitorable = false
+		_apply_hitbox_radius()      # 半径由当前武器决定（可换武器时重设）
 
 
 ## 技能系统：从 config 装配技能表，之后由 SkillSystem 自己做冷却 tick 与释放校验
@@ -312,9 +512,7 @@ func apply_guard(reduction: float, duration: float) -> void:
 ## 直接遍历 enemies 组按距离判定：100 个敌人量级，比物理查询更省。
 func skill_aoe_hit(radius: float, damage: int, knockback_speed: float) -> void:
 	var hits := 0
-	for e in get_tree().get_nodes_in_group("enemies"):
-		if not is_instance_valid(e):
-			continue
+	for e in _damageable_nodes():
 		var to_enemy: Vector2 = e.global_position - global_position
 		if to_enemy.length() > radius:
 			continue
@@ -327,13 +525,23 @@ func skill_aoe_hit(radius: float, damage: int, knockback_speed: float) -> void:
 
 ## 突进沿途伤害（钩爪突进）：同一目标只命中一次，去重表由调用方持有
 func skill_dash_hit(radius: float, damage: int, hit_targets: Dictionary) -> void:
-	for e in get_tree().get_nodes_in_group("enemies"):
-		if not is_instance_valid(e) or hit_targets.has(e):
+	for e in _damageable_nodes():
+		if hit_targets.has(e):
 			continue
 		if e.global_position.distance_to(global_position) > radius:
 			continue
 		hit_targets[e] = true
 		e.take_damage(damage)
+
+
+## 场上所有可受伤目标（敌人 + 中立生物），已滤掉失效实例
+func _damageable_nodes() -> Array:
+	var out: Array = []
+	for g in DAMAGEABLE_GROUPS:
+		for n in get_tree().get_nodes_in_group(g):
+			if is_instance_valid(n):
+				out.append(n)
+	return out
 
 
 ## 生成冲击波圆环（灰盒视觉反馈，播完自毁）
@@ -385,17 +593,18 @@ func end_attack_hit() -> void:
 
 
 ## 判定帧内调用：对 Hitbox 覆盖到的敌人结算伤害（同一目标只命中一次）
+## 仅近战武器使用；远程武器的判定在弹道节点里，所以这里直接返回。
 func resolve_attack_hit() -> void:
-	if hitbox == null:
+	if hitbox == null or attack_kind() != "melee":
 		return
-	var max_targets := int(Config.get_value("combat.attack.max_targets", 3))
-	var base_damage := float(Config.get_value("combat.attack.damage", 25.0))
-	var half_arc := deg_to_rad(float(Config.get_value("combat.attack.arc_degrees", 200.0))) * 0.5
+	var max_targets := int(attack_param("max_targets", 3.0))
+	var base_damage := attack_param("damage", 25.0)
+	var half_arc := deg_to_rad(attack_param("arc_degrees", 200.0)) * 0.5
 	var hits := 0
 	for area in hitbox.get_overlapping_areas():
 		if hits >= max_targets:
 			break
-		if not area.is_in_group("enemies"):
+		if not _is_damageable(area):
 			continue
 		if _hit_targets.has(area):
 			continue
@@ -408,7 +617,118 @@ func resolve_attack_hit() -> void:
 		hits += 1
 		var dmg := DamagePipeline.compute(base_damage)
 		area.take_damage(dmg)
-		print("[Combat] 命中敌人，造成 %d 伤害" % dmg)
+		print("[Combat] 命中 %s，造成 %d 伤害" % [area.name, dmg])
+
+
+## 发射一枚弹道（远程武器进入判定帧时调用）。返回是否真的发射了。
+##
+## 挂到玩家的父节点而不是玩家自己身上：箭的寿命比一次挥击长，挂在玩家下面
+## 一旦玩家被清掉（换局/死亡回收）会跟着消失；挂同层则与敌人同一容器，层级关系也更自然。
+## 顺序必须是「先 add_child 再设 global_position」—— 没入树时 global_position 不生效。
+func fire_projectile() -> bool:
+	var pc = weapon_data().get("projectile", null)
+	if not (pc is Dictionary) or (pc as Dictionary).is_empty():
+		push_warning("[Weapon] %s 是远程武器但没有 projectile 配置段"
+				% str(weapon_data().get("name", current_weapon)))
+		return false
+	var parent := get_parent()
+	if parent == null:
+		return false
+	var cfg: Dictionary = pc
+	var p := PROJECTILE.new()
+	p.name = "Projectile"
+	parent.add_child(p)
+	p.global_position = global_position + facing * float(cfg.get("muzzle_offset_px", 22.0))
+	p.setup(cfg, facing, int(attack_param("damage", 20.0)), _walls, _tile_size)
+	return true
+
+
+## 瞬狙（kind = hitscan）：判定帧瞬间沿瞄准线结算，不产生飞行弹道。
+## 返回命中数。链路：
+##   1. 射线 = 枪口 → 枪口 + facing * max_distance_px；
+##   2. first_wall_point 截断到第一个墙点（子弹打不穿墙）；
+##   3. targets_on_segment 按沿线先后取前 pierce 个（穿透）；
+##   4. 每个目标走 DamagePipeline（与近战/箭同一条减伤管线）；
+##   5. 表现 = Line2D 曳光（淡出自毁）+ 命中点 fx_ring。
+## 全部判定都是纯数据（无物理查询），无头探针可逐项断言。
+func fire_hitscan() -> int:
+	var hc = weapon_data().get("hitscan", null)
+	if not (hc is Dictionary) or (hc as Dictionary).is_empty():
+		push_warning("[Weapon] %s 是瞬狙武器但没有 hitscan 配置段"
+				% str(weapon_data().get("name", current_weapon)))
+		return 0
+	var cfg: Dictionary = hc
+	var parent := get_parent()
+	if parent == null:
+		return 0
+
+	var from := global_position + facing * float(cfg.get("muzzle_offset_px", 34.0))
+	var far := from + facing * float(cfg.get("max_distance_px", 900.0))
+	# 墙截断：撞墙的点就是弹道终点（曳光也画到这里，视觉与判定一致）
+	var wall_hit = PROJECTILE.first_wall_point(_walls, _tile_size, from, far)
+	var to: Vector2 = wall_hit if wall_hit != null else far
+
+	var pierce := int(cfg.get("pierce", 1))
+	var radius := float(cfg.get("hit_radius_px", 18.0))
+	var targets := PROJECTILE.targets_on_segment(from, to, radius, _damageable_nodes())
+	if pierce < targets.size():
+		targets = targets.slice(0, pierce)
+
+	var base_damage := attack_param("damage", 25.0)
+	for t in targets:
+		var dmg := DamagePipeline.compute(base_damage)
+		t.take_damage(dmg)
+		print("[Combat] 狙击命中 %s，造成 %d 伤害" % [t.name, dmg])
+
+	_spawn_tracer(from, to, cfg)
+	if wall_hit != null or not targets.is_empty():
+		var impact: Vector2 = to if (wall_hit != null or targets.is_empty()) \
+				else (targets[-1] as Node2D).global_position
+		_spawn_ring_at(impact, float(cfg.get("impact_radius", 26.0)),
+				Color(str(cfg.get("impact_color", "#ff9a3d"))))
+	return targets.size()
+
+
+## 曳光：Line2D 从枪口到终点，按 tracer_fade_seconds 淡出后自毁。
+## 挂玩家父层（与弹道同容器），寿命短，不随玩家移动。
+func _spawn_tracer(from: Vector2, to: Vector2, cfg: Dictionary) -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	var line := Line2D.new()
+	line.name = "SniperTracer"
+	line.width = float(cfg.get("tracer_width", 2.5))
+	line.default_color = Color(str(cfg.get("tracer_color", "#ffd873")))
+	line.z_index = 40
+	line.antialiased = true
+	parent.add_child(line)
+	line.global_position = from
+	line.add_point(Vector2.ZERO)
+	line.add_point(to - from)
+	var fade := maxf(float(cfg.get("tracer_fade_seconds", 0.18)), 0.05)
+	var tw := line.create_tween()
+	tw.tween_property(line, "modulate:a", 0.0, fade)
+	tw.tween_callback(line.queue_free)
+
+
+## 冲击环（复用 fx_ring），但**挂在世界层并定位到任意点**——
+## spawn_impact_ring 只能相对玩家（AOE 用），狙击命中点在远处，必须全局定位。
+func _spawn_ring_at(pos: Vector2, radius: float, color: Color) -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	var ring: Node2D = FX_RING.new()
+	ring.setup(radius, 0.35, color)
+	parent.add_child(ring)
+	ring.global_position = pos
+
+
+## 是否是可受伤目标（敌人 / 中立生物）
+static func _is_damageable(node: Node) -> bool:
+	for g in DAMAGEABLE_GROUPS:
+		if node.is_in_group(g):
+			return true
+	return false
 
 
 ## 受到伤害（无敌帧可免疫）；返回是否真的吃到伤害
@@ -529,6 +849,16 @@ func follow_path() -> void:
 	var need_repath := _cached_path.is_empty() or my_cell != _path_cell \
 			or _stall_frames >= STALL_REPATH_FRAMES
 	if need_repath:
+		# 因为"卡住"才重算 → 累计无效重算次数，超预算就放弃目标。
+		if _stall_frames >= STALL_REPATH_FRAMES:
+			_stall_repaths += 1
+			if _stall_repaths > STALL_GIVE_UP_REPATHS:
+				push_warning("[Player] 连续 %d 次重算路径仍无法前进，放弃移动目标（位置 %s）"
+						% [_stall_repaths, str(global_position)])
+				velocity = Vector2.ZERO
+				move_and_slide()
+				clear_move_target()
+				return
 		_path_cell = my_cell
 		_stall_frames = 0
 		_cached_path = _query_path(my_cell, end_cell)
@@ -555,18 +885,22 @@ func follow_path() -> void:
 		if dir.length() > 1.0:
 			facing = dir.normalized()
 
-	if dir.length() < 1.0:
+	var no_dir := dir.length() < 1.0
+	if no_dir:
 		velocity = Vector2.ZERO
 	else:
 		# 地形减速：雪原（biome.speed）与河水（river.slow）都落在这张表里。
 		velocity = dir.normalized() * speed * terrain_speed_at(my_cell)
 	move_and_slide()
 
-	# 卡住检测：本想移动却几乎没挪动（被墙/实体挡住）→ 计数触发重算
-	if velocity.length() > 0.0 and global_position.distance_to(old_pos) < 0.2:
+	# 卡住检测：本想移动却几乎没挪动（被墙/实体挡住）→ 计数触发重算。
+	# no_dir（路点已走完却没进入目标格）也要计入：那种情况速度本来就是 0，
+	# 旧版只判 `velocity.length() > 0`，计数器会被清零、永远不触发重算 → 硬死锁。
+	if (no_dir or velocity.length() > 0.0) and global_position.distance_to(old_pos) < 0.2:
 		_stall_frames += 1
 	else:
 		_stall_frames = 0
+		_stall_repaths = 0        # 真的挪动了 → 之前的无效重算记录作废
 
 
 # ------------------------------------------------------------
@@ -591,6 +925,7 @@ func _clear_path_cache() -> void:
 	_path_index = 0
 	_path_cell = Vector2i(-9999, -9999)
 	_stall_frames = 0
+	_stall_repaths = 0
 
 
 func _cell_of(pos: Vector2) -> Vector2i:

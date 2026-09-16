@@ -14,7 +14,7 @@ import os
 
 GODOT = r"C:/Users/Administrator/Downloads/Godot_v4.7.2-stable_win64_console.exe"
 PROJ = "D:/SteamPunkExtraction"
-OUT_DIR = "C:/Users/Administrator/WorkBuddy/2026-09-14-22-35-14"
+OUT_DIR = os.environ.get("WB_LOG_DIR", "C:/Users/Administrator/WorkBuddy/2026-09-15-23-06-42")
 
 
 def main() -> int:
@@ -28,6 +28,7 @@ def main() -> int:
     cmd = [GODOT, "--path", PROJ]
     window = False
     scene = None
+    user_args = []
     i = 0
     while i < len(rest):
         a = rest[i]
@@ -39,6 +40,13 @@ def main() -> int:
         elif a == "--quit-after":
             i += 1
             cmd += ["--quit-after", rest[i]]
+        elif a == "--fixed-fps":
+            i += 1
+            cmd += ["--fixed-fps", rest[i]]
+        elif a == "--":
+            # 后面的全部透传给 Godot 的 `--` 用户参数通道（--soak / --capture2d 等）
+            user_args = rest[i + 1:]
+            break
         else:
             scene = a
         i += 1
@@ -47,6 +55,9 @@ def main() -> int:
         cmd.insert(1, "--headless")
     if scene:
         cmd.append(scene)
+    if user_args:
+        cmd.append("--")
+        cmd += user_args
 
     p = subprocess.run(cmd, capture_output=True)
     out = p.stdout + b"\n" + p.stderr

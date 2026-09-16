@@ -2,15 +2,22 @@ extends Node
 ## ============================================================
 ## MetaProgression — 自动加载单例（在脚本里用 `Meta` 访问）
 ## 职责：局外持久层，跨局存在。
-##   1. 存档/读档（user://save.json）
+##   1. 存档/读档
 ##   2. 局外资源仓库（撤离成功带回的资源堆在这里）
 ##   3. 升级购买（两条养成线：survival 生存 / acquisition 获取）
 ##   4. 把养成加成折算成局内属性，供 RunManager 取用
+##
+## 存档位置分两种情况（见 Scripts/save_slots.gd）：
+##   · 从开始菜单进游戏：`SaveSlots.active_slot > 0`，读写 user://saves/slot_NN.json
+##   · 直接跑 Main.tscn（命令行/无头回归）：active_slot == 0，
+##     读写旧的单槽 user://save.json —— 行为与加菜单之前**完全一致**。
 ##
 ## 数值全部来自 Data/config.json 的 meta_progression 节点，
 ## 升级费用 = 配置 cost × (当前等级 + 1)，越买越贵。
 ## ============================================================
 
+## 旧版单槽存档路径。保留是为了让不经过菜单的入口（headless 回归、出图脚本）
+## 行为不变 —— 那些入口不该往玩家的真实存档槽里写数据。
 const SAVE_PATH := "user://save.json"
 
 ## 局外资源仓库，形如 {"scrap": 30, "steam_core": 2}
@@ -21,7 +28,9 @@ var upgrade_levels: Dictionary = {}
 
 func _ready() -> void:
 	load_save()
-	print("[Meta] 存档加载完成：仓库 %s | 升级 %s" % [bank, upgrade_levels])
+	print("[Meta] 存档加载完成（%s）：仓库 %s | 升级 %s" % [
+		("槽 %d" % SaveSlots.active_slot) if SaveSlots.has_active_slot() else "本地默认槽",
+		bank, upgrade_levels])
 
 
 # ------------------------------------------------------------
@@ -29,6 +38,18 @@ func _ready() -> void:
 # ------------------------------------------------------------
 
 func load_save() -> void:
+	bank = {}
+	upgrade_levels = {}
+	if SaveSlots.has_active_slot():
+		var slot_data: Dictionary = SaveSlots.read_slot(SaveSlots.active_slot)
+		if slot_data.is_empty():
+			push_warning("[Meta] 槽 %d 读不到内容，按空存档处理" % SaveSlots.active_slot)
+			return
+		bank = slot_data.get("bank", {})
+		upgrade_levels = slot_data.get("upgrades", {})
+		_prune_unknown_resources()
+		return
+	# --- 无激活槽：旧的单槽路径 ---
 	if not FileAccess.file_exists(SAVE_PATH):
 		return  # 首次游玩，无存档
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
@@ -59,6 +80,9 @@ func _prune_unknown_resources() -> void:
 
 
 func save_game() -> void:
+	if SaveSlots.has_active_slot():
+		SaveSlots.write_active(bank, upgrade_levels)
+		return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
 		push_error("[Meta] 存档写入失败：%s" % SAVE_PATH)

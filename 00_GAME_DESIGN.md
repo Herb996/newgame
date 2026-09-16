@@ -35,6 +35,10 @@ Keep Quiet / 嘘（2026-09-15 定稿；工程目录名仍为 SteamPunkExtraction
 4. 代码改动后必须能编译通过；报错自行读取日志修复。
 5. 所有数值配置写入 Data/*.json，不要硬编码在脚本里。
 6. 美术素材生成必须参考 01_ART_GUIDE.md，一次只生成一个类别。
+7. 需求全景与依赖关系见 `03_REQUIREMENTS.md`（可视化页面 `docs/requirements.html`，
+   改完 md 后运行 `python tools/gen_requirements_html.py` 重新生成）。任何设计拍板、功能完成、
+   优先级或依赖变化，必须同步更新该矩阵（含「文档-代码漂移清单」）；
+   本文件的「待回答」关闭时，同步移除对应条目。
 
 ## 当前阶段与里程碑
 Phase 1：垂直切片（进行中）

@@ -15,12 +15,17 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="SteamPunkExtraction"
-run/main_scene="res://Scenes/Main3D.tscn"
+run/main_scene="res://Scenes/StartMenu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [autoload]
 
+; 顺序有讲究：SaveSlots 读 Config 取槽位数，又要在 Meta._ready() 之前就绪
+; （Meta.load_save 会问 SaveSlots 有没有激活槽），所以夹在两者中间。
+; DisplaySettings 只管窗口/音量，放前面是为了进主场景前就把画面设置应用上。
 Config="*res://Scripts/config_loader.gd"
+SaveSlots="*res://Scripts/save_slots.gd"
+DisplaySettings="*res://Scripts/display_settings.gd"
 Meta="*res://Scripts/meta_progression.gd"
 NoiseSystem="*res://Scripts/noise_system.gd"
 ResourceRegistry="*res://Scripts/resource_registry.gd"

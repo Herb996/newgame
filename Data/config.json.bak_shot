@@ -1,0 +1,882 @@
+{
+  "map": {
+    "width": 128,
+    "height": 128,
+    "tile_size": 16,
+    "noise_frequency": 0.03,
+    "noise_threshold": 0.25,
+    "biome_noise_frequency": 0.008,
+    "biome_border_frequency": 0.08,
+    "biome_border_jitter": 0.06,
+    "biome_spread": 1.35,
+    "biome_edge_blend": 0.45,
+    "biomes": [
+      {
+        "id": 0,
+        "name": "草地",
+        "weight": 3.4,
+        "speed": 1.0,
+        "floor": [
+          0.3,
+          0.36,
+          0.18
+        ],
+        "wall": [
+          0.5,
+          0.46,
+          0.34
+        ],
+        "tint": [
+          1.02,
+          1.0,
+          0.92
+        ],
+        "tree": 0.028,
+        "rock": 0.014,
+        "debris": 0.012,
+        "crack": 0.03,
+        "ground_3d": "ground_grass.png",
+        "ground_tune": [
+          1.0,
+          1.0,
+          0.95
+        ]
+      },
+      {
+        "id": 1,
+        "name": "荒原",
+        "weight": 1.05,
+        "speed": 1.0,
+        "floor": [
+          0.33,
+          0.27,
+          0.18
+        ],
+        "wall": [
+          0.52,
+          0.37,
+          0.2
+        ],
+        "tint": [
+          1.06,
+          1.02,
+          0.96
+        ],
+        "tree": 0.018,
+        "rock": 0.09,
+        "debris": 0.045,
+        "crack": 0.085,
+        "floor_src": "Seamless_tileable_ground_textu_2026-09-14T23-35-17.png",
+        "ground_3d": "ground_waste.png",
+        "ground_tune": [
+          0.96,
+          0.93,
+          0.88
+        ]
+      },
+      {
+        "id": 2,
+        "name": "森林",
+        "weight": 1.25,
+        "speed": 1.0,
+        "floor": [
+          0.2,
+          0.28,
+          0.15
+        ],
+        "wall": [
+          0.42,
+          0.3,
+          0.17
+        ],
+        "tint": [
+          0.93,
+          0.98,
+          0.95
+        ],
+        "tree": 0.16,
+        "rock": 0.018,
+        "debris": 0.028,
+        "crack": 0.02,
+        "floor_src": "Seamless_tileable_ground_textu_2026-09-14T23-34-47.png",
+        "ground_3d": "ground_forest.png",
+        "ground_tune": [
+          1.06,
+          1.06,
+          1.02
+        ]
+      },
+      {
+        "id": 3,
+        "name": "雪原",
+        "weight": 0.95,
+        "speed": 0.62,
+        "floor": [
+          0.82,
+          0.86,
+          0.9
+        ],
+        "wall": [
+          0.72,
+          0.76,
+          0.8
+        ],
+        "tint": [
+          1.0,
+          1.01,
+          1.04
+        ],
+        "tree": 0.04,
+        "rock": 0.028,
+        "debris": 0.012,
+        "crack": 0.04,
+        "ground_3d": "ground_snow.png",
+        "ground_tune": [
+          0.84,
+          0.87,
+          0.92
+        ]
+      }
+    ],
+    "veins": {
+      "iron": {
+        "biomes": [
+          1
+        ],
+        "count": 22,
+        "min_distance_from_spawn_cells": 10
+      },
+      "gold": {
+        "biomes": [
+          1
+        ],
+        "count": 9,
+        "min_distance_from_spawn_cells": 14
+      },
+      "oil": {
+        "biomes": [
+          1
+        ],
+        "count": 10,
+        "min_distance_from_spawn_cells": 10
+      }
+    },
+    "cluster_noise_frequency": 0.05,
+    "cluster_threshold": 0.5,
+    "min_reachable_ratio": 0.3,
+    "max_regen_attempts": 10,
+    "river": {
+      "enabled": true,
+      "frequency": 0.045,
+      "width_cells": 1.3,
+      "jitter": 0.01,
+      "slow": 0.72,
+      "min_dist_from_spawn_cells": 8,
+      "orientation": [
+        [
+          0.4,
+          -0.22,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.22,
+          0.4
+        ]
+      ],
+      "biome_scale": [
+        1.0,
+        0.7,
+        1.25,
+        0.0
+      ]
+    },
+    "crack": {
+      "enabled": true,
+      "frequency": 0.075,
+      "width_cells": 0.75,
+      "jitter": 0.006,
+      "min_dist_from_spawn_cells": 3,
+      "orientation": [
+        [
+          0.55,
+          -0.18,
+          0.18,
+          1.0
+        ],
+        [
+          1.0,
+          0.18,
+          -0.18,
+          0.55
+        ]
+      ],
+      "biome_scale": [
+        0.9,
+        1.6,
+        0.55,
+        1.0
+      ]
+    },
+    "force_seed": 0,
+    "grade": {
+      "contrast": 1.12,
+      "brightness": -0.03,
+      "saturation": 0.75
+    },
+    "macro_light": {
+      "enabled": true,
+      "frequency": 0.013,
+      "strength": 0.28
+    },
+    "decor": {
+      "noise_frequency": 0.09,
+      "veg_contrast": 0.85,
+      "density": 1.05,
+      "clear_spawn_radius_cells": 3,
+      "shadow": true
+    },
+    "decor_collision": {
+      "enabled": true
+    }
+  },
+  "map3d": {
+    "model_height": [
+      4.0,
+      1.2,
+      0.55
+    ],
+    "model_footprint": [
+      1.5,
+      1.35,
+      1.6
+    ]
+  },
+  "player": {
+    "speed": 160,
+    "vision_radius_cells": 10,
+    "select_radius_px": 16,
+    "path_arrive_threshold_px": 6,
+    "selected_color": "#4fc3f7"
+  },
+  "sprites": {
+    "fps": {
+      "idle": 3,
+      "walk": 10,
+      "attack": 14,
+      "dodge": 14,
+      "hit": 16,
+      "dead": 8
+    },
+    "idle": {
+      "down": [
+        "res://Assets/Art/Sprites/Player/player_idle_down_00.png",
+        "res://Assets/Art/Sprites/Player/player_idle_down_01.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/Player/player_idle_up_00.png",
+        "res://Assets/Art/Sprites/Player/player_idle_up_01.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Player/player_idle_left_00.png",
+        "res://Assets/Art/Sprites/Player/player_idle_left_01.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/Player/player_idle_right_00.png",
+        "res://Assets/Art/Sprites/Player/player_idle_right_01.png"
+      ]
+    },
+    "walk": {
+      "down": [
+        "res://Assets/Art/Sprites/Player/player_walk_down_00.png",
+        "res://Assets/Art/Sprites/Player/player_walk_down_01.png",
+        "res://Assets/Art/Sprites/Player/player_walk_down_02.png",
+        "res://Assets/Art/Sprites/Player/player_walk_down_03.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/Player/player_walk_up_00.png",
+        "res://Assets/Art/Sprites/Player/player_walk_up_01.png",
+        "res://Assets/Art/Sprites/Player/player_walk_up_02.png",
+        "res://Assets/Art/Sprites/Player/player_walk_up_03.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Player/player_walk_left_00.png",
+        "res://Assets/Art/Sprites/Player/player_walk_left_01.png",
+        "res://Assets/Art/Sprites/Player/player_walk_left_02.png",
+        "res://Assets/Art/Sprites/Player/player_walk_left_03.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/Player/player_walk_right_00.png",
+        "res://Assets/Art/Sprites/Player/player_walk_right_01.png",
+        "res://Assets/Art/Sprites/Player/player_walk_right_02.png",
+        "res://Assets/Art/Sprites/Player/player_walk_right_03.png"
+      ]
+    }
+  },
+  "player3d": {
+    "world_height": 5.2,
+    "shaded": false,
+    "brightness": 1.06,
+    "shadow": true,
+    "shadow_size": 0.86,
+    "shadow_alpha": 0.34,
+    "ring_radius": 0.34,
+    "ring_color": "#4fc3f7",
+    "anchor_offset_px": 40,
+    "debug_marker": false,
+    "sprite_set": "ts",
+    "filter": "linear",
+    "alpha_cut": false
+  },
+  "camera": {
+    "pan_speed": 400,
+    "return_key": 70
+  },
+  "camera3d": {
+    "size": 32.0,
+    "pan_speed": 26,
+    "zoom_min": 16.0,
+    "zoom_max": 150,
+    "zoom_step": 0.12,
+    "zoom_smooth": 14,
+    "zoom_at_cursor": true,
+    "zoom_invert": false,
+    "zoom_fit_bounds": true,
+    "zoom_hud": true,
+    "cam_distance": 120,
+    "pitch_deg": 45.5,
+    "base_size": 26.0
+  },
+  "enemy": {
+    "count": 100,
+    "min_distance_from_player_cells": 20,
+    "max_hp": 40,
+    "contact_damage": 10,
+    "contact_cooldown_seconds": 1.0,
+    "knockback_px": 8,
+    "speed": 90,
+    "chase_speed_multiplier": 1.35,
+    "vision_cells": 10,
+    "vision_blocked_by_walls": true,
+    "los_step_cells": 0.35,
+    "lose_sight_seconds": 3.0,
+    "ai_active_radius_cells": 32,
+    "patrol_radius_cells": 6,
+    "patrol_idle_seconds": 1.5,
+    "repath_interval_seconds": 0.4,
+    "drop": {
+      "chance": 0.75,
+      "amount_min": 2,
+      "amount_max": 6,
+      "weights": {
+        "wood": 3,
+        "stone": 3,
+        "iron": 2,
+        "food": 3,
+        "gold": 1,
+        "oil": 1
+      }
+    }
+  },
+  "noise": {
+    "hear_radius_cells": 16,
+    "min_notice": 4,
+    "wall_attenuation": 0.5,
+    "decay_per_second": 10,
+    "max_alertness": 150,
+    "footstep_interval_seconds": 0.4,
+    "thresholds": {
+      "suspicious": 15,
+      "investigate": 30,
+      "combat": 70
+    },
+    "sources": {
+      "walk": 22,
+      "dodge": 40,
+      "attack": 120,
+      "shout": 160,
+      "skill_steam_burst": 90,
+      "skill_grapple_dash": 60,
+      "skill_gear_guard": 45
+    },
+    "ring_duration_seconds": 0.7,
+    "ring_color": "#ffd54f",
+    "ring_alpha": 0.35,
+    "ring_min_intensity": 35,
+    "ring_min_interval_seconds": 0.15
+  },
+  "combat": {
+    "input": {
+      "buffer_seconds": 0.25,
+      "attack_mouse_button": 2,
+      "attack_key": 74,
+      "dodge_key": 32
+    },
+    "player": {
+      "max_hp": 100,
+      "hitstun_seconds": 0.25,
+      "invincible_after_hit_seconds": 0.4,
+      "knockback_speed": 140
+    },
+    "attack": {
+      "windup_seconds": 0.12,
+      "active_seconds": 0.08,
+      "recovery_seconds": 0.2,
+      "cancel_window_seconds": 0.08,
+      "damage": 25,
+      "range_px": 30,
+      "arc_degrees": 200,
+      "max_targets": 3
+    },
+    "dodge": {
+      "duration_seconds": 0.22,
+      "speed_multiplier": 3.0,
+      "invincible": true,
+      "cooldown_seconds": 0.8
+    },
+    "stamina": {
+      "max": 100,
+      "regen_per_second": 16,
+      "regen_delay_seconds": 0.8
+    },
+    "skills": {
+      "steam_burst": {
+        "name": "蒸汽爆发",
+        "key": 49,
+        "type": "aoe_self",
+        "stamina_cost": 25,
+        "cooldown_seconds": 4.0,
+        "windup_seconds": 0.15,
+        "active_seconds": 0.12,
+        "recovery_seconds": 0.25,
+        "damage": 30,
+        "radius_px": 72,
+        "knockback_speed": 220,
+        "noise": 45
+      },
+      "grapple_dash": {
+        "name": "钩爪突进",
+        "key": 50,
+        "type": "dash",
+        "stamina_cost": 20,
+        "cooldown_seconds": 5.0,
+        "windup_seconds": 0.08,
+        "active_seconds": 0.18,
+        "recovery_seconds": 0.2,
+        "damage": 20,
+        "dash_speed": 900,
+        "hit_radius_px": 26,
+        "noise": 35
+      },
+      "gear_guard": {
+        "name": "齿轮护盾",
+        "key": 51,
+        "type": "buff",
+        "stamina_cost": 30,
+        "cooldown_seconds": 8.0,
+        "windup_seconds": 0.05,
+        "active_seconds": 0.15,
+        "recovery_seconds": 0.15,
+        "damage_reduction": 0.6,
+        "buff_duration_seconds": 2.5,
+        "noise": 30
+      }
+    }
+  },
+  "loot": {
+    "density": 0.05,
+    "amount_per_node": 10,
+    "pickup_radius_px": 20,
+    "pickup_retry_seconds": 0.5
+  },
+  "storage": {
+    "max_slots": 20,
+    "stack_limit": 1000
+  },
+  "session": {
+    "time_limit_seconds": 3600,
+    "extraction_hold_seconds": 3
+  },
+  "survival": {
+    "meal_interval_seconds": 60,
+    "food_per_meal": 1,
+    "starvation_damage": 5,
+    "starvation_interval_seconds": 30,
+    "heal_per_food": 25,
+    "eat_cooldown_seconds": 1.0,
+    "eat_key": 72
+  },
+  "extraction": {
+    "count": 3,
+    "spawn_at_minutes": 30,
+    "close_one_at_minutes": [
+      45,
+      55
+    ],
+    "min_distance_from_spawn_cells": 24,
+    "min_distance_between_points_cells": 28,
+    "trigger_radius": 24,
+    "minimap": {
+      "duration_seconds": 60,
+      "warn_before_close_seconds": 60,
+      "size_px": 220
+    }
+  },
+  "base": {
+    "map_size": 64,
+    "floor_3d": "wall_plate.png",
+    "floor_uv_scale": 0.22,
+    "wall_height": 1.8,
+    "interact_radius_cells": 4.5,
+    "player_spawn_cell": [
+      32,
+      32
+    ],
+    "buildings": [
+      {
+        "id": "warehouse",
+        "name": "仓库",
+        "cell": [
+          24,
+          30
+        ],
+        "hint": "按 E 查看仓库",
+        "h3d": 2.6
+      },
+      {
+        "id": "statue",
+        "name": "雕像",
+        "cell": [
+          36,
+          30
+        ],
+        "hint": "按 E 进行升级",
+        "h3d": 3.4
+      },
+      {
+        "id": "gate",
+        "name": "出发大门",
+        "cell": [
+          30,
+          42
+        ],
+        "hint": "按 E 出发进入废墟",
+        "h3d": 2.2
+      }
+    ]
+  },
+  "resources": {
+    "wood": {
+      "name": "木头",
+      "rarity": "common",
+      "value": 1,
+      "color": "#8a6a3f",
+      "per_node": 20,
+      "harvest_time_seconds": 2.5
+    },
+    "stone": {
+      "name": "石头",
+      "rarity": "common",
+      "value": 1,
+      "color": "#9a9aa0",
+      "per_node": 20,
+      "harvest_time_seconds": 2.5
+    },
+    "iron": {
+      "name": "铁",
+      "rarity": "common",
+      "value": 2,
+      "color": "#bfc8d4",
+      "per_node": 30,
+      "harvest_time_seconds": 4.0
+    },
+    "gold": {
+      "name": "金币",
+      "rarity": "rare",
+      "value": 10,
+      "color": "#d9b13b",
+      "per_node": 15,
+      "harvest_time_seconds": 5.0
+    },
+    "oil": {
+      "name": "石油",
+      "rarity": "rare",
+      "value": 8,
+      "color": "#2a2a30",
+      "per_node": 40,
+      "harvest_time_seconds": 6.0
+    },
+    "food": {
+      "name": "食物",
+      "rarity": "common",
+      "value": 1,
+      "color": "#5da04e",
+      "per_node": 10,
+      "harvest_time_seconds": 3.0
+    }
+  },
+  "meta_progression": {
+    "survival": {
+      "max_hp": {
+        "name": "生命上限",
+        "format": "int",
+        "base": 100,
+        "per_level": 10,
+        "max_level": 5,
+        "cost": {
+          "iron": 30
+        }
+      },
+      "backpack_capacity": {
+        "name": "背包容量",
+        "format": "int",
+        "base": 10,
+        "per_level": 2,
+        "max_level": 5,
+        "cost": {
+          "wood": 25,
+          "gold": 1
+        }
+      },
+      "extraction_speed": {
+        "name": "撤离速度",
+        "format": "percent",
+        "base": 1.0,
+        "per_level": 0.05,
+        "max_level": 5,
+        "cost": {
+          "wood": 20,
+          "gold": 1
+        }
+      },
+      "warehouse_capacity": {
+        "name": "仓库容量",
+        "format": "int",
+        "base": 20,
+        "per_level": 5,
+        "max_level": 5,
+        "cost": {
+          "stone": 40,
+          "gold": 2
+        }
+      }
+    },
+    "acquisition": {
+      "resource_find_chance": {
+        "name": "资源发现率",
+        "format": "percent",
+        "base": 0.5,
+        "per_level": 0.03,
+        "max_level": 5,
+        "cost": {
+          "stone": 25,
+          "gold": 1
+        }
+      },
+      "rare_resource_chance": {
+        "name": "稀有资源率",
+        "format": "percent",
+        "base": 0.05,
+        "per_level": 0.01,
+        "max_level": 5,
+        "cost": {
+          "oil": 30,
+          "gold": 2
+        }
+      }
+    }
+  },
+  "fog3d": {
+    "enabled": true,
+    "height": 0.06,
+    "reveal_soft_cells": 2.2,
+    "soft_lo": 0.22,
+    "soft_hi": 0.68,
+    "color": "#040405"
+  },
+  "debug": {
+    "smoke_test": false,
+    "flow_test": false,
+    "auto_enter_run": false,
+    "main3d_start": "base",
+    "time_scale": 20.0,
+    "log_state_transitions": true,
+    "map_preview": "",
+    "map_preview_cells": 128,
+    "main3d_capture": "",
+    "main3d_capture_delay": 3.0,
+    "main3d_capture_frames": 4
+  },
+  "nav": {
+    "snap_radius_cells": 3,
+    "unstick_radius_cells": 4
+  },
+  "sprites_hd": {
+    "fps": {
+      "idle": 3,
+      "walk": 10,
+      "attack": 14,
+      "dodge": 14,
+      "hit": 16,
+      "dead": 8
+    },
+    "idle": {
+      "down": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_down_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_down_01.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_up_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_up_01.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_left_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_left_01.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_right_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_right_01.png"
+      ]
+    },
+    "walk": {
+      "down": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_down_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_down_01.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_down_02.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_down_03.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_up_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_up_01.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_up_02.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_up_03.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_left_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_left_01.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_left_02.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_left_03.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_right_00.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_right_01.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_right_02.png",
+        "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_right_03.png"
+      ]
+    }
+  },
+  "sprites_ts": {
+    "fps": {
+      "idle": 6,
+      "walk": 10,
+      "attack": 14,
+      "dodge": 14,
+      "hit": 10,
+      "dead": 8
+    },
+    "idle": {
+      "down": [
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_down_00.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_down_01.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_down_02.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_down_03.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_down_04.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_down_05.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_down_06.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_down_07.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_up_00.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_up_01.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_up_02.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_up_03.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_up_04.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_up_05.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_up_06.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_up_07.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_left_00.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_left_01.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_left_02.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_left_03.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_left_04.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_left_05.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_left_06.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_left_07.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_right_00.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_right_01.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_right_02.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_right_03.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_right_04.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_right_05.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_right_06.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_idle_right_07.png"
+      ]
+    },
+    "walk": {
+      "down": [
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_down_00.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_down_01.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_down_02.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_down_03.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_down_04.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_down_05.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_up_00.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_up_01.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_up_02.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_up_03.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_up_04.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_up_05.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_left_00.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_left_01.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_left_02.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_left_03.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_left_04.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_left_05.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_right_00.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_right_01.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_right_02.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_right_03.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_right_04.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_walk_right_05.png"
+      ]
+    },
+    "attack": {
+      "down": [
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_down_00.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_down_01.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_down_02.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_down_03.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_up_00.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_up_01.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_up_02.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_up_03.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_left_00.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_left_01.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_left_02.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_left_03.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_right_00.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_right_01.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_right_02.png",
+        "res://Assets/Art/Sprites/PlayerTS/warrior_attack_right_03.png"
+      ]
+    }
+  }
+}

@@ -24,14 +24,32 @@ extends Area2D
 ##   1. AStarGrid2D 由 EnemySystem 构建一次，全体敌人共享（绝不每人建网格）
 ##   2. 追击时按 repath_interval_seconds 节流重算路径，不是每帧重算
 ##   3. 距玩家超过 ai_active_radius_cells 的敌人进入休眠，完全不跑 AI
+##
+## 美术（2026-09-15 定：Tiny Swords 免费包）：
+##   官方包没有"怪物"，用 4 个阵营/兵种单位当敌人，每人一套 idle/run/attack 帧。
+##   表现层复用 PlayerAnimator（它的 parse_spec 支持"四向共用一组帧"的扁平写法），
+##   所以敌人与玩家播帧逻辑完全一致，不需要第二套动画代码。
+##   官方**没有受击/死亡动画** → 受击靠瞬间泛红，死亡靠缩放淡出（见 take_damage/_die）。
 ## ============================================================
 
 const DROP_SCENE := preload("res://Scenes/LootNode.tscn")
 
 var hp := 0
 var max_hp := 0
+var damage := 10                   # 接触伤害（由类型覆盖）
+var speed_mult := 1.0              # 相对 enemy.speed 的速度倍率
+var type_id := &""                 # 类型 id（调试/统计用）
+var type_name := ""                # 类型中文名（HUD/调试用）
 var _contact_cooldown := 0.0
 var _last_known := Vector2.ZERO   # 玩家最后被看到的位置（跟丢后走这里）
+
+# --- 表现层 ---
+var _body: Sprite2D = null
+var _animator: PlayerAnimator = null
+var _anim_state := PlayerAnimator.Anim.IDLE
+var _attack_timer := 0.0           # >0 表示正在播攻击动作，播完回 idle/walk
+var _hit_flash := 0.0              # 受击泛红剩余秒数
+var _dying := false                # 已进入死亡淡出，不再参与 AI/受伤
 
 # --- 噪音警觉度（02_TECH_BUILD.md 第二部分 噪音机制）---
 var noise_alertness := 0.0
@@ -58,6 +76,8 @@ var state_machine: StateMachine
 func _ready() -> void:
 	add_to_group("enemies")
 	visible = false  # 初始隐藏，等雾系统第一帧判定
+	_body = get_node_or_null("Body") as Sprite2D
+	# 兜底：类型由 setup() 注入，但 _ready 早于 setup，先用全局默认值起手
 	max_hp = int(Config.get_value("enemy.max_hp", 40))
 	hp = max_hp
 	body_entered.connect(_on_body_entered)
@@ -66,8 +86,14 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _dying:
+		return                       # 死亡淡出中：不再跑 AI、不再受伤
 	if _contact_cooldown > 0.0:
 		_contact_cooldown -= delta
+	if _attack_timer > 0.0:
+		_attack_timer -= delta
+	if _hit_flash > 0.0:
+		_hit_flash -= delta
 	# 噪音警觉度随时间衰减（听到动静→去查看→没发现→慢慢放松）
 	if noise_alertness > 0.0:
 		noise_alertness = maxf(0.0, noise_alertness
@@ -81,6 +107,8 @@ func _physics_process(delta: float) -> void:
 	if _dormant:
 		return
 	state_machine.physics_update(delta)
+	_update_anim(delta)
+	# 染色必须在动画器之后：动画器每帧会写 modulate，放前面会被覆盖掉
 	_update_alert_visual()
 
 
@@ -96,12 +124,50 @@ func _init_state_machine() -> void:
 	state_machine.start()
 
 
-## 由 EnemySystem 调用：注入地图导航数据（共享 A* 网格）
-func setup(walls: Array, tile_size: int, astar: AStarGrid2D) -> void:
+## 由 EnemySystem 调用：注入地图导航数据（共享 A* 网格）+ 本实例的兵种配置。
+## type_cfg 为空时退化为 config 的 enemy.max_hp / enemy.contact_damage 单一敌人类型。
+func setup(walls: Array, tile_size: int, astar: AStarGrid2D,
+		type_cfg: Dictionary = {}) -> void:
 	_walls = walls
 	_tile_size = tile_size
 	_astar = astar
 	_home = global_position
+	_apply_type(type_cfg)
+
+
+## 套用兵种：属性 + 帧序列 + 脚底偏移。所有数值都能在 config 的 enemy_types 里调。
+func _apply_type(type_cfg: Dictionary) -> void:
+	if not type_cfg.is_empty():
+		type_id = StringName(str(type_cfg.get("id", "")))
+		type_name = str(type_cfg.get("name", type_cfg.get("id", "")))
+		max_hp = int(type_cfg.get("hp", Config.get_value("enemy.max_hp", 40)))
+		damage = int(type_cfg.get("damage", Config.get_value("enemy.contact_damage", 10)))
+		speed_mult = float(type_cfg.get("speed_mult", 1.0))
+	hp = max_hp
+
+	if _body == null:
+		return
+	# 帧序列：enemy_types 里直接写成 idle/walk/attack 三段扁平数组，
+	# 与 sprites_ts 同一套写法，PlayerAnimator.parse_spec 直接吃得下。
+	var view := {
+		"offset_y": float(type_cfg.get("offset_y", Config.get_value("enemy_types.offset_y", -40.0))),
+		"scale": float(type_cfg.get("scale", Config.get_value("enemy_types.scale", 1.0))),
+		"pixel_unit": float(type_cfg.get("pixel_unit",
+				Config.get_value("enemy_types.pixel_unit", 6.0))),
+	}
+	var view_cfg := {
+		"sprite_scale": view["scale"],
+		"sprite_offset_y": view["offset_y"],
+		"sprite_pixel_unit": view["pixel_unit"],
+	}
+	# 用 PlayerAnimator.Anim 的名字约定做键：idle / walk / attack
+	var spec := {}
+	for key in ["idle", "walk", "attack"]:
+		if type_cfg.has(key):
+			spec[key] = type_cfg[key]
+	spec["fps"] = type_cfg.get("fps", {})
+	_animator = PlayerAnimator.new(_body)
+	_animator.load_from_config(spec, view_cfg, "")   # 空 label = 不打印（100 个会刷屏）
 
 
 # ------------------------------------------------------------
@@ -194,22 +260,40 @@ func repath_to_noise_source() -> void:
 		clear_move_target()
 
 
-## 警觉视觉反馈：本体 Polygon2D 染色（红=正常/巡逻，黄=疑惑，橙=调查，亮红=看见玩家）
-## 轻量、零素材，便于玩家一眼判断敌人状态。
-func _update_alert_visual() -> void:
-	var body := get_node_or_null("Body")
-	if body == null:
+## 表现层每帧推进：把 FSM/移动状态翻译成动画状态。
+## ATTACK 优先级最高（接触伤害时短暂播放），其次是"有路径在走"→ walk，否则 idle。
+func _update_anim(delta: float) -> void:
+	if _animator == null:
 		return
+	var st := PlayerAnimator.Anim.IDLE
+	if _attack_timer > 0.0:
+		st = PlayerAnimator.Anim.ATTACK
+	elif _has_target and not _path.is_empty():
+		st = PlayerAnimator.Anim.WALK
+	_anim_state = st
+	# 官方单位是正面单朝向帧，四向共用；朝向参数只影响无帧状态的程序化位移
+	_animator.update(delta, st, Vector2(0.0, 1.0))
+
+
+## 警觉视觉反馈：本体染色（红=巡逻常态，黄=疑惑，橙=调查，亮红=看见玩家）
+## 官方包没有受击帧，受击反馈只能靠"瞬间泛红"叠加在这套警觉色之上。
+## 调用时机必须在 _update_anim 之后 —— 动画器每帧都会写 modulate。
+func _update_alert_visual() -> void:
+	if _body == null or _dying:
+		return                        # 死亡淡出由 tween 独占 modulate
 	var susp := float(Config.get_value("noise.thresholds.suspicious", 20.0))
 	var inv := float(Config.get_value("noise.thresholds.investigate", 50.0))
+	var tint := Color(1.0, 1.0, 1.0)
 	if can_see_player():
-		body.modulate = Color(1.0, 0.35, 0.2)
+		tint = Color(1.0, 0.35, 0.2)
 	elif noise_alertness >= inv:
-		body.modulate = Color(1.0, 0.7, 0.2)    # 调查：橙
+		tint = Color(1.0, 0.7, 0.2)    # 调查：橙
 	elif noise_alertness >= susp:
-		body.modulate = Color(1.0, 0.9, 0.4)    # 疑惑：浅黄
-	else:
-		body.modulate = Color(1.0, 1.0, 1.0)    # 正常（本体自带红色）
+		tint = Color(1.0, 0.9, 0.4)    # 疑惑：浅黄
+	if _hit_flash > 0.0:
+		var full := maxf(float(Config.get_value("enemy.hit_flash_seconds", 0.18)), 0.01)
+		tint = tint.lerp(Color(1.0, 0.25, 0.2), clampf(_hit_flash / full, 0.0, 1.0))
+	_body.modulate = tint
 
 
 # ------------------------------------------------------------
@@ -227,7 +311,7 @@ func clear_move_target() -> void:
 
 
 func patrol_speed() -> float:
-	return float(Config.get_value("enemy.speed", 90))
+	return float(Config.get_value("enemy.speed", 90)) * speed_mult
 
 
 func chase_speed() -> float:
@@ -325,19 +409,39 @@ func _in_bounds(cell: Vector2i) -> bool:
 
 ## 受到玩家攻击伤害（由 Player.resolve_attack_hit / 技能效果调用）
 func take_damage(amount: int) -> void:
-	if hp <= 0:
+	if hp <= 0 or _dying:
 		return
 	hp -= amount
+	_hit_flash = float(Config.get_value("enemy.hit_flash_seconds", 0.18))
 	if hp <= 0:
 		_die()
 		return
-	print("[Combat] 敌人剩余 HP %d/%d" % [hp, max_hp])
 
 
-## 死亡结算：按概率掉落资源 → 移除自身
+## 死亡结算：按概率掉落资源 → 淡出 → 移除自身。
+## 不再"瞬间消失"：淡出期间 _dying=true，AI、受伤、接触伤害全部停摆，
+## 敌人不会在倒下动画里还能打人，也不会被重复结算掉落。
 func _die() -> void:
+	if _dying:
+		return
+	_dying = true
 	_spawn_drop()
-	queue_free()
+	_fade_out()
+
+
+## 死亡淡出：同时做 透明 / 缩小 / 下沉，读起来像"倒下了"而不是"被抠掉"。
+## 时长取 0，或没有 Body 节点时，直接释放（无头跑测试更干净）。
+func _fade_out() -> void:
+	var dur := float(Config.get_value("enemy.death_fade_seconds", 0.45))
+	if _body == null or dur <= 0.0:
+		queue_free()
+		return
+	set_physics_process(false)     # 停止一切逻辑，只留 tween
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(_body, "modulate", Color(0.45, 0.45, 0.45, 0.0), dur)
+	tween.tween_property(_body, "scale", _body.scale * 0.7, dur)
+	tween.tween_property(_body, "position:y", _body.position.y + 12.0, dur)
+	tween.chain().tween_callback(queue_free)
 
 
 ## 掉落：在原地生成一个资源点（复用 LootNode 场景，玩家走近自动拾取）
@@ -388,9 +492,13 @@ func apply_knockback(impulse: Vector2) -> void:
 
 ## 玩家碰到敌人 → 接触伤害（带冷却，避免每帧掉血）
 func _on_body_entered(body: Node) -> void:
+	if _dying:
+		return
 	if not body.is_in_group("player"):
 		return
 	if _contact_cooldown > 0.0:
 		return
-	if body.take_damage(int(Config.get_value("enemy.contact_damage", 10)), global_position):
+	if body.take_damage(damage, global_position):
 		_contact_cooldown = float(Config.get_value("enemy.contact_cooldown_seconds", 1.0))
+		# 打中玩家的同时播一下挥击动作，让"谁在打我"一眼可辨
+		_attack_timer = float(Config.get_value("enemy.attack_anim_seconds", 0.35))

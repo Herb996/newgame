@@ -22,13 +22,19 @@ func setup(root: Node2D) -> Vector2:
 	var size: int = int(Config.get_value("base.map_size", 64))
 
 	# 平地 + 外圈墙（复用局内瓦片集：地板/墙样式一致）
+	# 【2026-09-16】图集列布局改为「每群系 16 个 blob + 尾部 1 列水面」，所以：
+	#   地板 = 群系 0 的"四邻全连通"blob（下标 5 = row1,col1），基地是整片平地，
+	#          用 5 号块才不会在每格之间冒出崖壁描边；
+	#   墙   = atlas_wall_start() 的水面列。
+	var floor_col := MapGenerator.blob_offset(true, true, true, true)
+	var wall_col := MapGenerator.atlas_wall_start()
 	var layer := TileMapLayer.new()
 	layer.name = "BaseTileMap"
 	layer.tile_set = MapGenerator._build_tileset(tile_size)
 	for y in range(size):
 		for x in range(size):
 			var is_wall: bool = x == 0 or y == 0 or x == size - 1 or y == size - 1
-			layer.set_cell(Vector2i(x, y), 0, Vector2i(1 if is_wall else 0, 0))
+			layer.set_cell(Vector2i(x, y), 0, Vector2i(wall_col if is_wall else floor_col, 0))
 	var map_root := Node2D.new()
 	map_root.name = "BaseMapRoot"
 	map_root.add_child(layer)
@@ -39,13 +45,15 @@ func setup(root: Node2D) -> Vector2:
 	var spawn_cell := Vector2i(int(spawn_cell_cfg[0]), int(spawn_cell_cfg[1]))
 	_spawn = Vector2(spawn_cell) * tile_size + Vector2(tile_size * 0.5, tile_size * 0.5)
 
-	# 建筑布局（cell = 建筑 4x4 的左上角格）
+	# 建筑布局（cell = 建筑占地的左上角格）
+	var cells: int = int(Config.get_value("base.building_cells", 4))
 	for b in Config.get_value("base.buildings", []):
 		var bld := BUILDING_SCENE.instantiate()
 		var cell: Array = b["cell"]
-		# 建筑中心 = 左上角 + 2 格（4x4 的一半）
-		bld.position = Vector2(cell[0] + 2, cell[1] + 2) * tile_size
-		bld.setup(str(b["id"]), str(b["name"]), str(b.get("hint", "按 E")))
+		# 建筑中心 = 左上角 + 占地边长的一半
+		bld.position = Vector2(cell[0] + cells * 0.5, cell[1] + cells * 0.5) * tile_size
+		bld.setup(str(b["id"]), str(b["name"]), str(b.get("hint", "按 E")),
+				str(b.get("sprite", "")))
 		bld.interacted.connect(_on_building_interacted)
 		root.add_child(bld)
 

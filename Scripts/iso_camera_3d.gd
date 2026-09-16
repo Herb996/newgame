@@ -228,6 +228,12 @@ func zoom_hud_active() -> bool:
 	return _zoom_idle < HUD_HOLD
 
 
+## 要不要显示提示条。由相机自己回答，提示层（view_hint.gd）不用知道这是 2D 还是 3D：
+## 2D 那条线读 camera.zoom_hud，本条线读 camera3d.zoom_hud。
+func zoom_hud_enabled() -> bool:
+	return bool(Config.get_value("camera3d.zoom_hud", true))
+
+
 # ------------------------------------------------------------
 # 平移 / 回中 / 取景钳制
 # ------------------------------------------------------------

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Keep Quiet — 需求全景</title>
+<style>
+:root{
+  --bg:#f4eee1; --panel:#fbf7ee; --ink:#2b2318; --sub:#7a6a52;
+  --line:#d9cbae; --accent:#b06a2b; --accent2:#5b7f5e;
+  --done:#2e9e5b; --doing:#3a7bd5; --planned:#d9a520; --design:#8e5bb5;
+  --blocked:#d97b2e; --p0:#cc3333; --paused:#9aa0a6;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+ background:var(--bg);color:var(--ink);font-size:14px}
+header{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,#3a2d1c,#2b2318);
+ color:#f0e6d2;padding:10px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:17px;margin:0;letter-spacing:1px}
+header .gen{font-size:11px;color:#b9a87c;margin-left:auto}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav button{background:transparent;border:1px solid #6b5836;color:#e8dcc0;
+ padding:5px 14px;border-radius:16px;cursor:pointer;font-size:13px}
+nav button.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:bold}
+#qbox{background:#f0e6d2;border:none;border-radius:14px;padding:6px 12px;width:200px;outline:none}
+main{padding:16px 18px;max-width:1400px;margin:0 auto}
+section.view{display:none}
+section.view.on{display:block}
+.badge{display:inline-block;padding:1px 9px;border-radius:10px;color:#fff;font-size:12px;white-space:nowrap}
+.b-done{background:var(--done)}.b-doing{background:var(--doing)}.b-planned{background:var(--planned)}
+.b-design{background:var(--design)}.b-blocked{background:var(--blocked)}.b-p0{background:var(--p0)}
+.b-paused{background:var(--paused)}
+.prio{display:inline-block;padding:1px 7px;border-radius:4px;font-size:12px;border:1px solid}
+.p-P0{color:var(--p0);border-color:var(--p0);font-weight:bold}
+.p-P1{color:#b06a2b;border-color:#b06a2b}
+.p-P2{color:#5b7f5e;border-color:#5b7f5e}
+.p-P3{color:#8a8a8a;border-color:#8a8a8a}
+.chip{display:inline-block;background:#efe4cb;border:1px solid var(--line);border-radius:10px;
+ padding:0 8px;font-size:12px;cursor:pointer;color:var(--accent);margin:1px 2px}
+.chip:hover{background:var(--accent);color:#fff}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+ margin-bottom:14px;box-shadow:0 1px 3px rgba(60,40,10,.06)}
+h2.viewtitle{font-size:16px;margin:2px 0 12px;color:var(--accent)}
+.statrow{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.stat{flex:1;min-width:110px;background:var(--panel);border:1px solid var(--line);
+ border-radius:10px;padding:10px 14px;text-align:center}
+.stat .n{font-size:26px;font-weight:bold}
+.stat .t{font-size:12px;color:var(--sub)}
+.warn{background:#fdeaea;border:1px solid #e5b8b8;border-radius:10px;padding:10px 14px;margin-bottom:14px}
+.warn b{color:var(--p0)}
+.modbar{display:flex;align-items:center;gap:8px;margin:5px 0}
+.modbar .mn{width:150px;font-size:12px;color:var(--sub);text-align:right;flex:none}
+.modbar .bar{flex:1;height:16px;border-radius:8px;overflow:hidden;display:flex;background:#eadfc8}
+.modbar .pct{width:44px;font-size:12px;flex:none}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;align-items:center}
+.legend span{cursor:pointer;padding:2px 8px;border-radius:10px;border:1px solid var(--line);user-select:none}
+.legend span.off{opacity:.35}
+table{width:100%;border-collapse:collapse;background:var(--panel);font-size:13px}
+th,td{border-bottom:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:#efe4cb;cursor:pointer;user-select:none;position:sticky;top:64px;z-index:5}
+tr:hover td{background:#f6efdd}
+td.dep{white-space:normal}
+#graphwrap{position:relative;height:calc(100vh - 150px);min-height:480px;background:var(--panel);
+ border:1px solid var(--line);border-radius:10px;overflow:hidden}
+canvas{display:block;width:100%;height:100%;cursor:grab}
+#gpanel{position:absolute;right:10px;top:10px;width:290px;max-height:calc(100% - 20px);overflow:auto;
+ background:rgba(251,247,238,.97);border:1px solid var(--line);border-radius:10px;padding:12px;display:none}
+#gpanel h3{margin:0 0 6px;font-size:14px;color:var(--accent)}
+#gpanel .row{margin:4px 0;font-size:12px;color:var(--sub)}
+#gtip{position:absolute;pointer-events:none;background:#2b2318;color:#f0e6d2;font-size:12px;
+ padding:4px 8px;border-radius:6px;display:none;max-width:280px;z-index:9}
+.gtools{position:absolute;left:10px;top:10px;display:flex;gap:6px}
+.gtools button{background:#efe4cb;border:1px solid var(--line);border-radius:6px;padding:3px 10px;
+ cursor:pointer;font-size:12px}
+.phase{border-left:4px solid var(--accent);padding:2px 0 2px 14px;margin-bottom:18px}
+.phase h3{margin:2px 0 8px;font-size:15px}
+.pitem{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 12px;
+ margin:6px 0;font-size:13px}
+.oq{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--design);
+ border-radius:8px;padding:9px 13px;margin:8px 0}
+.oq .no{font-weight:bold;color:var(--design);margin-right:8px}
+.oq .bl{margin-top:4px;font-size:12px;color:var(--sub)}
+code{background:#eadfc8;border-radius:4px;padding:0 5px;font-size:12px}
+.foot{color:var(--sub);font-size:12px;text-align:center;margin:18px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚙ Keep Quiet · 需求全景</h1>
+  <nav id="nav"></nav>
+  <input id="qbox" placeholder="搜索需求 / ID / 来源…">
+  <span class="gen" id="gen"></span>
+</header>
+<main>
+  <section class="view" id="v-overview">
+    <h2 class="viewtitle">总览</h2>
+    <div id="p0warn"></div>
+    <div class="statrow" id="stats"></div>
+    <div class="card"><h2 class="viewtitle">各模块完成率</h2><div id="modbars"></div></div>
+    <div class="card"><h2 class="viewtitle">状态分布</h2><div id="donut" style="display:flex;gap:24px;align-items:center;flex-wrap:wrap"></div></div>
+    <div class="card"><h2 class="viewtitle">文档-代码漂移（本页面生成时核实）</h2><ol id="drift" style="margin:0;padding-left:20px;line-height:1.9"></ol></div>
+  </section>
+
+  <section class="view" id="v-matrix">
+    <h2 class="viewtitle">需求矩阵（点击表头排序 · 点击依赖 ID 跳转依赖图）</h2>
+    <div class="legend" id="fstatus"></div>
+    <div class="legend" id="fprio"></div>
+    <div class="legend"><select id="fmodule" style="padding:3px 8px;border-radius:6px;border:1px solid var(--line)"></select>
+      <span id="fcount" style="color:var(--sub)"></span></div>
+    <div style="overflow:auto"><table id="mtab"></table></div>
+  </section>
+
+  <section class="view" id="v-graph">
+    <h2 class="viewtitle">依赖关系图（拖拽移动 · 滚轮缩放 · 点击查看详情；箭头 = 前置 → 依赖方）</h2>
+    <div id="graphwrap">
+      <canvas id="gc"></canvas>
+      <div class="gtools"><button id="gfit">复位视图</button><button id="gunpin">解除固定</button></div>
+      <div class="legend" id="glegend" style="position:absolute;left:10px;bottom:10px;background:rgba(251,247,238,.9);padding:6px 10px;border-radius:8px;border:1px solid var(--line);margin:0"></div>
+      <div id="gpanel"></div>
+      <div id="gtip"></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-roadmap">
+    <h2 class="viewtitle">建议执行路线</h2>
+    <div id="phases"></div>
+  </section>
+
+  <section class="view" id="v-open">
+    <h2 class="viewtitle">待拍板清单（点击阻塞项跳转）</h2>
+    <div id="oqs"></div>
+  </section>
+</main>
+<div class="foot">数据源：03_REQUIREMENTS.md（单一事实源）· 更新方式：改 md 后运行 <code>python tools/gen_requirements_html.py</code></div>
+
+<script>
+const DATA = {"reqs": [{"id": "R-MAP-01", "desc": "程序化地图（噪声地形+群系+洪水填充连通性+重生成）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.1", "module": "MAP", "module_name": "地图生成"}, {"id": "R-MAP-02", "desc": "导航网格（AStarGrid2D + 点击寻路）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.1", "module": "MAP", "module_name": "地图生成"}, {"id": "R-MAP-03", "desc": "群系玩法差异（各群系资源产出不同）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.1", "module": "MAP", "module_name": "地图生成"}, {"id": "R-MAP-04", "desc": "地形速度网格（雪原 0.62/浅滩 0.72，敌人生效）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.1", "module": "MAP", "module_name": "地图生成"}, {"id": "R-MAP-05", "desc": "卡树/石头 bug（DecorCollision + 端点吸附）", "status": "done", "priority": "P0", "deps": [], "openq": [], "source": "02 §A.3，commit 323fdc6 已修", "module": "MAP", "module_name": "地图生成"}, {"id": "R-MAP-06", "desc": "河流/裂缝带宽调参（河 43%→稀长蜿蜒、缝≥0.9 格）", "status": "doing", "priority": "P1", "deps": [], "openq": [], "source": "02 §B", "module": "MAP", "module_name": "地图生成"}, {"id": "R-MAP-07", "desc": "天气系统（局内动态切换、影响噪音、道具可改）", "status": "design", "priority": "P2", "deps": ["R-NOISE-01"], "openq": [26], "source": "00 §3.1，细则=待拍板 26", "module": "MAP", "module_name": "地图生成"}, {"id": "R-MAP-08", "desc": "POI / 地图建筑 / 巢穴（巢穴产怪+拆除奖励）", "status": "design", "priority": "P2", "deps": [], "openq": [24], "source": "00 §3.1，细则=待拍板 24", "module": "MAP", "module_name": "地图生成"}, {"id": "R-MAP-09", "desc": "矿脉反复采集节点（数据已注册）", "status": "planned", "priority": "P1", "deps": ["R-LOOT-05"], "openq": [], "source": "00 §3.1", "module": "MAP", "module_name": "地图生成"}, {"id": "R-LOOT-01", "desc": "自动拾取（半径触发+格满重试+冷却）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.2", "module": "LOOT", "module_name": "搜刮与采集"}, {"id": "R-LOOT-02", "desc": "背包格子制（每种 1 格，默认 10）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.2", "module": "LOOT", "module_name": "搜刮与采集"}, {"id": "R-LOOT-03", "desc": "资源点生成（密度+稀有度加权+只刷可达格）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.2", "module": "LOOT", "module_name": "搜刮与采集"}, {"id": "R-LOOT-03b", "desc": "仓库入库规则（20 格/叠加 1000/截断丢弃）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.2", "module": "LOOT", "module_name": "搜刮与采集"}, {"id": "R-LOOT-04", "desc": "资源点总量刻意压低（\"惊喜\"定位）", "status": "planned", "priority": "P1", "deps": [], "openq": [], "source": "00 §3.2", "module": "LOOT", "module_name": "搜刮与采集"}, {"id": "R-LOOT-05", "desc": "采集玩法：harvest() 接交互入口（3D 射线→registry）", "status": "planned", "priority": "P1", "deps": [], "openq": [], "source": "02 §D-A；代码核实：全项目零调用", "module": "LOOT", "module_name": "搜刮与采集"}, {"id": "R-LOOT-06", "desc": "搜刮（拆建筑/采集）时角色减速", "status": "planned", "priority": "P2", "deps": ["R-LOOT-05"], "openq": [], "source": "00 §3.8", "module": "LOOT", "module_name": "搜刮与采集"}, {"id": "R-LOOT-07", "desc": "敌人掉落装备/道具类", "status": "design", "priority": "P2", "deps": ["R-COMBAT-05"], "openq": [], "source": "00 §3.2", "module": "LOOT", "module_name": "搜刮与采集"}, {"id": "R-LOOT-08", "desc": "拆建筑（POI 可拆，读条/掉落/噪音反馈）", "status": "design", "priority": "P2", "deps": ["R-MAP-08"], "openq": [], "source": "00 §3.13", "module": "LOOT", "module_name": "搜刮与采集"}, {"id": "R-SESS-01", "desc": "60 分钟倒计时 + HUD 显示", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.3", "module": "SESS / EXTRACT", "module_name": "限时与撤离"}, {"id": "R-SESS-02", "desc": "debug.time_scale 调回 1.0", "status": "p0", "priority": "**P0**", "deps": [], "openq": [], "source": "02 §A.1；代码实测仍为 20.0", "module": "SESS / EXTRACT", "module_name": "限时与撤离"}, {"id": "R-EXTRACT-01", "desc": "撤离时间轴（30 开 3 / 45、55 各关 1）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.4", "module": "SESS / EXTRACT", "module_name": "限时与撤离"}, {"id": "R-EXTRACT-02", "desc": "选址规则 + 预定关闭顺序 + 关闭保护", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.4", "module": "SESS / EXTRACT", "module_name": "限时与撤离"}, {"id": "R-EXTRACT-03", "desc": "撤离小地图（弹出/警示橙圈闪烁）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.4", "module": "SESS / EXTRACT", "module_name": "限时与撤离"}, {"id": "R-EXTRACT-04", "desc": "站圈 3 秒撤离 + 进度弧脉冲", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.4", "module": "SESS / EXTRACT", "module_name": "限时与撤离"}, {"id": "R-EXTRACT-05", "desc": "撤离被敌人攻击打断并重置", "status": "planned", "priority": "P1", "deps": [], "openq": [], "source": "00 §3.4；代码核实：extraction_point.gd 无打断逻辑", "module": "SESS / EXTRACT", "module_name": "限时与撤离"}, {"id": "R-EXTRACT-06", "desc": "每个撤离点只能用一次（为抓宠铺路）", "status": "planned", "priority": "P2", "deps": ["R-META-10"], "openq": [], "source": "00 §3.4；代码核实：未做消耗", "module": "SESS / EXTRACT", "module_name": "限时与撤离"}, {"id": "R-EXTRACT-07", "desc": "撤离点关闭前吸引怪物聚集", "status": "planned", "priority": "P2", "deps": ["R-ENEMY-02"], "openq": [], "source": "00 §3.4", "module": "SESS / EXTRACT", "module_name": "限时与撤离"}, {"id": "R-EXTRACT-08", "desc": "撤离瞬间拾取重试窗口的结算规则", "status": "design", "priority": "P1", "deps": [], "openq": [38], "source": "待拍板 38", "module": "SESS / EXTRACT", "module_name": "限时与撤离"}, {"id": "R-ENEMY-01", "desc": "敌人生成（数量/距离/去重/只刷可达格）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.6", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-ENEMY-02", "desc": "AI 巡逻/调查/追击 + 休眠/共享 A*/节流", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.6", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-ENEMY-03", "desc": "视野墙体遮挡 + 最后已知位置", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.6", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-ENEMY-04", "desc": "击杀掉落（75%/加权 2~6 单位）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.6", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-ENEMY-05", "desc": "战争迷雾（探索记忆+视野内显隐）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.6", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-ENEMY-06", "desc": "兵种系统（enemy_types 数据驱动+帧序列）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "9/16 代码新增（文档未收录，见漂移清单）", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-ENEMY-07", "desc": "动物系统（羊群/惊逃/掉落肉）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "9/16 代码新增（animal.gd/animal_system.gd）", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-ENEMY-08", "desc": "正式版 6 种怪玩法差异 + 群系映射表", "status": "design", "priority": "P2", "deps": ["R-MAP-03"], "openq": [23], "source": "00 §3.6，待拍板 23/49", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-ENEMY-09", "desc": "机械 vs 丧尸阵营互殴（谁近打谁）", "status": "planned", "priority": "P2", "deps": ["R-ENEMY-06"], "openq": [], "source": "00 §3.6", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-ENEMY-10", "desc": "远程攻击敌人", "status": "planned", "priority": "P2", "deps": ["R-ENEMY-06"], "openq": [], "source": "00 §3.6", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-ENEMY-11", "desc": "动态难度（怪死增强剩余敌人，有上限）", "status": "planned", "priority": "P2", "deps": ["R-ENEMY-06"], "openq": [], "source": "00 §3.6", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-ENEMY-12", "desc": "精英/BOSS 掉落（基础+随机稀有）", "status": "planned", "priority": "P2", "deps": ["R-ENEMY-04"], "openq": [], "source": "00 §3.6", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-ENEMY-13", "desc": "敌人群体分离（避免挤成一团）", "status": "planned", "priority": "P3", "deps": [], "openq": [], "source": "00 §3.6", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-ENEMY-14", "desc": "失物怪（死亡回收，掉血随机掉落遗失物）", "status": "design", "priority": "P3", "deps": ["R-ENEMY-06", "R-META-04"], "openq": [48], "source": "00 §2，待拍板 48，暂不排期", "module": "ENEMY", "module_name": "敌人与生物"}, {"id": "R-COMBAT-01", "desc": "FSM + 三段式攻击 + 受击硬直 + 冲刺 + 伤害管线", "status": "done", "priority": "", "deps": [], "openq": [], "source": "02 §2 Phase1", "module": "COMBAT", "module_name": "战斗"}, {"id": "R-COMBAT-02", "desc": "技能系统（3 技能）+ 体力循环", "status": "done", "priority": "", "deps": [], "openq": [], "source": "02 §2 Phase2", "module": "COMBAT", "module_name": "战斗"}, {"id": "R-COMBAT-03", "desc": "攻击/闪避消耗体力", "status": "planned", "priority": "P1", "deps": ["R-COMBAT-02"], "openq": [], "source": "00 §3.7", "module": "COMBAT", "module_name": "战斗"}, {"id": "R-COMBAT-04", "desc": "击退不得把敌人推进墙里", "status": "planned", "priority": "P1", "deps": [], "openq": [], "source": "00 §3.7", "module": "COMBAT", "module_name": "战斗"}, {"id": "R-COMBAT-05", "desc": "武器系统（换武器=换攻击参数）", "status": "design", "priority": "P2", "deps": [], "openq": [], "source": "00 §3.7", "module": "COMBAT", "module_name": "战斗"}, {"id": "R-COMBAT-06", "desc": "护甲/装备防御", "status": "design", "priority": "P2", "deps": ["R-COMBAT-05", "R-META-04"], "openq": [], "source": "00 §3.7", "module": "COMBAT", "module_name": "战斗"}, {"id": "R-COMBAT-07", "desc": "暴击", "status": "planned", "priority": "P2", "deps": [], "openq": [], "source": "00 §3.7（管线已留乘数位）", "module": "COMBAT", "module_name": "战斗"}, {"id": "R-COMBAT-08", "desc": "投掷物制造噪音引怪", "status": "planned", "priority": "P2", "deps": ["R-NOISE-01", "R-COMBAT-05"], "openq": [], "source": "00 §3.7", "module": "COMBAT", "module_name": "战斗"}, {"id": "R-COMBAT-09", "desc": "下蹲/静走状态（降脚步噪音）", "status": "planned", "priority": "P1", "deps": ["R-NOISE-01"], "openq": [50], "source": "00 §2 节奏，待拍板 50", "module": "COMBAT", "module_name": "战斗"}, {"id": "R-COMBAT-10", "desc": "钩爪最终机制（拉人/撞墙/跨河）", "status": "design", "priority": "P2", "deps": [], "openq": [25], "source": "待拍板 25", "module": "COMBAT", "module_name": "战斗"}, {"id": "R-COMBAT-11", "desc": "消耗品（药水/手雷/陷阱）", "status": "design", "priority": "P2", "deps": ["R-COMBAT-05"], "openq": [], "source": "00 §3.7", "module": "COMBAT", "module_name": "战斗"}, {"id": "R-COMBAT-12", "desc": "状态效果（燃烧/中毒/泥沼）", "status": "paused", "priority": "P3", "deps": [], "openq": [], "source": "00 §3.7 暂不做", "module": "COMBAT", "module_name": "战斗"}, {"id": "R-COMBAT-13", "desc": "被打断技能扣体力的可见反馈", "status": "design", "priority": "P3", "deps": [], "openq": [37], "source": "待拍板 37", "module": "COMBAT", "module_name": "战斗"}, {"id": "R-NOISE-01", "desc": "噪音系统（广播+衰减+三档阈值+调查+染色反馈）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.10", "module": "NOISE", "module_name": "噪音"}, {"id": "R-NOISE-02", "desc": "声源圆环视觉反馈", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.10（2D 主线下正常）", "module": "NOISE", "module_name": "噪音"}, {"id": "R-NOISE-03", "desc": "\"我被发现了\"专属视听反馈", "status": "planned", "priority": "P2", "deps": ["R-NOISE-01"], "openq": [], "source": "00 §3.10", "module": "NOISE", "module_name": "噪音"}, {"id": "R-NOISE-04", "desc": "天气影响噪音传播（雨降/雷掩）", "status": "design", "priority": "P2", "deps": ["R-MAP-07"], "openq": [], "source": "00 §3.1/3.10", "module": "NOISE", "module_name": "噪音"}, {"id": "R-NOISE-05", "desc": "环境噪音源（伐木场/碎玻璃）、白噪音掩蔽、动态寻路权重", "status": "planned", "priority": "P3", "deps": [], "openq": [], "source": "02 §2 噪音原始稿", "module": "NOISE", "module_name": "噪音"}, {"id": "R-SURV-01", "desc": "食物/饥饿/H 进食 + HUD 生存栏", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.9", "module": "SURV", "module_name": "生存"}, {"id": "R-SURV-02", "desc": "食物收支平衡验证（60/局 vs 每点 10）", "status": "planned", "priority": "P1", "deps": ["R-LOOT-04"], "openq": [39], "source": "00 §3.9，待拍板 39", "module": "SURV", "module_name": "生存"}, {"id": "R-META-01", "desc": "基地（仓库/雕像/大门 + 按 E 交互 + 面板暂停）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.5", "module": "META", "module_name": "局外养成与基地"}, {"id": "R-META-02", "desc": "生存/获取两条升级线（即时生效+存档）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.5", "module": "META", "module_name": "局外养成与基地"}, {"id": "R-META-03", "desc": "积分货币（杀怪+生存；死亡低分、撤离翻倍）", "status": "planned", "priority": "P1", "deps": [], "openq": [27], "source": "00 §2，细则=待拍板 27", "module": "META", "module_name": "局外养成与基地"}, {"id": "R-META-04", "desc": "携带系统（进局带初始装备/消耗品）", "status": "planned", "priority": "P1", "deps": [], "openq": [], "source": "00 §2", "module": "META", "module_name": "局外养成与基地"}, {"id": "R-META-05", "desc": "保底初始装（回基地自动补发）", "status": "planned", "priority": "P1", "deps": ["R-META-04"], "openq": [51], "source": "待拍板 51", "module": "META", "module_name": "局外养成与基地"}, {"id": "R-META-06", "desc": "安全箱（道具解锁，死亡保留格子）", "status": "planned", "priority": "P2", "deps": ["R-META-04"], "openq": [], "source": "00 §2", "module": "META", "module_name": "局外养成与基地"}, {"id": "R-META-07", "desc": "建筑自由摆放/慢慢扩建", "status": "design", "priority": "P3", "deps": [], "openq": [], "source": "00 §3.5", "module": "META", "module_name": "局外养成与基地"}, {"id": "R-META-08", "desc": "NPC（商人/任务发布者）", "status": "design", "priority": "P3", "deps": ["R-META-03"], "openq": [], "source": "00 §3.5", "module": "META", "module_name": "局外养成与基地"}, {"id": "R-META-09", "desc": "基地自动采集建筑", "status": "design", "priority": "P3", "deps": ["R-LOOT-05"], "openq": [], "source": "00 §3.13", "module": "META", "module_name": "局外养成与基地"}, {"id": "R-META-10", "desc": "抓宠撤离（可控单位随玩家撤离）", "status": "design", "priority": "P3", "deps": ["R-EXTRACT-06"], "openq": [], "source": "00 §3.13，需设计稿", "module": "META", "module_name": "局外养成与基地"}, {"id": "R-META-11", "desc": "RTS 发育/地形改造", "status": "design", "priority": "P3", "deps": [], "openq": [], "source": "00 §3.13，需设计稿", "module": "META", "module_name": "局外养成与基地"}, {"id": "R-UI-01", "desc": "局内 HUD（倒计时/体力/技能/生存/背包/结算）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.11", "module": "UI", "module_name": "界面与音频"}, {"id": "R-UI-02", "desc": "主菜单 + 选档进入", "status": "done", "priority": "", "deps": ["R-SAVE-02"], "openq": [], "source": "9/16 代码新增（start_menu/slot_panel）", "module": "UI", "module_name": "界面与音频"}, {"id": "R-UI-03", "desc": "设置菜单（音量/键位/分辨率/窗口）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "9/16 代码新增（settings_panel/misc_panel/display_settings）", "module": "UI", "module_name": "界面与音频"}, {"id": "R-UI-04", "desc": "中英文双语", "status": "done", "priority": "", "deps": [], "openq": [], "source": "9/16 代码新增（language 节点）", "module": "UI", "module_name": "界面与音频"}, {"id": "R-UI-05", "desc": "伤害飘字/敌人血条（默认关，设置可开）", "status": "planned", "priority": "P2", "deps": ["R-UI-03"], "openq": [], "source": "00 §3.8/3.11", "module": "UI", "module_name": "界面与音频"}, {"id": "R-UI-06", "desc": "命中停顿", "status": "planned", "priority": "P2", "deps": [], "openq": [], "source": "00 §3.8", "module": "UI", "module_name": "界面与音频"}, {"id": "R-UI-07", "desc": "屏幕震动", "status": "planned", "priority": "P2", "deps": [], "openq": [], "source": "00 §3.8", "module": "UI", "module_name": "界面与音频"}, {"id": "R-UI-08", "desc": "结算面板明细字段", "status": "design", "priority": "P2", "deps": [], "openq": [31], "source": "待拍板 31", "module": "UI", "module_name": "界面与音频"}, {"id": "R-UI-09", "desc": "小地图资源/敌人/噪音标记", "status": "planned", "priority": "P2", "deps": ["R-MAP-08"], "openq": [], "source": "00 §3.11", "module": "UI", "module_name": "界面与音频"}, {"id": "R-UI-10", "desc": "BGM + 音效（Audio 目前空目录）", "status": "planned", "priority": "P1", "deps": [], "openq": [32], "source": "02 §D-B，清单=待拍板 32", "module": "UI", "module_name": "界面与音频"}, {"id": "R-UI-11", "desc": "手柄支持", "status": "design", "priority": "P3", "deps": [], "openq": [33], "source": "待拍板 33", "module": "UI", "module_name": "界面与音频"}, {"id": "R-SAVE-01", "desc": "单档存档（bank+等级）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.5", "module": "SAVE", "module_name": "存档"}, {"id": "R-SAVE-02", "desc": "多档位存档（6 槽）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "9/16 代码新增（save_slots.gd）", "module": "SAVE", "module_name": "存档"}, {"id": "R-SAVE-03", "desc": "旧档版本迁移策略", "status": "design", "priority": "P2", "deps": [], "openq": [30], "source": "待拍板 30", "module": "SAVE", "module_name": "存档"}, {"id": "R-ART-01", "desc": "地形图集/装饰/水面（Tiny Swords CC0）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "MISSING_ASSETS §一", "module": "ART", "module_name": "美术素材"}, {"id": "R-ART-02", "desc": "玩家序列帧（TS 风格 192px）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "commit ba7d5ea", "module": "ART", "module_name": "美术素材"}, {"id": "R-ART-03", "desc": "敌人原画接入管线（images/ 40 张→抠图→派生帧→接线）", "status": "doing", "priority": "P2", "deps": ["R-ENEMY-06"], "openq": [], "source": "02 §C（enemy_types 已用 TS 兵种，原画组待并入）", "module": "ART", "module_name": "美术素材"}, {"id": "R-ART-04", "desc": "P0 占位素材替换（铁矿脉/油田/油桶，见清单）", "status": "planned", "priority": "P2", "deps": [], "openq": [], "source": "MISSING_ASSETS §二", "module": "ART", "module_name": "美术素材"}, {"id": "R-ART-05", "desc": "Loot/建筑/UI 正式美术", "status": "blocked", "priority": "P2", "deps": [], "openq": [], "source": "02 §D-C，目录全空", "module": "ART", "module_name": "美术素材"}, {"id": "R-ART-06", "desc": "基地地板/墙体正式美术", "status": "planned", "priority": "P2", "deps": [], "openq": [], "source": "02 §D-B", "module": "ART", "module_name": "美术素材"}, {"id": "R-ART-07", "desc": "玩家 attack/dodge/hit/dead 序列帧", "status": "planned", "priority": "P2", "deps": ["R-ART-02"], "openq": [], "source": "02 §D-A（现走程序化形变）", "module": "ART", "module_name": "美术素材"}, {"id": "R-PERF-01", "desc": "100 敌人性能方案（休眠+共享网格+节流）", "status": "done", "priority": "", "deps": [], "openq": [], "source": "00 §3.6", "module": "PERF / STEAM", "module_name": "性能与平台"}, {"id": "R-PERF-02", "desc": "渲染后端定稿（Forward+ + MSAA/AF）", "status": "done", "priority": "", "deps": [], "openq": [35], "source": "commit eba1860，待拍板 35 可关闭", "module": "PERF / STEAM", "module_name": "性能与平台"}, {"id": "R-PERF-03", "desc": "最低配置目标", "status": "design", "priority": "P2", "deps": [], "openq": [36], "source": "待拍板 36", "module": "PERF / STEAM", "module_name": "性能与平台"}, {"id": "R-STEAM-01", "desc": "Steam 成就", "status": "design", "priority": "P3", "deps": [], "openq": [53], "source": "待拍板 53", "module": "PERF / STEAM", "module_name": "性能与平台"}, {"id": "R-STEAM-02", "desc": "云存档（per-slot 策略）", "status": "design", "priority": "P3", "deps": ["R-SAVE-02"], "openq": [53], "source": "待拍板 53", "module": "PERF / STEAM", "module_name": "性能与平台"}], "edges": [["R-NOISE-01", "R-MAP-07"], ["R-LOOT-05", "R-MAP-09"], ["R-LOOT-05", "R-LOOT-06"], ["R-COMBAT-05", "R-LOOT-07"], ["R-MAP-08", "R-LOOT-08"], ["R-META-10", "R-EXTRACT-06"], ["R-ENEMY-02", "R-EXTRACT-07"], ["R-MAP-03", "R-ENEMY-08"], ["R-ENEMY-06", "R-ENEMY-09"], ["R-ENEMY-06", "R-ENEMY-10"], ["R-ENEMY-06", "R-ENEMY-11"], ["R-ENEMY-04", "R-ENEMY-12"], ["R-ENEMY-06", "R-ENEMY-14"], ["R-META-04", "R-ENEMY-14"], ["R-COMBAT-02", "R-COMBAT-03"], ["R-COMBAT-05", "R-COMBAT-06"], ["R-META-04", "R-COMBAT-06"], ["R-NOISE-01", "R-COMBAT-08"], ["R-COMBAT-05", "R-COMBAT-08"], ["R-NOISE-01", "R-COMBAT-09"], ["R-COMBAT-05", "R-COMBAT-11"], ["R-NOISE-01", "R-NOISE-03"], ["R-MAP-07", "R-NOISE-04"], ["R-LOOT-04", "R-SURV-02"], ["R-META-04", "R-META-05"], ["R-META-04", "R-META-06"], ["R-META-03", "R-META-08"], ["R-LOOT-05", "R-META-09"], ["R-EXTRACT-06", "R-META-10"], ["R-SAVE-02", "R-UI-02"], ["R-UI-03", "R-UI-05"], ["R-MAP-08", "R-UI-09"], ["R-ENEMY-06", "R-ART-03"], ["R-ART-02", "R-ART-07"], ["R-SAVE-02", "R-STEAM-02"]], "modules": [{"key": "MAP", "name": "地图生成"}, {"key": "LOOT", "name": "搜刮与采集"}, {"key": "SESS / EXTRACT", "name": "限时与撤离"}, {"key": "ENEMY", "name": "敌人与生物"}, {"key": "COMBAT", "name": "战斗"}, {"key": "NOISE", "name": "噪音"}, {"key": "SURV", "name": "生存"}, {"key": "META", "name": "局外养成与基地"}, {"key": "UI", "name": "界面与音频"}, {"key": "SAVE", "name": "存档"}, {"key": "ART", "name": "美术素材"}, {"key": "PERF / STEAM", "name": "性能与平台"}], "open_questions": [{"no": 21, "q": "资源 <code>value</code> 字段去留", "blocks": ["R-META-08"], "blocks_text": "R-META-08 NPC"}, {"no": 23, "q": "6 种怪玩法差异", "blocks": ["R-ENEMY-08"], "blocks_text": "R-ENEMY-08"}, {"no": 24, "q": "巢穴设计", "blocks": ["R-MAP-08", "R-ENEMY-08"], "blocks_text": "R-MAP-08, R-ENEMY-08"}, {"no": 25, "q": "钩爪最终机制", "blocks": ["R-COMBAT-10"], "blocks_text": "R-COMBAT-10"}, {"no": 26, "q": "天气数值/道具", "blocks": ["R-MAP-07", "R-NOISE-04"], "blocks_text": "R-MAP-07, R-NOISE-04"}, {"no": 27, "q": "积分细则（给分/双货币面板）", "blocks": ["R-META-03"], "blocks_text": "R-META-03"}, {"no": 28, "q": "撤离速度下限", "blocks": ["R-META-02"], "blocks_text": "R-META-02 数值"}, {"no": 29, "q": "\"资源发现概率\"改哪个参数", "blocks": ["R-META-02"], "blocks_text": "R-META-02 数值"}, {"no": 30, "q": "旧档迁移策略", "blocks": ["R-SAVE-03"], "blocks_text": "R-SAVE-03"}, {"no": 31, "q": "结算面板字段", "blocks": ["R-UI-08"], "blocks_text": "R-UI-08"}, {"no": 32, "q": "音效清单", "blocks": ["R-UI-10"], "blocks_text": "R-UI-10"}, {"no": 33, "q": "手柄支持", "blocks": ["R-UI-11"], "blocks_text": "R-UI-11"}, {"no": 36, "q": "最低配置目标", "blocks": ["R-PERF-03"], "blocks_text": "R-PERF-03"}, {"no": 37, "q": "打断技能反馈", "blocks": ["R-COMBAT-13"], "blocks_text": "R-COMBAT-13"}, {"no": 38, "q": "撤离瞬间拾取结算", "blocks": ["R-EXTRACT-08"], "blocks_text": "R-EXTRACT-08"}, {"no": 39, "q": "食物收支平衡", "blocks": ["R-SURV-02"], "blocks_text": "R-SURV-02"}, {"no": 48, "q": "失物怪细则", "blocks": ["R-ENEMY-14"], "blocks_text": "R-ENEMY-14"}, {"no": 49, "q": "怪×群系映射表", "blocks": ["R-ENEMY-08"], "blocks_text": "R-ENEMY-08"}, {"no": 50, "q": "下蹲数值（噪音/体力/按键）", "blocks": ["R-COMBAT-09"], "blocks_text": "R-COMBAT-09"}, {"no": 51, "q": "保底初始装内容", "blocks": ["R-META-05"], "blocks_text": "R-META-05"}, {"no": 52, "q": "抓宠/RTS 排期", "blocks": ["R-META-10"], "blocks_text": "R-META-10/11"}, {"no": 53, "q": "Steam 成就+云档结构", "blocks": ["R-STEAM-01"], "blocks_text": "R-STEAM-01/02"}], "phases": [{"title": "第 0 步 · P0 清障（试玩前）", "items": [{"text": "R-SESS-02 time_scale → 1.0", "ids": ["R-SESS-02"]}, {"text": "R-MAP-06 河水/裂缝调参收尾（02 §B 建议值已给）", "ids": ["R-MAP-06"]}, {"text": "R-EXTRACT-05 撤离受击打断（改动小、影响核心循环）", "ids": ["R-EXTRACT-05"]}]}, {"title": "第 1 阶段 · Phase 1 收尾（P1）", "items": [{"text": "R-COMBAT-09 下蹲/静走（\"Keep Quiet\"的玩法承诺）", "ids": ["R-COMBAT-09"]}, {"text": "R-COMBAT-03 攻击/闪避耗体力 + R-COMBAT-04 击退防进墙", "ids": ["R-COMBAT-03", "R-COMBAT-04"]}, {"text": "R-LOOT-05 采集接入口 + R-MAP-09 矿脉 + R-LOOT-04 资源点压低 + R-SURV-02 食物平衡（一组数值联动，一起调）", "ids": ["R-LOOT-05", "R-MAP-09", "R-LOOT-04", "R-SURV-02"]}, {"text": "R-META-04 携带系统 + R-META-05 保底初始装", "ids": ["R-META-04", "R-META-05"]}, {"text": "R-META-03 积分货币（先拍板待回答 27）", "ids": ["R-META-03"]}, {"text": "R-UI-10 音效（先给打击/拾取/警报三类最小集）", "ids": ["R-UI-10"]}]}, {"title": "第 2 阶段 · Phase 2 内容（P2）", "items": [{"text": "R-ENEMY-08 六怪映射（拍板 23/49）→ R-ENEMY-09 阵营互殴 → R-ENEMY-10 远程 → R-ENEMY-11 动态难度 → R-ENEMY-12 精英掉落", "ids": ["R-ENEMY-08", "R-ENEMY-09", "R-ENEMY-10", "R-ENEMY-11", "R-ENEMY-12"]}, {"text": "R-COMBAT-05 武器 → R-COMBAT-06 护甲 → R-COMBAT-07 暴击 → R-COMBAT-08 投掷物 → R-COMBAT-11 消耗品", "ids": ["R-COMBAT-05", "R-COMBAT-06", "R-COMBAT-07", "R-COMBAT-08", "R-COMBAT-11"]}, {"text": "R-MAP-07 天气（拍板 26）+ R-NOISE-04 联动", "ids": ["R-MAP-07", "R-NOISE-04"]}, {"text": "R-MAP-08 POI/巢穴（拍板 24）→ R-LOOT-08 拆建筑 → R-UI-09 小地图标记", "ids": ["R-MAP-08", "R-LOOT-08", "R-UI-09"]}, {"text": "手感包：R-UI-05 飘字 + R-UI-06 命中停顿 + R-UI-07 震屏 + R-NOISE-03 发现反馈", "ids": ["R-UI-05", "R-UI-06", "R-UI-07", "R-NOISE-03"]}, {"text": "美术：R-ART-03 敌人原画并入 + R-ART-04/05/06/07 占位替换", "ids": ["R-ART-03", "R-ART-04"]}]}, {"title": "第 3 阶段 · 中长期（P3，先出设计稿）", "items": [{"text": "R-EXTRACT-06 撤离点一次性 → R-META-10 抓宠撤离", "ids": ["R-EXTRACT-06", "R-META-10"]}, {"text": "R-ENEMY-14 失物怪（拍板 48）", "ids": ["R-ENEMY-14"]}, {"text": "R-META-06 安全箱 → R-META-07 自由摆放 → R-META-08 NPC → R-META-09 自动采集", "ids": ["R-META-06", "R-META-07", "R-META-08", "R-META-09"]}, {"text": "R-META-11 RTS 发育", "ids": ["R-META-11"]}, {"text": "R-STEAM-01/02 成就+云存档（拍板 53）、R-PERF-03 最低配置", "ids": ["R-STEAM-01", "R-PERF-03"]}]}], "drift": ["<b>主场景回退 2D</b>：<code>project.godot</code> 主场景现为 <code>Scenes/StartMenu.tscn</code>，菜单进 <code>Scenes/Main.tscn</code>（2D）。02 文档\"3D 唯一入口 Main3D\"已不成立，3D 轨道暂停。", "<b>Autoload 新增 2 个</b>：<code>SaveSlots</code>、<code>DisplaySettings</code>（02 表格只列了 4 个）。", "<b>9/16 新落地系统</b>（00/02 均标\"待实现\"但实际已完成）：主菜单、设置面板、中英文、多档位存档、兵种系统（enemy_types）、动物系统（animals）。", "<b>卡树 bug 已修</b>（02 §A.3 仍标\"未修\"）：commit 323fdc6，DecorCollision + 端点吸附 + probe_stuck 7 断言。", "<b>渲染后端已定</b>（待回答 35 可关闭）：commit eba1860 切 Forward+ + MSAA/AF。"], "generated": "2026-09-16 13:17"};
+const SM = {
+  done:{label:"已完成",c:"var(--done)",hex:"#2e9e5b"},
+  doing:{label:"进行中",c:"var(--doing)",hex:"#3a7bd5"},
+  planned:{label:"已拍板未做",c:"var(--planned)",hex:"#d9a520"},
+  design:{label:"待设计",c:"var(--design)",hex:"#8e5bb5"},
+  blocked:{label:"素材阻塞",c:"var(--blocked)",hex:"#d97b2e"},
+  p0:{label:"P0阻塞",c:"var(--p0)",hex:"#cc3333"},
+  paused:{label:"暂缓",c:"var(--paused)",hex:"#9aa0a6"}};
+const RMAP = {}; DATA.reqs.forEach(r=>RMAP[r.id]=r);
+const state = {status:new Set(), prio:new Set(), module:"", q:"", sel:null, sort:"id", asc:true};
+function esc(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function badge(r){return `<span class="badge b-${r.status}">${SM[r.status].label}</span>`;}
+function prio(r){return r.priority?`<span class="p p-${r.priority}">${r.priority}</span>`:`<span class="p" style="color:#bbb">—</span>`;}
+function depChips(ids){return ids.map(d=>`<span class="chip" data-goto="${d}">${d}</span>`).join("")||"<span style='color:#bbb'>—</span>";}
+function matches(r){
+  if(state.status.size && !state.status.has(r.status)) return false;
+  if(state.prio.size && !state.prio.has(r.priority||"—")) return false;
+  if(state.module && r.module!==state.module) return false;
+  if(state.q){const q=state.q.toLowerCase();
+    if(!(r.id+" "+r.desc+" "+r.source+" "+r.module+" "+r.module_name).toLowerCase().includes(q)) return false;}
+  return true;}
+function goGraph(id){ state.sel=id; showView("graph"); fitTo(id); }
+document.addEventListener("click",e=>{const g=e.target.closest("[data-goto]");
+  if(g){const id=g.dataset.goto; if(RMAP[id]) goGraph(id);}});
+
+/* ---------- tabs ---------- */
+const VIEWS=[["overview","总览"],["matrix","矩阵"],["graph","依赖图"],["roadmap","路线"],["open","待拍板"]];
+const nav=document.getElementById("nav");
+VIEWS.forEach(([k,t],i)=>{const b=document.createElement("button");b.textContent=t;b.dataset.v=k;
+  if(i===0)b.classList.add("on");b.onclick=()=>showView(k);nav.appendChild(b);});
+function showView(k){document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===k));
+  document.querySelectorAll("section.view").forEach(s=>s.classList.toggle("on",s.id==="v-"+k));
+  if(k==="graph") resizeCanvas();}
+function showView0(k){showView(k);}
+
+/* ---------- overview ---------- */
+function renderOverview(){
+  const cnt={}; DATA.reqs.forEach(r=>cnt[r.status]=(cnt[r.status]||0)+1);
+  const total=DATA.reqs.length, done=cnt.done||0;
+  document.getElementById("stats").innerHTML=
+    `<div class="stat"><div class="n">${total}</div><div class="t">需求总数</div></div>`+
+    `<div class="stat"><div class="n" style="color:var(--done)">${done}</div><div class="t">已完成 (${Math.round(done/total*100)}%)</div></div>`+
+    Object.keys(SM).filter(k=>k!=="done"&&cnt[k]).map(k=>
+      `<div class="stat"><div class="n" style="color:${SM[k].hex}">${cnt[k]}</div><div class="t">${SM[k].label}</div></div>`).join("");
+  const p0=DATA.reqs.filter(r=>r.status==="p0"||r.priority==="P0"&&r.status!=="done");
+  document.getElementById("p0warn").innerHTML = p0.length?
+    `<div class="warn"><b>⚠ P0 阻塞项</b>：`+p0.map(r=>`<span class="chip" data-goto="${r.id}">${r.id}</span> ${esc(r.desc)}`).join("　")+`</div>`:
+    `<div class="warn" style="background:#eaf6ec;border-color:#bfe0c4"><b style="color:var(--done)">✓ 无 P0 阻塞项</b></div>`;
+  const mods=DATA.modules.map(m=>{
+    const rs=DATA.reqs.filter(r=>r.module===m.key);
+    const d=rs.filter(r=>r.status==="done").length;
+    return {m,rs,d,pct:Math.round(d/rs.length*100)};});
+  document.getElementById("modbars").innerHTML=mods.map(x=>{
+    const seg=Object.keys(SM).filter(k=>x.rs.some(r=>r.status===k)).map(k=>{
+      const n=x.rs.filter(r=>r.status===k).length;
+      return `<div style="width:${n/x.rs.length*100}%;background:${SM[k].hex}" title="${SM[k].label} ${n}"></div>`;}).join("");
+    return `<div class="modbar"><div class="mn">${x.m.key} · ${x.m.name}</div><div class="bar">${seg}</div><div class="pct">${x.pct}%</div></div>`;}).join("");
+  const order=Object.keys(SM).filter(k=>cnt[k]);
+  let acc=0, circles=order.map(k=>{const frac=cnt[k]/total;const dash=`${frac*100.46} 100`;
+    const off=-acc*100.46+25;acc+=frac;
+    return `<circle r="15.915" cx="21" cy="21" fill="transparent" stroke="${SM[k].hex}" stroke-width="7" stroke-dasharray="${dash}" stroke-dashoffset="${off}"/>`;}).join("");
+  document.getElementById("donut").innerHTML=
+    `<svg width="150" height="150" viewBox="0 0 42 42">${circles}
+     <text x="21" y="20.5" text-anchor="middle" font-size="6" font-weight="bold" fill="#2b2318">${Math.round(done/total*100)}%</text>
+     <text x="21" y="26" text-anchor="middle" font-size="2.6" fill="#7a6a52">完成</text></svg>`+
+    `<div>`+order.map(k=>`<div style="margin:3px 0"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${SM[k].hex};margin-right:6px"></span>${SM[k].label} <b>${cnt[k]}</b></div>`).join("")+`</div>`;
+  document.getElementById("drift").innerHTML=DATA.drift.map(d=>`<li style="font-size:13px">${d}</li>`).join("");
+}
+
+/* ---------- matrix ---------- */
+function renderFilters(){
+  const cnt={}; DATA.reqs.forEach(r=>cnt[r.status]=(cnt[r.status]||0)+1);
+  document.getElementById("fstatus").innerHTML=Object.keys(SM).map(k=>
+    `<span data-s="${k}" class="${state.status.size&&!state.status.has(k)?"off":""}" style="background:${SM[k].hex};color:#fff;border:none">${SM[k].label} ${cnt[k]||0}</span>`).join("");
+  document.getElementById("fprio").innerHTML="<b style='color:var(--sub);font-size:12px'>优先级:</b>"+
+    ["P0","P1","P2","P3","—"].map(p=>{const n=DATA.reqs.filter(r=>(r.priority||"—")===p).length;
+    return `<span data-p="${p}" class="${state.prio.size&&!state.prio.has(p)?"off":""}" style="background:${p==="—"?"#c9bda1":SM2[p]}">${p} ${n}</span>`;}).join("");
+  const sel=document.getElementById("fmodule");
+  if(!sel.options.length){sel.innerHTML=`<option value="">全部模块</option>`+DATA.modules.map(m=>`<option value="${m.key}">${m.key} · ${m.name}</option>`).join("");
+    sel.onchange=()=>{state.module=sel.value;renderMatrix();};}
+  sel.value=state.module;
+  document.querySelectorAll("#fstatus span").forEach(s=>s.onclick=()=>{const k=s.dataset.s;
+    state.status.has(k)?state.status.delete(k):state.status.add(k);renderMatrix();});
+  document.querySelectorAll("#fprio span").forEach(s=>s.onclick=()=>{const k=s.dataset.p;
+    state.prio.has(k)?state.prio.delete(k):state.prio.add(k);renderMatrix();});
+}
+const SM2={P0:"#cc3333",P1:"#b06a2b",P2:"#5b7f5e",P3:"#8a8a8a","—":"#c9bda1"};
+function renderMatrix(){
+  renderFilters();
+  let rows=DATA.reqs.filter(matches);
+  const key=state.sort;
+  rows.sort((a,b)=>{let x=a[key],y=b[key];if(key==="status"){x=Object.keys(SM).indexOf(x);y=Object.keys(SM).indexOf(y);}
+    if(x<y)return state.asc?-1:1;if(x>y)return state.asc?1:-1;return a.id<b.id?-1:1;});
+  document.getElementById("fcount").textContent=`显示 ${rows.length} / ${DATA.reqs.length} 条`;
+  const th=(k,t)=>`<th data-k="${k}">${t}${state.sort===k?(state.asc?" ▲":" ▼"):""}</th>`;
+  document.getElementById("mtab").innerHTML=
+    `<thead><tr>${th("id","ID")}${th("module","模块")}<th>需求</th>${th("status","状态")}${th("priority","优先级")}<th>依赖</th><th>来源</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr><td style="white-space:nowrap"><a href="#" data-goto="${r.id}" style="color:var(--accent);text-decoration:none;font-weight:bold">${r.id}</a></td>
+      <td style="white-space:nowrap;color:var(--sub)">${r.module}</td><td>${esc(r.desc)}</td><td>${badge(r)}</td><td>${prio(r)}</td>
+      <td class="dep">${depChips(r.deps)}</td><td style="color:var(--sub);font-size:12px">${esc(r.source)}</td></tr>`).join("")+`</tbody>`;
+  document.querySelectorAll("#mtab th").forEach(h=>h.onclick=()=>{const k=h.dataset.k;if(!k)return;
+    if(state.sort===k)state.asc=!state.asc;else{state.sort=k;state.asc=true;}renderMatrix();});
+}
+
+/* ---------- graph ---------- */
+const cv=document.getElementById("gc"), ctx=cv.getContext("2d");
+let W=800,H=600,dpr=1,view={k:1,x:0,y:0},alpha=1,nodes=[],nmap={},hover=null,drag=null,pan=null;
+function initGraph(){
+  nodes=DATA.reqs.map((r,i)=>({...r, x:0,y:0,vx:0,vy:0,fixed:false}));
+  nodes.forEach(n=>nmap[n.id]=n);
+  const mods=DATA.modules, anchor={};
+  mods.forEach((m,i)=>{const a=i/mods.length*Math.PI*2-Math.PI/2;anchor[m.key]={x:Math.cos(a)*340,y:Math.sin(a)*340};});
+  nodes.forEach(n=>{const a=anchor[n.module]||{x:0,y:0};n.x=a.x+(Math.random()-0.5)*120;n.y=a.y+(Math.random()-0.5)*120;});
+  DATA.reqs.forEach(r=>{r.deg=0;});
+  DATA.edges.forEach(([a,b])=>{if(nmap[a])nmap[a].deg++;if(nmap[b])nmap[b].deg++;});
+  alpha=1;
+  requestAnimationFrame(loop);
+}
+function resizeCanvas(){const r=cv.parentElement.getBoundingClientRect();dpr=window.devicePixelRatio||1;
+  W=r.width;H=r.height;cv.width=W*dpr;cv.height=H*dpr;fitView();}
+function fitView(){view.k=Math.min(W/900,H/900)*0.9;view.x=W/2;view.y=H/2;}
+function fitTo(id){const n=nmap[id];view.k=1.1;view.x=W/2-n.x*view.k;view.y=H/2-n.y*view.k;state.sel=id;draw();showPanel();}
+function sim(){
+  if(alpha<0.003)return;
+  for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
+    const a=nodes[i],b=nodes[j];let dx=b.x-a.x,dy=b.y-a.y,d2=dx*dx+dy*dy;if(d2<1)d2=1;
+    if(d2>90000)continue;const f=1400/d2*alpha;const d=Math.sqrt(d2);dx/=d;dy/=d;
+    a.vx-=dx*f;a.vy-=dy*f;b.vx+=dx*f;b.vy+=dy*f;}
+  DATA.edges.forEach(([ai,bi])=>{const a=nmap[ai],b=nmap[bi];if(!a||!b)return;
+    let dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1;const f=(d-95)*0.025*alpha;
+    dx/=d;dy/=d;a.vx+=dx*f;a.vy+=dy*f;b.vx-=dx*f;b.vy-=dy*f;});
+  nodes.forEach(n=>{n.vx+=-n.x*0.004*alpha;n.vy+=-n.y*0.004*alpha;
+    if(!n.fixed){n.vx*=0.82;n.vy*=0.82;n.x+=n.vx;n.y+=n.vy;}else{n.vx=0;n.vy=0;}});
+  alpha*=0.995;
+}
+function nodeR(n){return 7+Math.min(9,(n.deg||0)*1.6);}
+function toWorld(px,py){return [(px-view.x)/view.k,(py-view.y)/view.k];}
+function draw(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  ctx.translate(view.x,view.y);ctx.scale(view.k,view.k);
+  const sel=state.sel, conn=sel?new Set([sel]):null;
+  if(sel){DATA.edges.forEach(([a,b])=>{if(a===sel||b===sel){conn.add(a);conn.add(b);}});}
+  DATA.edges.forEach(([a,b])=>{const A=nmap[a],B=nmap[b];if(!A||!B)return;
+    const dim=(A._dim&&B._dim)?false:(A._dim||B._dim);
+    const hot=sel&&(a===sel||b===sel);
+    ctx.strokeStyle=hot?"#b06a2b":(dim?"rgba(150,130,100,.08)":"rgba(150,130,100,.35)");
+    ctx.lineWidth=hot?1.8:1;
+    const ang=Math.atan2(B.y-A.y,B.x-A.x),rA=nodeR(A)+1,rB=nodeR(B)+4;
+    const x1=A.x+Math.cos(ang)*rA,y1=A.y+Math.sin(ang)*rA,x2=B.x-Math.cos(ang)*rB,y2=B.y-Math.sin(ang)*rB;
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-Math.cos(ang-0.4)*7,y2-Math.sin(ang-0.4)*7);
+    ctx.lineTo(x2-Math.cos(ang+0.4)*7,y2-Math.sin(ang+0.4)*7);
+    ctx.fillStyle=ctx.strokeStyle;ctx.fill();});
+  nodes.forEach(n=>{n._dim=!matches(n);
+    const dim=n._dim&&!(conn&&conn.has(n.id));
+    ctx.globalAlpha=dim?0.15:1;
+    ctx.beginPath();ctx.arc(n.x,n.y,nodeR(n),0,7);
+    ctx.fillStyle=SM[n.status].hex;ctx.fill();
+    ctx.lineWidth=n.id===sel?3:1.2;ctx.strokeStyle=n.id===sel?"#2b2318":(n.fixed?"#b06a2b":"rgba(43,35,24,.35)");ctx.stroke();
+    if(view.k>0.55||n.id===sel||n===hover){ctx.fillStyle=dim?"rgba(43,35,24,.2)":"#2b2318";
+      ctx.font="bold 9px sans-serif";ctx.textAlign="center";
+      ctx.fillText(n.id.replace(/^R-/,""),n.x,n.y+nodeR(n)+11);}});
+  ctx.globalAlpha=1;
+}
+function loop(){sim();draw();requestAnimationFrame(loop);}
+function pick(px,py){const [x,y]=toWorld(px,py);
+  for(let i=nodes.length-1;i>=0;i--){const n=nodes[i],r=nodeR(n)+3;
+    if((x-n.x)**2+(y-n.y)**2<r*r)return n;}return null;}
+cv.addEventListener("mousedown",e=>{const n=pick(e.offsetX,e.offsetY);
+  if(n){drag=n;n.fixed=true;alpha=Math.max(alpha,0.3);}else{pan=[e.clientX,e.clientY,view.x,view.y];cv.style.cursor="grabbing";}});
+window.addEventListener("mousemove",e=>{
+  if(drag){const r=cv.getBoundingClientRect();const [x,y]=toWorld(e.clientX-r.left,e.clientY-r.top);
+    drag.x=x;drag.y=y;return;}
+  if(pan){view.x=pan[2]+(e.clientX-pan[0]);view.y=pan[3]+(e.clientY-pan[1]);return;}});
+window.addEventListener("mouseup",()=>{drag=null;pan=null;cv.style.cursor="grab";});
+cv.addEventListener("wheel",e=>{e.preventDefault();
+  const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;
+  const [wx,wy]=toWorld(px,py);view.k*=e.deltaY<0?1.12:0.89;view.k=Math.max(0.25,Math.min(3,view.k));
+  view.x=px-wx*view.k;view.y=py-wy*view.k;},{passive:false});
+cv.addEventListener("click",e=>{const n=pick(e.offsetX,e.offsetY);state.sel=n?n.id:null;showPanel();draw();});
+cv.addEventListener("mousemove",e=>{const n=pick(e.offsetX,e.offsetY);hover=n;
+  const t=document.getElementById("gtip");
+  if(n){t.style.display="block";t.style.left=(e.offsetX+14)+"px";t.style.top=(e.offsetY+8)+"px";
+    t.textContent=`${n.id} [${SM[n.status].label}${n.priority?" "+n.priority:""}] ${n.desc}`;}
+  else t.style.display="none";});
+function showPanel(){const p=document.getElementById("gpanel");
+  if(!state.sel){p.style.display="none";return;}
+  const r=RMAP[state.sel];const up=r.deps.map(d=>`<span class="chip" data-goto="${d}">${d}</span>`).join(" ")||"—";
+  const down=DATA.reqs.filter(x=>x.deps.includes(r.id)).map(x=>`<span class="chip" data-goto="${x.id}">${x.id}</span>`).join(" ")||"—";
+  const oq=r.openq.map(n=>`<span class="chip" data-v="open">#${n}</span>`).join(" ")||"";
+  p.style.display="block";
+  p.innerHTML=`<h3>${r.id}</h3><div>${esc(r.desc)}</div>
+   <div class="row">${badge(r)} ${prio(r)} <span style="margin-left:6px">${r.module} · ${r.module_name}</span></div>
+   <div class="row"><b>前置依赖：</b>${up}</div><div class="row"><b>被依赖：</b>${down}</div>
+   ${oq?`<div class="row"><b>关联待拍板：</b>${oq}</div>`:""}
+   <div class="row">${esc(r.source)}</div>`;}
+document.getElementById("gfit").onclick=fitView;
+document.getElementById("gunpin").onclick=()=>{nodes.forEach(n=>n.fixed=false);alpha=0.6;};
+document.getElementById("glegend").innerHTML=Object.keys(SM).map(k=>
+  `<span style="color:${SM[k].hex};border-color:${SM[k].hex};cursor:default">● ${SM[k].label}</span>`).join("");
+
+/* ---------- roadmap / open ---------- */
+function renderRoadmap(){
+  document.getElementById("phases").innerHTML=DATA.phases.map((ph,i)=>
+    `<div class="phase"><h3>${["🧹","🔧","🎨","🚀"][i]||"▸"} ${esc(ph.title)}</h3>`+
+    ph.items.map(it=>`<div class="pitem">${it.ids.length?it.ids.map(d=>`<span class="chip" data-goto="${d}">${d}</span>`).join(" "):""} ${esc(it.text.replace(/R-[A-Z0-9]+-\d+[a-z]?\s*/g,""))}</div>`).join("")+
+    `</div>`).join("");
+}
+function renderOpen(){
+  document.getElementById("oqs").innerHTML=DATA.open_questions.map(o=>
+    `<div class="oq"><span class="no">#${o.no}</span>${o.q}
+     <div class="bl">阻塞：${o.blocks.length?o.blocks.map(b=>`<span class="chip" data-goto="${b}">${b}</span>`).join(" "):esc(o.blocks_text)}</div></div>`).join("");
+}
+
+/* ---------- search ---------- */
+document.getElementById("qbox").addEventListener("input",e=>{state.q=e.target.value.trim();
+  renderMatrix();if(document.getElementById("v-graph").classList.contains("on"))draw();});
+document.getElementById("gen").textContent="生成于 "+DATA.generated;
+
+renderOverview();renderMatrix();initGraph();renderRoadmap();renderOpen();
+showView0("overview");
+</script>
+</body>
+</html>

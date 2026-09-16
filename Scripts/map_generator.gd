@@ -3,27 +3,26 @@ extends RefCounted
 ## ============================================================
 ## MapGenerator — 程序化地图生成
 ##
-## 三层渲染（2026-09-15 改版，见 03_ART_STYLE_GUIDE「地形美术」）：
-##   1. 地形层 TileMapLayer：生物群系分区（数量由 config.json 的 map.biomes 决定，
-##      当前含草地共 5 种）+ 每群系地板 12 变体 / 墙 6 变体 + 墙顶受光变体；
-##      变体按格子哈希确定性挑选。
+## 三层渲染（2026-09-16 改版，见 docs/MISSING_ASSETS.md 与 tools/build_ts_assets.py）：
+##   1. 地形层 TileMapLayer：生物群系分区（数量由 config.json 的 map.biomes 决定）
+##      × 每群系 16 个 blob 自动拼接瓦片。**直接用 Tiny Swords 官方 64px 图集原样
+##      切片**，四邻连通性决定用哪一块，岸线/崖壁由素材自带的描边自然生成。
 ##   2. 装饰层 Node2D：树 / 石头（并入 walls，参与寻路与连通性）、
-##      地面残骸（纯视觉，不阻挡）。贴地投影 + 2.5D 高度。
-##      每株装饰随机缩放/翻转/亮度 + 按群系色调，消除克隆感。
+##      灌木 / 碎石（纯视觉，不阻挡）。每类有多套原画随机抽，消除克隆感。
 ##   3. 雾层（FogSystem，z_index 5）：盖住未探索区，装饰层 z_index 0 会被盖住。
 ##
-## 【贴图来源】地形瓦片与装饰物贴图均为 AI 生成的 2.5D 手绘质感素材，
-## 由 tools/ 下的 Python 脚本离线处理好放进 Assets/Art/：
-##   Assets/Art/Tiles/atlas_floor.png  N 群系 x 12 变体（横向一行，N=biome_count）
-##   Assets/Art/Tiles/atlas_wall.png   N 群系 x  6 变体
-##   Assets/Art/Sprites/Decor/{tree,rock,debris}_00.png  透明通道精灵
-## 贴图缺失时自动回退到程序化逐像素绘制（_paint_floor/_paint_wall/
-## _make_tree/...），保证工程在任何状态下都能跑起来。
+## 【贴图来源】全部为 Tiny Swords (Free Pack)（Pixel Frog，CC0）官方素材，
+## 由 tools/build_ts_assets.py 离线搬进 Assets/Art/：
+##   Assets/Art/Tiles/TS/tilemap_colorN.png   地形（576x384 = 64px 网格 9x6）
+##   Assets/Art/Tiles/TS/water_bg.png         水面（64x64 可平铺）
+##   Assets/Art/Sprites/Decor/*.png           树/石/灌木/碎石/矿脉
+## 贴图缺失时自动回退到程序化逐像素绘制（_paint_blob/_paint_water/
+## _make_crack/...），保证工程在任何状态下都能跑起来。
 ##
 ## 关键区分：
 ##   terrain[y][x] → 渲染用（0 地板 / 1 墙）
 ##   walls[y][x]   → 通行用（墙 或 树 或 石头 = true）
-##   biome[y][x]   → 生物群系 id（0..BIOME_COUNT-1），决定地板/墙基色与装饰配方
+##   biome[y][x]   → 生物群系 id（0..BIOME_COUNT-1），决定用哪张官方地形图集与装饰配方
 ##   三者不同：树所在格渲染成地板，但通行上是障碍。
 ##
 ## 数值全部来自 Data/config.json 的 map / map.decor 节点。
@@ -40,20 +39,38 @@ extends RefCounted
 ## ============================================================
 
 # ---------- 瓦片图集布局（横向一行，图集 y 恒为 0）----------
-# 每个 biome 各自拥有一组地板/墙/墙顶变体，使不同区域观感明显区分
-const FLOOR_VARIANTS := 12       # 单 biome 地板变体数
-const WALL_VARIANTS := 6         # 单 biome 墙体变体数
-const ATLAS_FLOOR := 0           # 地板起始列
-const ATLAS_SEED := 20260915     # 回退图集固定种子：外观稳定，不随地图变化
+# 【2026-09-16 改版】地形全面改用 Tiny Swords 官方图集 Terrain/Tileset。
+#
+# 官方 Tilemap_colorN.png 是 576x384 = 64px 网格 x 9 列 x 6 行，其中
+# **cols 0-3 / rows 0-3 是一个标准的 4-bit blob autotile**：每格表示"该格四个方向
+# 是否与同类地形相连"的一种组合（共 2^4 = 16 种）。编码规则：
+#     右连通 ⟺ col ∈ {0,1}      左连通 ⟺ col ∈ {1,2}
+#     下连通 ⟺ row ∈ {0,1}      上连通 ⟺ row ∈ {1,2}
+# （由 tools/analyze_ts_blob.py 逐格统计边缘暗带反推，5 张配色图全部吻合。）
+# 于是 atlas 列 = row * 4 + col，渲染时按四邻是否为同类地形反查即可（自动描岸线）。
+#
+# 旧实现是"每 biome 12 个随机地板变体"，且把官方图按 16px 硬抠成横条 ——
+# 描边关系丢了，地图看着跟素材包完全两回事——本次即修正这一点。
+#
+# 官方这套素材**没有岩石山体**，它表达"不可通行地形"的方式是水。因此：
+#   floor（可走） → 该群系的地形 blob（自动拼接，岸线天然吻合）
+#   wall（不可走） → 官方水面（Water Background color.png，64x64 可平铺）铺满
+const BLOB_N := 16              # 单 biome 地形 blob 组合数（row*4+col）
+const SRC_TILE := 64            # Tiny Swords 官方瓦片边长（重采样前）
+const WALL_VARIANTS := 1        # 水面列数（官方水面只有一张可平铺瓦片）
+const ATLAS_SEED := 20260915    # 回退图集固定种子：外观稳定，不随地图变化
 
 # 生物群系数量与图集列布局：不再写死常量，改为运行时从 config.json 的
-# map.biomes 读取（biome_count()），因此【加一种地形只改配置、GDScript 零改码】。
-# 草地、雪原等后续地形都只需在 config 里加一项，再跑一次 build_tile_atlas.py。
-# 图集列数学仍按 BIOME_COUNT 推导，所以自动跟着变。
+# map.biomes 读取（biome_count()），因此【加一种地形只改配置、GDScript 零改码】：
+# 在 config 里加一项（含 tileset 字段指向某张 Tilemap_colorN.png）即可。
+# 图集列数学仍按 biome_count() 推导，所以自动跟着变。
 # 注意：3D 迁移时 RGBA 四通道权重贴图最多只能 4 群系，N 群系需改用
 # 「主导群系 id + 次主导 id/权重」数据贴图（见 memory 记录），现在定数据格式就按 N 设计。
 static func biome_count() -> int:
 	return _biomes().size()
+
+static func biome_tileset(i: int) -> String:   # 该群系用的官方地形图集文件名
+	return str(_biome_at(i).get("tileset", DEFAULT_TERRAIN))
 
 static func biome_name(i: int) -> String:          # 群系显示名（日志与断言用）
 	return str(_biome_at(i).get("name", "?"))
@@ -64,36 +81,71 @@ static func biome_speed(i: int) -> float:          # 基础移速系数（雪原
 static func biome_weight(i: int) -> float:         # 噪声区间权重（越大越常见）
 	return maxf(0.0001, float(_biome_at(i).get("weight", 1.0)))
 
-static func atlas_wall_start() -> int:      # 墙体起始列 = 全群系地板列之后
-	return FLOOR_VARIANTS * biome_count()
+static func atlas_wall_start() -> int:      # 水面起始列 = 全群系地形 blob 列之后
+	return BLOB_N * biome_count()
 
-static func atlas_wall_top_start() -> int:  # 墙顶受光起始列 = 全群系墙体列之后
-	return atlas_wall_start() + WALL_VARIANTS * biome_count()
+static func atlas_cols() -> int:            # 图集总列数（不再有"墙顶受光"段）
+	return atlas_wall_start() + WALL_VARIANTS
 
-static func atlas_cols() -> int:            # 图集总列数
-	return atlas_wall_top_start() + WALL_VARIANTS * biome_count()
+# ---------- blob autotile 编码（Tiny Swords 官方 4x4 布局）----------
+# 输入：四方向是否与**同类地形**（此处就是可走地面）相连。
+# 输出：blob 在图集中的列偏移（0..15）= row * 4 + col。
+# 规则来自对 Tilemap_colorN.png 逐格边缘不透明度的反推（tools/inspect_ts_tileset.py）。
+static func blob_row(t_ok: bool, b_ok: bool) -> int:
+	if b_ok:
+		return 1 if t_ok else 0
+	return 2 if t_ok else 3
 
-# ---------- 外部 AI 贴图资源 ----------
-const ATLAS_FLOOR_PATH := "res://Assets/Art/Tiles/atlas_floor.png"
-const ATLAS_WALL_PATH := "res://Assets/Art/Tiles/atlas_wall.png"
-const SRC_TILE := 16             # AI 图集原始瓦片边长（缩放前）
+static func blob_col(l_ok: bool, r_ok: bool) -> int:
+	if r_ok:
+		return 1 if l_ok else 0
+	return 2 if l_ok else 3
+
+static func blob_offset(t_ok: bool, b_ok: bool, l_ok: bool, r_ok: bool) -> int:
+	return blob_row(t_ok, b_ok) * 4 + blob_col(l_ok, r_ok)
+
+
+## 直接对地形网格取某格的 blob 下标（4 邻是否同为可走地形）。
+## 已由 tools/analyze_ts_blob.py 逐格像素统计验证：Tilemap_color1.png 的
+## 4x4 区块 16 格与上面两条规则**完全吻合**（右通⟺col∈{0,1}，下通⟺row∈{0,1}）。
+## 地图外圈一律当作"不可走" → 地图边缘自动生成完整崖壁，不会出现半截贴图。
+static func blob_index(terrain: Array, x: int, y: int) -> int:
+	var h: int = terrain.size()
+	if h == 0:
+		return 0
+	var w: int = (terrain[0] as Array).size()
+	var t_ok: bool = y > 0 and not bool(terrain[y - 1][x])
+	var b_ok: bool = y < h - 1 and not bool(terrain[y + 1][x])
+	var l_ok: bool = x > 0 and not bool(terrain[y][x - 1])
+	var r_ok: bool = x < w - 1 and not bool(terrain[y][x + 1])
+	return blob_offset(t_ok, b_ok, l_ok, r_ok)
+
+# ---------- 外部贴图资源（Tiny Swords 官方 CC0 素材，见 assets/README）----------
+const TERRAIN_DIR := "res://Assets/Art/Tiles/TS/"
+const DEFAULT_TERRAIN := "tilemap_color1.png"
+const WATER_SRC := "water_bg.png"
 
 # ---------- 生物群系定义（数据驱动，唯一真相源 = Data/config.json 的 map.biomes）----------
 # 每项：{id, name, floor:[r,g,b], wall:[r,g,b], tint:[r,g,b], tree, rock, debris,
 #        floor_src?（AI 无缝地面纹理文件名，缺省则程序化生成）}
 # 历史默认值（config 缺失时回落，确保工程随时可跑）：
+# tileset 指定 Tiny Swords 官方图集文件名（Assets/Art/Tiles/TS/ 下）
 const _DEFAULT_BIOMES := [
 	{"name": "草地", "weight": 3.4, "speed": 1.0, "floor": Color(0.30, 0.36, 0.18),
-	 "wall": Color(0.50, 0.46, 0.34), "tint": Color(1.02, 1.00, 0.92),
+	 "wall": Color(0.50, 0.46, 0.34), "tint": Color(1.0, 1.0, 1.0),
+	 "tileset": "tilemap_color1.png",
 	 "tree": 0.030, "rock": 0.015, "debris": 0.012, "crack": 0.015},
 	{"name": "荒原", "weight": 1.05, "speed": 1.0, "floor": Color(0.33, 0.27, 0.18),
-	 "wall": Color(0.52, 0.37, 0.20), "tint": Color(1.06, 1.02, 0.96),
+	 "wall": Color(0.52, 0.37, 0.20), "tint": Color(1.0, 1.0, 1.0),
+	 "tileset": "tilemap_color4.png",
 	 "tree": 0.020, "rock": 0.160, "debris": 0.050, "crack": 0.070},
 	{"name": "森林", "weight": 1.25, "speed": 1.0, "floor": Color(0.20, 0.28, 0.15),
-	 "wall": Color(0.42, 0.30, 0.17), "tint": Color(0.93, 0.98, 0.95),
+	 "wall": Color(0.42, 0.30, 0.17), "tint": Color(1.0, 1.0, 1.0),
+	 "tileset": "tilemap_color3.png",
 	 "tree": 0.330, "rock": 0.020, "debris": 0.030, "crack": 0.010},
 	{"name": "雪原", "weight": 0.95, "speed": 0.62, "floor": Color(0.82, 0.86, 0.90),
-	 "wall": Color(0.72, 0.76, 0.80), "tint": Color(1.00, 1.01, 1.04),
+	 "wall": Color(0.72, 0.76, 0.80), "tint": Color(1.0, 1.0, 1.0),
+	 "tileset": "tilemap_color2.png",
 	 "tree": 0.045, "rock": 0.030, "debris": 0.012, "crack": 0.020},
 ]
 
@@ -119,7 +171,9 @@ static func _load_biomes() -> Array:
 		b["speed"] = clampf(float(entry.get("speed", 1.0)), 0.05, 4.0)
 		b["tree"] = float(entry.get("tree", 0.05))
 		b["rock"] = float(entry.get("rock", 0.03))
-		b["debris"] = float(entry.get("debris", 0.02))
+		b["bush"] = float(entry.get("bush", 0.02))
+		b["pebble"] = float(entry.get("pebble", 0.02))
+		b["tileset"] = str(entry.get("tileset", DEFAULT_TERRAIN))
 		out.append(b)
 	return out
 
@@ -195,53 +249,138 @@ const C_DARK := Color(0.12, 0.09, 0.07)    # 裂纹 / 阴影
 const C_OIL := Color(0.09, 0.08, 0.09)     # 油污
 
 # ---------- 装饰物类型 ----------
-# 1~3 是"立体"物件：底边对齐格心、带落地投影，其中树/石并入 walls 阻挡通行。
+# 1~3、6 是"立体"物件：底边对齐格心、带落地投影，其中树/石并入 walls 阻挡通行。
 # 4~5 是"贴地"地表特征：整格居中铺、无投影、不阻挡通行 ——
 #   DECOR_CRACK 地表裂缝（纯视觉，暗示地层破碎，荒原多）
 #   DECOR_WATER 河水浅滩（可涉水通过，但降速，系数见 map.river.slow）
 const DECOR_NONE := 0
 const DECOR_TREE := 1
 const DECOR_ROCK := 2
-const DECOR_DEBRIS := 3
+const DECOR_DEBRIS := 3      # 碎石/断枝（贴地立体件，不阻挡）
 const DECOR_CRACK := 4
 const DECOR_WATER := 5
-const DECOR_PATHS := {
-	DECOR_TREE: "res://Assets/Art/Sprites/Decor/tree_00.png",
-	DECOR_ROCK: "res://Assets/Art/Sprites/Decor/rock_00.png",
-	DECOR_DEBRIS: "res://Assets/Art/Sprites/Decor/debris_00.png",
-	DECOR_CRACK: "",
-	DECOR_WATER: "",
+const DECOR_BUSH := 6        # 灌木（不阻挡，给森林加层次）
+
+# 【2026-09-16】每种装饰给**一组**贴图，按格子哈希确定性抽一个 —— 一片林子里
+# 出现 4 种树、4 种石头，消除"复制粘贴"感。数组顺序即变体下标，勿随意调序
+# （哈希取模依赖它，调序会让同一张地图的观感变化）。
+const DECOR_PATH_LISTS := {
+	DECOR_TREE: [
+		"res://Assets/Art/Sprites/Decor/tree_00.png", "res://Assets/Art/Sprites/Decor/tree_01.png",
+		"res://Assets/Art/Sprites/Decor/tree_02.png", "res://Assets/Art/Sprites/Decor/tree_03.png",
+		"res://Assets/Art/Sprites/Decor/tree_04.png", "res://Assets/Art/Sprites/Decor/tree_05.png",
+		"res://Assets/Art/Sprites/Decor/tree_06.png", "res://Assets/Art/Sprites/Decor/tree_07.png",
+		"res://Assets/Art/Sprites/Decor/tree_08.png", "res://Assets/Art/Sprites/Decor/tree_09.png",
+		"res://Assets/Art/Sprites/Decor/tree_10.png", "res://Assets/Art/Sprites/Decor/tree_11.png",
+		"res://Assets/Art/Sprites/Decor/tree_12.png", "res://Assets/Art/Sprites/Decor/tree_13.png",
+		"res://Assets/Art/Sprites/Decor/tree_14.png", "res://Assets/Art/Sprites/Decor/tree_15.png",
+	],
+	DECOR_ROCK: [
+		"res://Assets/Art/Sprites/Decor/rock_00.png", "res://Assets/Art/Sprites/Decor/rock_01.png",
+		"res://Assets/Art/Sprites/Decor/rock_02.png", "res://Assets/Art/Sprites/Decor/rock_03.png",
+		"res://Assets/Art/Sprites/Decor/stump_00.png", "res://Assets/Art/Sprites/Decor/stump_01.png",
+		"res://Assets/Art/Sprites/Decor/stump_02.png", "res://Assets/Art/Sprites/Decor/stump_03.png",
+	],
+	DECOR_DEBRIS: [
+		"res://Assets/Art/Sprites/Decor/pebble_00.png", "res://Assets/Art/Sprites/Decor/pebble_01.png",
+		"res://Assets/Art/Sprites/Decor/pebble_02.png", "res://Assets/Art/Sprites/Decor/pebble_03.png",
+		"res://Assets/Art/Sprites/Decor/pebble_04.png", "res://Assets/Art/Sprites/Decor/pebble_05.png",
+		"res://Assets/Art/Sprites/Decor/pebble_06.png", "res://Assets/Art/Sprites/Decor/pebble_07.png",
+		"res://Assets/Art/Sprites/Decor/pebble_08.png", "res://Assets/Art/Sprites/Decor/pebble_09.png",
+		"res://Assets/Art/Sprites/Decor/pebble_10.png", "res://Assets/Art/Sprites/Decor/pebble_11.png",
+		"res://Assets/Art/Sprites/Decor/pebble_12.png", "res://Assets/Art/Sprites/Decor/pebble_13.png",
+		"res://Assets/Art/Sprites/Decor/pebble_14.png", "res://Assets/Art/Sprites/Decor/pebble_15.png",
+	],
+	DECOR_BUSH: [
+		"res://Assets/Art/Sprites/Decor/bush_00.png", "res://Assets/Art/Sprites/Decor/bush_01.png",
+		"res://Assets/Art/Sprites/Decor/bush_02.png", "res://Assets/Art/Sprites/Decor/bush_03.png",
+		"res://Assets/Art/Sprites/Decor/bush_04.png", "res://Assets/Art/Sprites/Decor/bush_05.png",
+		"res://Assets/Art/Sprites/Decor/bush_06.png", "res://Assets/Art/Sprites/Decor/bush_07.png",
+		"res://Assets/Art/Sprites/Decor/bush_08.png", "res://Assets/Art/Sprites/Decor/bush_09.png",
+		"res://Assets/Art/Sprites/Decor/bush_10.png", "res://Assets/Art/Sprites/Decor/bush_11.png",
+		"res://Assets/Art/Sprites/Decor/bush_12.png", "res://Assets/Art/Sprites/Decor/bush_13.png",
+		"res://Assets/Art/Sprites/Decor/bush_14.png", "res://Assets/Art/Sprites/Decor/bush_15.png",
+	],
+	DECOR_CRACK: [],      # 程序化绘制
+	DECOR_WATER: [],      # 走官方水面贴图（water_bg，见 _decor_texture）
 }
 
 # 每类装饰物的基准亮度：石头原画偏浅，直接铺在暗色地表上会过于抢眼，压暗一档
 const DECOR_BASE_TINT := {
 	DECOR_TREE: Color(1.00, 1.00, 1.00),
-	DECOR_ROCK: Color(0.80, 0.80, 0.82),
-	DECOR_DEBRIS: Color(0.95, 0.95, 0.95),
+	DECOR_ROCK: Color(1.00, 1.00, 1.00),   # Tiny Swords 原画自带配色，压灰可惜
+	DECOR_DEBRIS: Color(0.98, 0.98, 0.98),
 	DECOR_CRACK: Color(1.00, 1.00, 1.00),
 	DECOR_WATER: Color(1.00, 1.00, 1.00),
+	DECOR_BUSH: Color(1.00, 1.00, 1.00),
 }
 
-# 阻挡通行的装饰类别：只有树与石头（裂缝、河水可走）
+# 【贴地纯色块：整片统一，禁止逐格上色调】
+#
+# 河水用的是官方 water_bg.png，那是一张 **64x64 单色、完全不透明** 的平铺贴图
+# （实测：64x64 只有 1 种像素 (71,171,169,255)，行/列均值波动都是 0）。
+# 正因为它是"平的"，逐格乘群系 tint + 0.90~1.08 亮度抖动会立刻把格子网格
+# 暴露出来：同一条河在沼泽格里被染成 (96,140,71) 的泥绿、在草地里还是青色，
+# 于是整条河看起来像"一堆青绿小方块拼的色斑"，而不是水。
+# （立体物件可以逐格抖动——原画本身有细节，抖动被读作光影变化，不会露格子。）
+#
+# 这里改成整片恒定色调，并留一点透明度让地表透出来：
+#   ① 相邻水格颜色完全一致 → 河面连成整片，看不到格子缝；
+#   ② 半透明读作"可涉水的浅滩"，与不可通行的整块水面（不透明、纯青）区分开 ——
+#      这正是当初给沼泽加 tint 想解决的问题（玩家要能一眼看出哪儿能走）。
+const DECOR_UNIFORM_TINT := {
+	DECOR_WATER: Color(0.88, 0.95, 1.00, 0.80),
+}
+
+# 阻挡通行的装饰类别：只有树与石头（碎石、灌木、裂缝、河水可走）
 const DECOR_BLOCKING := [DECOR_TREE, DECOR_ROCK]
 # 贴地类装饰：整格居中、无投影、不做随机缩放（缩放会露出格子缝）
 const DECOR_FLAT := [DECOR_CRACK, DECOR_WATER]
-# 渲染顺序：先铺地表特征（河水 → 裂缝），再放立体物件（残骸 → 树 → 石）。
+# 渲染顺序：先铺地表特征（河水 → 裂缝），再放立体物件（碎石 → 灌木 → 树 → 石）。
 # 同层 add 顺序即绘制顺序，保证水在裂缝之下、物件在地表特征之上。
-const DECOR_RENDER_ORDER := [DECOR_WATER, DECOR_CRACK, DECOR_DEBRIS, DECOR_TREE, DECOR_ROCK]
+const DECOR_RENDER_ORDER := [DECOR_WATER, DECOR_CRACK, DECOR_DEBRIS, DECOR_BUSH,
+		DECOR_TREE, DECOR_ROCK]
+# 立体物件里"本身平摊在地上"的类别：不需要落地投影
+const DECOR_NO_SHADOW := [DECOR_DEBRIS, DECOR_BUSH]
 
 # ---------- 矿脉（地图资源节点，非装饰、不阻挡通行）----------
 const VEIN_IRON := 0
 const VEIN_GOLD := 1
 const VEIN_OIL := 2
 const VEIN_RES := {"iron": VEIN_IRON, "gold": VEIN_GOLD, "oil": VEIN_OIL}
-static var _ore_tex: Dictionary = {}     # 矿脉贴图缓存（按 kind）
+# 每种矿脉一组贴图（金矿用官方 Gold Stone 1~6；铁矿由金矿去色派生；油田为程序化占位）。
+# 官方免费包里只有金矿，铁矿/油田见 docs/MISSING_ASSETS.md 的补图清单。
+const ORE_PATH_LISTS := {
+	VEIN_IRON: [
+		"res://Assets/Art/Sprites/Decor/ore_iron_00.png",
+		"res://Assets/Art/Sprites/Decor/ore_iron_01.png",
+		"res://Assets/Art/Sprites/Decor/ore_iron_02.png",
+	],
+	VEIN_GOLD: [
+		"res://Assets/Art/Sprites/Decor/ore_gold_00.png",
+		"res://Assets/Art/Sprites/Decor/ore_gold_01.png",
+		"res://Assets/Art/Sprites/Decor/ore_gold_02.png",
+		"res://Assets/Art/Sprites/Decor/ore_gold_03.png",
+		"res://Assets/Art/Sprites/Decor/ore_gold_04.png",
+		"res://Assets/Art/Sprites/Decor/ore_gold_05.png",
+	],
+	VEIN_OIL: [
+		"res://Assets/Art/Sprites/Decor/ore_oil_00.png",
+	],
+}
+static var _ore_tex: Dictionary = {}     # 矿脉贴图缓存（按 kind -> Array[Texture2D]）
 
-static var _decor_tex: Dictionary = {}     # 装饰物贴图缓存（只加载/生成一次）
-static var _decor_img: Dictionary = {}     # 装饰物原始 Image（预览合成用）
+static var _decor_tex: Dictionary = {}     # 装饰物贴图缓存（kind -> Array[Texture2D]）
+static var _decor_img: Dictionary = {}     # 装饰物原始 Image（kind -> Array[Image]，预览合成用）
 static var _decor_shadow_tex: Dictionary = {}  # 装饰物落地投影贴图缓存（按类别）
 static var _atlas_img: Image = null        # 瓦片图集 Image（预览合成用）
-static var _used_ai_atlas := false         # 本次图集是否来自 AI 素材（调试用）
+static var _used_ai_atlas := false         # 本次图集是否来自官方素材（调试用）
+
+## 关掉宏观明暗层（由 main.gd 的 `--no-macro` 设置）。
+## 为什么要留这个开关：MacroLight 是"整图叠加的乘法着色"，一旦它有问题，
+## 症状会出现在**所有**东西上（地面看着脏、水面出条纹），容易误判成地形贴图坏了。
+## 能一键关掉它，就能立刻二分出"到底是叠加层还是地形本身"。
+static var disable_macro := false
 
 
 static func generate() -> Dictionary:
@@ -394,10 +533,12 @@ static func generate() -> Dictionary:
 			# 裂缝/河水不在这里 —— 它们是 _paint_band 画的连续带。
 			var p_tree: float = w["tree"] * density * veg_mul * (3.0 if in_patch else 1.0)
 			var p_rock: float = w["rock"] * density * veg_mul
-			var p_debris: float = w["debris"] * density * veg_mul
+			var p_bush: float = w["bush"] * density * veg_mul * (1.6 if in_patch else 1.0)
+			var p_debris: float = w["pebble"] * density * veg_mul
 			var r := rng.randf()
 			var acc := 0.0
 			var kind := DECOR_NONE
+			# 判定顺序 = 绘制优先级：阻挡物（树/石）先占格，再考虑可走的灌木/碎石。
 			acc += p_tree
 			if r < acc:
 				kind = DECOR_TREE
@@ -406,9 +547,13 @@ static func generate() -> Dictionary:
 				if r < acc:
 					kind = DECOR_ROCK
 				else:
-					acc += p_debris
+					acc += p_bush
 					if r < acc:
-						kind = DECOR_DEBRIS
+						kind = DECOR_BUSH
+					else:
+						acc += p_debris
+						if r < acc:
+							kind = DECOR_DEBRIS
 			if kind == DECOR_NONE:
 				continue
 			decor[y][x] = kind
@@ -453,39 +598,41 @@ static func generate() -> Dictionary:
 				veins.append({"res_id": str(res_key), "gx": gx, "gy": gy})
 				break
 
-	# ---- 第二遍：渲染瓦片（按生物群系取对应变体列；墙顶受光判断依赖最终 terrain）----
+	# ---- 第二遍：按四邻连通性反查官方 blob 瓦片（自动描出岸线/崖壁）----
 	for y in range(height):
 		for x in range(width):
-			var b: int = biome[y][x]
 			if terrain[y][x]:
-				# 上方是地板 → 这格是墙的顶面，加受光边（2.5D 俯视的体积感）
-				var is_top: bool = (y > 0 and not terrain[y - 1][x])
-				var v := _variant(x, y, WALL_VARIANTS)
-				var col: int = (atlas_wall_top_start() if is_top else atlas_wall_start()) + b * WALL_VARIANTS + v
-				layer.set_cell(Vector2i(x, y), 0, Vector2i(col, 0))
+				# 不可通行地形 = 官方水面（共用一份贴图，不分群系）
+				layer.set_cell(Vector2i(x, y), 0, Vector2i(atlas_wall_start(), 0))
 			else:
-				var v := _variant(x, y, FLOOR_VARIANTS)
-				layer.set_cell(Vector2i(x, y), 0, Vector2i(b * FLOOR_VARIANTS + v, 0))
+				var b: int = biome[y][x]
+				layer.set_cell(Vector2i(x, y), 0,
+						Vector2i(b * BLOB_N + blob_index(terrain, x, y), 0))
 
 	# ---- 装饰层 ----
 	# 按 DECOR_RENDER_ORDER 分趟绘制：先铺地表特征（河水 → 裂缝），再放立体物件
-	# （残骸 → 树 → 石）。同层 add 顺序即绘制顺序，保证水在最底、物件压在最上。
+	# （碎石 → 灌木 → 树 → 石）。同层 add 顺序即绘制顺序，保证水在最底、物件压在最上。
 	var decor_root := Node2D.new()
 	decor_root.name = "DecorLayer"
 	decor_root.y_sort_enabled = true   # 同层内按 y 排序，下方的树遮上方的树
-	var counts := {DECOR_TREE: 0, DECOR_ROCK: 0, DECOR_DEBRIS: 0, DECOR_CRACK: 0, DECOR_WATER: 0}
+	var counts := {DECOR_TREE: 0, DECOR_ROCK: 0, DECOR_DEBRIS: 0, DECOR_CRACK: 0,
+			DECOR_WATER: 0, DECOR_BUSH: 0}
 	for k in DECOR_RENDER_ORDER:
 		var kk: int = int(k)
-		var tex := _decor_texture(kk)
-		if tex == null:
+		var tex_list := _decor_textures(kk)
+		if tex_list.is_empty():
 			continue
-		var tex_size := Vector2(tex.get_size())
 		# 贴地类（裂缝/河水）整格居中且不缩放——缩放会让相邻水格之间露出格子缝
 		var is_flat: bool = DECOR_FLAT.has(kk)
+		var no_shadow: bool = DECOR_NO_SHADOW.has(kk)
 		for y in range(height):
 			for x in range(width):
 				if int(decor[y][x]) != kk:
 					continue
+				var tex: Texture2D = tex_list[_decor_variant(x, y, tex_list.size())]
+				if tex == null:
+					continue
+				var tex_size := Vector2(tex.get_size())
 				# 立体物件做随机缩放/翻转/亮度抖动，消除克隆感
 				var sc := Vector2.ONE
 				if is_flat:
@@ -494,12 +641,12 @@ static func generate() -> Dictionary:
 					sc = Vector2(float(tile_size) / maxf(tex_size.x, 1.0),
 							float(tile_size) / maxf(tex_size.y, 1.0))
 				else:
-					sc = Vector2(rng.randf_range(0.88, 1.12), rng.randf_range(0.88, 1.12))
+					sc = Vector2(rng.randf_range(0.92, 1.08), rng.randf_range(0.92, 1.08))
 				var pos := Vector2(x * tile_size + tile_size * 0.5,
 								   y * tile_size + tile_size * 0.5)
 				# 落地投影：必须先添加影子再添加本体——同 y 时 y_sort 保持添加序，
-				# 影子就永远压在本体下面。残骸/裂缝/河水本来就平摊在地上，不需要投影。
-				if shadow_on and not is_flat and kk != DECOR_DEBRIS:
+				# 影子就永远压在本体下面。裂缝/河水/碎石/灌木本来就贴地，不需要投影。
+				if shadow_on and not is_flat and not no_shadow:
 					var shadow_tex := _decor_shadow_texture(kk, tex_size.x)
 					if shadow_tex != null:
 						var sh := Sprite2D.new()
@@ -515,11 +662,16 @@ static func generate() -> Dictionary:
 				s.centered = false
 				s.scale = sc
 				s.flip_h = rng.randf() < 0.5
-				# 群系整体色调（与地表同源：地面亮的地方物件也亮）× 类别基准亮度 × 随机抖动
-				var tint: Color = _biome_tint(biome[y][x])
-				var base_tint: Color = DECOR_BASE_TINT.get(kk, Color(1, 1, 1))
-				s.modulate = Color(tint.r * base_tint.r, tint.g * base_tint.g,
-						tint.b * base_tint.b) * rng.randf_range(0.90, 1.08)
+				if DECOR_UNIFORM_TINT.has(kk):
+					# 贴地纯色块（河水）：整片恒定，不理会所在格子的群系与抖动。
+					# 见 DECOR_UNIFORM_TINT 上方的说明——逐格上色会让平色贴图露格子。
+					s.modulate = DECOR_UNIFORM_TINT[kk]
+				else:
+					# 群系整体色调（与地表同源：地面亮的地方物件也亮）× 类别基准亮度 × 随机抖动
+					var tint: Color = _biome_tint(biome[y][x])
+					var base_tint: Color = DECOR_BASE_TINT.get(kk, Color(1, 1, 1))
+					s.modulate = Color(tint.r * base_tint.r, tint.g * base_tint.g,
+							tint.b * base_tint.b) * rng.randf_range(0.90, 1.08)
 				s.position = pos
 				if is_flat:
 					# 贴地：整格居中
@@ -536,12 +688,12 @@ static func generate() -> Dictionary:
 		var kind: int = int(VEIN_RES.get(vd["res_id"], -1))
 		if kind < 0:
 			continue
-		var otex := _ore_texture(kind)
+		var otex := _ore_texture(kind, int(vd["gx"]), int(vd["gy"]))
 		if otex == null:
 			continue
 		var opos := Vector2(vd["gx"] * tile_size + tile_size * 0.5,
 							vd["gy"] * tile_size + tile_size * 0.5)
-		var osc := Vector2(rng.randf_range(0.85, 1.1), rng.randf_range(0.85, 1.1))
+		var osc := Vector2(rng.randf_range(0.9, 1.05), rng.randf_range(0.9, 1.05))
 		# 落地软影（比树小）
 		if shadow_on:
 			var osh := _decor_shadow_texture(DECOR_ROCK, otex.get_width() * 0.7)
@@ -560,7 +712,7 @@ static func generate() -> Dictionary:
 		os.scale = osc
 		os.flip_h = rng.randf() < 0.5
 		var bt: Color = _biome_tint(biome[vd["gy"]][vd["gx"]])
-		os.modulate = bt * rng.randf_range(0.92, 1.06)
+		os.modulate = bt * rng.randf_range(0.94, 1.04)
 		os.position = opos
 		os.offset = Vector2(-otex.get_width() * 0.5, 2.0 - otex.get_height())
 		os.z_index = 0
@@ -585,7 +737,7 @@ static func generate() -> Dictionary:
 	# 宏观明暗层：低分辨率光照图放大后乘法混合。刻意最后添加 —— 同 z_index 下
 	# 绘制在最上层，连装饰一起受光；否则会出现"地面有明暗、树却一样亮"的割裂。
 	var macro_img: Image = null
-	if macro_on and macro_strength > 0.0:
+	if macro_on and macro_strength > 0.0 and not disable_macro:
 		macro_img = _make_macro_light_image(width, height, macro_noise, macro_strength)
 		if macro_img != null:
 			root.add_child(_wrap_macro_light(macro_img, tile_size))
@@ -629,9 +781,11 @@ static func generate() -> Dictionary:
 	print("[Map] 地图生成完成：%dx%d 瓦片（%dx%d 像素），地板 %d 格，可达 %d 格（%.0f%%），贴图=%s"
 		% [width, height, width * tile_size, height * tile_size, floor_count, reach_count,
 		   ratio * 100.0, "AI" if _used_ai_atlas else "程序化(回退)"])
-	print("[Map] 装饰物：树 %d / 石头 %d / 残骸 %d / 裂缝 %d / 河水 %d，出生点 %s"
-		% [int(counts[DECOR_TREE]), int(counts[DECOR_ROCK]), int(counts[DECOR_DEBRIS]),
-		   int(counts[DECOR_CRACK]), int(counts[DECOR_WATER]), spawn])
+	print("[Map] 装饰物：树 %d / 石头 %d / 灌木 %d / 碎石 %d / 裂缝 %d / 河水 %d，出生点 %s"
+		% [int(counts[DECOR_TREE]), int(counts[DECOR_ROCK]), int(counts[DECOR_BUSH]),
+		   int(counts[DECOR_DEBRIS]), int(counts[DECOR_CRACK]),
+		   int(counts[DECOR_WATER]), spawn])
+	print("[Map] 矿脉 %d 处" % veins.size())
 	var biome_str := ""
 	for i in range(biome_count()):
 		if i > 0:
@@ -695,7 +849,7 @@ static func build_preview(result: Dictionary, cells: int) -> Image:
 			Image.FORMAT_RGBA8)
 	out.fill(Color(0, 0, 0, 1))
 
-	# 地形层：从缓存图集按格复制（变体选择逻辑与渲染时完全一致，含群系偏移）
+	# 地形层：从缓存图集按格复制（blob 选择逻辑与渲染时**逐字一致**）
 	if _atlas_img != null:
 		for y in range(mini(cells, h)):
 			for x in range(mini(cells, w)):
@@ -706,12 +860,9 @@ static func build_preview(result: Dictionary, cells: int) -> Image:
 					b = int(biome[gy][gx])
 				var col: int
 				if terrain[gy][gx]:
-					var is_top: bool = (gy > 0 and not terrain[gy - 1][gx])
-					var v := _variant(gx, gy, WALL_VARIANTS)
-					col = (atlas_wall_top_start() if is_top else atlas_wall_start()) + b * WALL_VARIANTS + v
+					col = atlas_wall_start()
 				else:
-					var v := _variant(gx, gy, FLOOR_VARIANTS)
-					col = b * FLOOR_VARIANTS + v
+					col = b * BLOB_N + blob_index(terrain, gx, gy)
 				out.blit_rect(_atlas_img, Rect2i(col * ts, 0, ts, ts),
 						Vector2i(x * ts, y * ts))
 
@@ -722,16 +873,19 @@ static func build_preview(result: Dictionary, cells: int) -> Image:
 			var gy: int = y0 + y
 			var gx: int = x0 + x
 			var k: int = decor[gy][gx]
-			if k == DECOR_NONE or not _decor_img.has(k):
+			var imgs: Array = _decor_img.get(k, [])
+			if k == DECOR_NONE or imgs.is_empty():
 				continue
-			var src: Image = _decor_img[k]
+			var src: Image = imgs[_decor_variant(gx, gy, imgs.size())]
+			if src == null:
+				continue
 			var tint: Color = _biome_tint(biome[gy][gx])
 			var base_tint: Color = DECOR_BASE_TINT.get(k, Color(1, 1, 1))
 			var use_tint := Color(tint.r * base_tint.r, tint.g * base_tint.g,
 					tint.b * base_tint.b)
 			var flat: bool = DECOR_FLAT.has(k)
-			# 落地投影：与运行时同序（先影后本体）；残骸/裂缝/河水平摊在地上，不投影
-			if shadow_on and not flat and k != DECOR_DEBRIS:
+			# 落地投影：与运行时同序（先影后本体）；裂缝/河水/碎石/灌木贴地，不投影
+			if shadow_on and not flat and not DECOR_NO_SHADOW.has(k):
 				var sw: float = maxf(6.0, src.get_width() * 0.80)
 				var shh: float = maxf(3.0, sw * 0.34)
 				_blend_shadow(out, int(x * ts + ts * 0.5),
@@ -741,7 +895,11 @@ static func build_preview(result: Dictionary, cells: int) -> Image:
 			var dx: int = int(x * ts + ts * 0.5 - src.get_width() * 0.5)
 			var dy: int = int(y * ts + ts * 0.5 + 2.0 - src.get_height())
 			if flat:
-				dy = int(y * ts + ts * 0.5 - src.get_height() * 0.5)
+				# 贴地贴图先缩到"一格见方"，再整格居中
+				src = src.duplicate()
+				src.resize(ts, ts, Image.INTERPOLATE_LANCZOS)
+				dx = int(x * ts)
+				dy = int(y * ts)
 			_blend(out, src, dx, dy, use_tint)
 
 	# 宏观明暗：等价于运行时 MacroLight 的乘法混合（先放大插值，再逐像素乘）
@@ -817,9 +975,13 @@ static func _hash_xy(x: int, y: int, salt: int) -> int:
 	return absi(h)
 
 
-## 确定性变体选择：同一格永远得到同一个变体，重生成地图不会闪烁
-static func _variant(x: int, y: int, count: int) -> int:
-	return _hash_xy(x, y, 17) % count
+## 确定性变体选择：同一格永远得到同一个变体，重生成地图不会闪烁。
+## 【2026-09-16】装饰物改成"一组贴图随机抽一张"后由它决定抽哪张。salt 与
+## 地形/群系用的 salt 分开，调装饰不会连带改动地形观感。
+static func _decor_variant(x: int, y: int, count: int) -> int:
+	if count <= 1:
+		return 0
+	return _hash_xy(x, y, 29) % count
 
 
 ## 群系边界渗透：若该格处在两个群系的交界且哈希命中，则改用某个邻格的群系。
@@ -848,7 +1010,9 @@ static func _blended_biome(biome: Array, x: int, y: int, blend: float) -> int:
 	return cand[_hash_xy(x, y, 53) % cand.size()]
 
 
-## 读出 PNG 的 Image（未导入的 PNG 会返回 null，交给调用方回退）
+## 读出 PNG 的 Image（未导入的 PNG 会返回 null，交给调用方回退）。
+## 统一转 RGBA8：官方瓦片边缘带透明像素（崖壁下方是镂空的），转 RGB 会把
+## 透明区变成黑块，拼图时在地图边缘露出一圈黑边。
 static func _load_image(path: String) -> Image:
 	if path == "" or not ResourceLoader.exists(path):
 		return null
@@ -858,94 +1022,124 @@ static func _load_image(path: String) -> Image:
 		if im != null:
 			if im.is_compressed():
 				im.decompress()
-			im.convert(Image.FORMAT_RGB8)
+			im.convert(Image.FORMAT_RGBA8)
 			return im
 	return null
 
 
-## 把横向排列的源图集按列重采样到目标瓦片边长
-static func _resize_atlas(src: Image, tile_size: int, cols: int) -> Image:
-	var dst := Image.create(tile_size * cols, tile_size, false, Image.FORMAT_RGB8)
-	dst.fill(Color(0, 0, 0))
-	for i in range(cols):
-		var sx: int = i * SRC_TILE
-		if sx + SRC_TILE > src.get_width():
-			break
-		var region := src.get_region(Rect2i(sx, 0, SRC_TILE, SRC_TILE))
-		if tile_size != SRC_TILE:
-			region.resize(tile_size, tile_size, Image.INTERPOLATE_LANCZOS)
-		dst.blit_rect(region, Rect2i(0, 0, tile_size, tile_size),
-				Vector2i(i * tile_size, 0))
-	return dst
+## 从源图里取一块并（必要时）重采样到 ts×ts。
+## 官方瓦片是 64px，tile_size 也是 64 时**完全不动像素**（NEAREST 只用于缩小时）。
+static func _grab(src: Image, rect: Rect2i, ts: int) -> Image:
+	var region := src.get_region(rect)
+	if region.get_width() != ts or region.get_height() != ts:
+		region.resize(ts, ts, Image.INTERPOLATE_LANCZOS)
+	return region
 
 
-## 墙顶受光：整体提亮 + 首行加一条高光边，模拟 2.5D 俯视的受光顶面
-## 提亮幅度刻意压小（1.10）——过大时墙体在 16px 下会变成亮块，与地表脱节
-static func _paint_top_light(col: Image, ts: int) -> void:
-	for y in range(ts):
-		for x in range(ts):
-			var c := col.get_pixel(x, y)
-			col.set_pixel(x, y, Color(minf(c.r * 1.10, 1.0), minf(c.g * 1.10, 1.0),
-					minf(c.b * 1.10, 1.0)))
-	for x in range(ts):
-		var c := col.get_pixel(x, 0)
-		col.set_pixel(x, 0, Color(minf(c.r * 1.18 + 0.06, 1.0),
-				minf(c.g * 1.18 + 0.06, 1.0), minf(c.b * 1.18 + 0.06, 1.0)))
+## 把图按系数乘色（RGB 各乘 tint 分量，alpha 原样）。tint 全 1 时直接返回原图，
+## 避免四个群系都白白跑一遍逐像素循环。
+static func _tinted(src: Image, tint: Color) -> Image:
+	if is_equal_approx(tint.r, 1.0) and is_equal_approx(tint.g, 1.0) \
+			and is_equal_approx(tint.b, 1.0):
+		return src
+	# 必须显式写 Image：Image.duplicate() 的静态返回类型是 Resource，
+	# 用 := 推断会把 out 定成 Resource，后面 out.get_pixel() 就成了 Variant，
+	# `var c := out.get_pixel(..)` 直接报 "Cannot infer the type of c"。
+	var out: Image = src.duplicate()
+	out.convert(Image.FORMAT_RGBA8)
+	for y in range(out.get_height()):
+		for x in range(out.get_width()):
+			var c := out.get_pixel(x, y)
+			if c.a <= 0.0:
+				continue          # 透明区跳过，省一半循环
+			out.set_pixel(x, y, Color(clampf(c.r * tint.r, 0.0, 1.0),
+					clampf(c.g * tint.g, 0.0, 1.0),
+					clampf(c.b * tint.b, 0.0, 1.0), c.a))
+	return out
 
 
-## 组装完整图集：地板列 + 墙体列 + 墙顶列
+## 组装完整图集（横向一行，y 恒为 0）：
+##   [0, BLOB_N * biome_count)       每个群系 16 个 blob 组合（官方 4x4 区块，原样）
+##   [atlas_wall_start, atlas_cols)  不可通行地形 = 官方水面（一份贴图共用）
+##
+## 素材缺失（PNG 没导入 / 路径写错）时整张图集回退到程序化绘制，保证工程随时能跑。
 static func _build_atlas_image(tile_size: int) -> Image:
-	var img := Image.create(tile_size * atlas_cols(), tile_size, false, Image.FORMAT_RGB8)
-	img.fill(Color(0, 0, 0))
+	var img := Image.create(tile_size * atlas_cols(), tile_size, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
 
-	var floor_img := _load_image(ATLAS_FLOOR_PATH)
-	var wall_img := _load_image(ATLAS_WALL_PATH)
-	if floor_img != null and wall_img != null:
-		var fi := _resize_atlas(floor_img, tile_size, biome_count() * FLOOR_VARIANTS)
-		var wi := _resize_atlas(wall_img, tile_size, biome_count() * WALL_VARIANTS)
-		img.blit_rect(fi, Rect2i(0, 0, fi.get_width(), fi.get_height()), Vector2i(0, 0))
-		img.blit_rect(wi, Rect2i(0, 0, wi.get_width(), wi.get_height()),
+	var ok := true
+	for b in range(biome_count()):
+		var sheet := _load_image(TERRAIN_DIR + biome_tileset(b))
+		if sheet == null:
+			push_warning("[Map] 地形图集缺失，回退程序化绘制：%s%s"
+					% [TERRAIN_DIR, biome_tileset(b)])
+			ok = false
+			break
+		# 群系色调：必须在**这里**乘上去，不能只靠 _grade_atlas——
+		# _grade_atlas 默认关闭（官方素材本身就是成品配色），挂在它下面的 tint
+		# 等于死配置。以前"沼泽"用的是官方 color5（一片青绿），跟不可通行水面
+		# 撞色、玩家分不清哪儿能走；现在靠 tint 把它压成沼泽黄绿就能一眼区分。
+		var tint: Color = _biome_tint(b)
+		for k in range(BLOB_N):
+			var rect := Rect2i((k % 4) * SRC_TILE, (k / 4) * SRC_TILE, SRC_TILE, SRC_TILE)
+			if rect.end.x > sheet.get_width() or rect.end.y > sheet.get_height():
+				push_warning("[Map] 地形图集尺寸不足，缺少 blob 区块：%s" % biome_tileset(b))
+				ok = false
+				break
+			img.blit_rect(_tinted(_grab(sheet, rect, tile_size), tint),
+					Rect2i(0, 0, tile_size, tile_size),
+					Vector2i((b * BLOB_N + k) * tile_size, 0))
+		if not ok:
+			break
+
+	var water := _load_image(TERRAIN_DIR + WATER_SRC)
+	if ok and water != null:
+		img.blit_rect(_grab(water, Rect2i(0, 0, water.get_width(), water.get_height()), tile_size),
+				Rect2i(0, 0, tile_size, tile_size),
 				Vector2i(atlas_wall_start() * tile_size, 0))
-		# 墙顶受光变体由墙体列派生（省一份素材，且光照关系天然一致）
-		for i in range(biome_count() * WALL_VARIANTS):
-			var col := wi.get_region(Rect2i(i * tile_size, 0, tile_size, tile_size))
-			_paint_top_light(col, tile_size)
-			img.blit_rect(col, Rect2i(0, 0, tile_size, tile_size),
-					Vector2i((atlas_wall_top_start() + i) * tile_size, 0))
+	else:
+		if water == null:
+			push_warning("[Map] 水面贴图缺失：%s%s" % [TERRAIN_DIR, WATER_SRC])
+		ok = false
+
+	if ok:
 		_used_ai_atlas = true
 		_grade_atlas(img, tile_size)
 		return img
 
-	# ---- 回退：AI 贴图缺失时用程序化逐像素绘制 ----
+	# ---- 回退：官方素材缺失时用程序化逐像素绘制 ----
+	# 同样按 blob 语义画：四邻不连通的一侧描一道暗边，至少能看出地形结构。
 	_used_ai_atlas = false
+	img.fill(Color(0, 0, 0, 0))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = ATLAS_SEED  # 固定种子：图集外观稳定
 	for b in range(biome_count()):
 		var w: Dictionary = _biome_at(b)
-		for v in range(FLOOR_VARIANTS):
-			_paint_floor(img, (b * FLOOR_VARIANTS + v) * tile_size, tile_size, v, rng, w["floor"])
-		for v in range(WALL_VARIANTS):
-			_paint_wall(img, (atlas_wall_start() + b * WALL_VARIANTS + v) * tile_size, tile_size,
-					v, rng, false, w["wall"])
-		for v in range(WALL_VARIANTS):
-			_paint_wall(img, (atlas_wall_top_start() + b * WALL_VARIANTS + v) * tile_size, tile_size,
-					v, rng, true, w["wall"])
+		for k in range(BLOB_N):
+			_paint_blob(img, (b * BLOB_N + k) * tile_size, tile_size, k, rng, w["floor"])
+	_paint_water(img, atlas_wall_start() * tile_size, tile_size, rng)
 	_grade_atlas(img, tile_size)
 	return img
 
 
-## 色调分级：对整张图集做「对比曲线 + 去饱和 + 群系色调」。
-## 顺序有讲究：
-##   1. 对比曲线把灰糊的中间调拉开，同时整体压暗一点（给群系提亮留空间）；
-##   2. 去饱和让画面沉稳——AI 贴图本身的饱和度偏高，直接叠色调会"艳"；
-##   3. 最后才乘 BIOME_TINT，四个区域的明暗和色温才真正分开。
+## 色调分级：对整张图集做「对比曲线 + 去饱和」。
+##
+## 【2026-09-16】默认**关闭**（map.grade.enabled = false）：官方 Tiny Swords 素材
+## 本身已经是成品配色，再压对比、去饱和只会把它弄脏，四个群系的区分靠
+## config 里各自挑不同的 Tilemap_colorN 来实现，比后期调色自然得多。
+## 只有回退到程序化贴图时才建议打开（那时颜色是脚本糊出来的，需要拉对比）。
+##
+## 注意：这里**不再**乘群系 tint。tint 已经挪到 _build_atlas_image 的 blit 阶段，
+## 两处都乘会让色调被平方（本来想压 0.4，结果压成 0.16）。_grade_atlas 现在只管
+## 对比/亮度/饱和度这三项全局调整。
 static func _grade_atlas(img: Image, ts: int) -> void:
+	if not bool(Config.get_value("map.grade.enabled", false)):
+		return
 	var contrast: float = float(Config.get_value("map.grade.contrast", 1.12))
-	var bright: float = float(Config.get_value("map.grade.brightness", -0.03))
-	var sat: float = float(Config.get_value("map.grade.saturation", 0.82))
+	var bright: float = float(Config.get_value("map.grade.brightness", 0.0))
+	var sat: float = float(Config.get_value("map.grade.saturation", 0.92))
 	for y in range(ts):
 		for x in range(img.get_width()):
-			var tint: Color = _biome_tint(_biome_of_column(x / ts))
 			var c := img.get_pixel(x, y)
 			var r: float = clampf((c.r - 0.5) * contrast + 0.5 + bright, 0.0, 1.0)
 			var g: float = clampf((c.g - 0.5) * contrast + 0.5 + bright, 0.0, 1.0)
@@ -955,43 +1149,51 @@ static func _grade_atlas(img: Image, ts: int) -> void:
 			r = luma + (r - luma) * sat
 			g = luma + (g - luma) * sat
 			b = luma + (b - luma) * sat
-			img.set_pixel(x, y, Color(
-					clampf(r * tint.r, 0.0, 1.0),
-					clampf(g * tint.g, 0.0, 1.0),
-					clampf(b * tint.b, 0.0, 1.0)))
-
-
-## 图集列号 → 所属群系（地板 / 墙体 / 墙顶三段列区各自换算）
-static func _biome_of_column(col: int) -> int:
-	if col < atlas_wall_start():
-		return clampi(col / FLOOR_VARIANTS, 0, biome_count() - 1)
-	if col < atlas_wall_top_start():
-		return clampi((col - atlas_wall_start()) / WALL_VARIANTS, 0, biome_count() - 1)
-	return clampi((col - atlas_wall_top_start()) / WALL_VARIANTS, 0, biome_count() - 1)
+			img.set_pixel(x, y, Color(r, g, b, c.a))
 
 
 static func _build_tileset(tile_size: int) -> TileSet:
 	var img := _build_atlas_image(tile_size)
-	# 缓存一份 RGBA 副本供预览合成（图集本身是 RGB8，无法直接 blit 到 RGBA 画布）
+	# 缓存一份副本供预览合成（build_preview 用 blit_rect 拼图）
 	_atlas_img = img.duplicate()
 	_atlas_img.convert(Image.FORMAT_RGBA8)
 
 	var ts := TileSet.new()
 	ts.tile_size = Vector2i(tile_size, tile_size)
+	# 自检：tile_size 与 atlas 源的实际取样区域必须一致。TileSetAtlasSource 的
 	var src := TileSetAtlasSource.new()
 	src.texture = ImageTexture.create_from_image(img)
+	# 【必须显式设置】TileSetAtlasSource.texture_region_size 的默认值是 **16x16**，
+	# 它不会跟着 TileSet.tile_size 走。官方素材是 64px 格，如果不设，图集就会按
+	# 16px 去切 64px 的瓦片：set_cell 取到的是"某个瓦片左上角 16px 的一小块"，
+	# 再被拉成整格。症状是地面变成"深色底 + 每格一小块色斑"，而 —— 关键 ——
+	# **build_preview 走的是 blit_rect 直拼、按 64px 正确切片，所以预览图是对的**，
+	# 于是出现"预览好看、进游戏全黑"这种极难定位的偏差（这个坑踩过）。
+	src.texture_region_size = Vector2i(tile_size, tile_size)
 	for i in range(atlas_cols()):
 		src.create_tile(Vector2i(i, 0))
 	ts.add_source(src, 0)
 
-	# 碰撞：所有墙变体（普通 + 墙顶，含各群系）都是整格实心
+	# 碰撞：只有水面列是整格实心（地形 blob 全部可走；树/石的碰撞由
+	# map_generator 自己用 _build_decor_collision 补，见 generate()）
+	#
+	# 【必须绕原点（=格心）画，不能从 (0,0) 画到 (tile_size,tile_size)】
+	# TileData 的碰撞多边形坐标系是**以格心为原点**的：编辑器里画满一格，得到的
+	# 顶点就是 (-ts/2,-ts/2)…(ts/2,ts/2)。写成 (0,0)→(ts,ts) 会让整块碰撞体
+	# 相对瓦片右下偏移半格（64px 格 → 偏 32px），于是：
+	#   · A* 的 walls 网格认为某格可走，物理上却在"自己格子的正中间"撞墙；
+	#   · 玩家能往水里走进 32px 后被卡住，而且重算路径仍是同一条 → 永久僵在原地
+	#     （stall 重算救不了，因为第一步方向没变）。
+	# 这个坑是行为验证探针（tools/run_soak.py）抓出来的：玩家在 move 状态
+	# 有目标却静止 7.5 秒，把碰撞体 dump 出来才看到接触点正好落在格心。
+	var half := float(tile_size) * 0.5
 	ts.add_physics_layer()
 	for i in range(atlas_wall_start(), atlas_cols()):
 		var d := src.get_tile_data(Vector2i(i, 0), 0)
 		d.set_collision_polygons_count(0, 1)
 		d.set_collision_polygon_points(0, 0, PackedVector2Array([
-			Vector2(0, 0), Vector2(tile_size, 0),
-			Vector2(tile_size, tile_size), Vector2(0, tile_size),
+			Vector2(-half, -half), Vector2(half, -half),
+			Vector2(half, half), Vector2(-half, half),
 		]))
 	return ts
 
@@ -1031,82 +1233,49 @@ static func _wrap_macro_light(img: Image, tile_size: int) -> Sprite2D:
 	return s
 
 
-## 地板（回退绘制）：基色 + 颗粒噪点，各变体再加一种地表特征
-static func _paint_floor(img: Image, ox: int, ts: int, variant: int,
+## 填充矩形（带越界保护），回退绘制用
+static func _fill_rect(img: Image, x0: int, y0: int, w: int, h: int, c: Color) -> void:
+	for y in range(y0, y0 + h):
+		for x in range(x0, x0 + w):
+			_set_rgba(img, x, y, c)
+
+
+## 单个 blob 瓦片（回退绘制）：基色 + 颗粒噪点，四邻**不连通**的一侧描一道暗边。
+## 这是官方 blob 的极简近似——至少能看出"哪里是地、哪里是崖"，
+## 官方 PNG 到位时走不到这里（见 _build_atlas_image 的分支）。
+static func _paint_blob(img: Image, ox: int, ts: int, k: int,
 		rng: RandomNumberGenerator, base: Color) -> void:
+	var row: int = k / 4
+	var col: int = k % 4
+	var up_open: bool = row >= 1 and row <= 2
+	var down_open: bool = row <= 1
+	var left_open: bool = col >= 1 and col <= 2
+	var right_open: bool = col <= 1
 	for y in range(ts):
 		for x in range(ts):
-			_set_rgb(img, ox + x, y, base * rng.randf_range(0.82, 1.18))
-	match variant:
-		1:  # 碎石：几颗亮石子 + 下方投影
-			for _i in range(rng.randi_range(3, 6)):
-				var px := rng.randi_range(1, ts - 2)
-				var py := rng.randi_range(1, ts - 3)
-				_set_rgb(img, ox + px, py, C_STONE * rng.randf_range(0.85, 1.15))
-				_set_rgb(img, ox + px, py + 1, C_DARK)
-		2:  # 裂纹：一条自上而下的折线
-			var cx := rng.randi_range(2, ts - 3)
-			for y in range(1, ts - 1):
-				_set_rgb(img, ox + cx, y, C_DARK)
-				cx = clampi(cx + rng.randi_range(-1, 1), 1, ts - 2)
-		3:  # 苔藓：几团暗绿
-			for _i in range(3):
-				var mx := rng.randi_range(2, ts - 3)
-				var my := rng.randi_range(2, ts - 3)
-				for dy in range(-1, 2):
-					for dx in range(-1, 2):
-						if rng.randf() < 0.62:
-							_set_rgb(img, ox + mx + dx, my + dy,
-								C_MOSS * rng.randf_range(0.85, 1.2))
-		4:  # 金属碎屑：零星铜锈点
-			for _i in range(rng.randi_range(2, 5)):
-				var px := rng.randi_range(1, ts - 2)
-				var py := rng.randi_range(1, ts - 2)
-				_set_rgb(img, ox + px, py, C_RUST * rng.randf_range(0.7, 1.0))
-		5:  # 油污：中央一团暗斑
-			var mx := rng.randi_range(4, ts - 5)
-			var my := rng.randi_range(4, ts - 5)
-			for dy in range(-2, 3):
-				for dx in range(-2, 3):
-					if dx * dx + dy * dy <= 5 and rng.randf() < 0.8:
-						_set_rgb(img, ox + mx + dx, my + dy, C_OIL)
-		_:
-			pass
+			_set_rgba(img, ox + x, y, Color(base.r, base.g, base.b, 1.0)
+					* rng.randf_range(0.94, 1.06))
+	var edge: int = maxi(2, ts / 12)
+	var dark := Color(base.r * 0.42, base.g * 0.38, base.b * 0.34, 1.0)
+	if not up_open:
+		_fill_rect(img, ox, 0, ts, edge, dark)
+	if not down_open:
+		_fill_rect(img, ox, ts - edge, ts, edge, dark)
+	if not left_open:
+		_fill_rect(img, ox, 0, edge, ts, dark)
+	if not right_open:
+		_fill_rect(img, ox + ts - edge, 0, edge, ts, dark)
 
 
-## 墙体（回退绘制）：基色 + 颗粒噪点，变体加砖缝/铆钉/管道；
-## is_top（墙顶）整体提亮并在首行加高光边，模拟 2.5D 受光顶面
-static func _paint_wall(img: Image, ox: int, ts: int, variant: int,
-		rng: RandomNumberGenerator, is_top: bool, base: Color) -> void:
-	var bcol: Color = base
-	if is_top:
-		bcol = bcol.lightened(0.16)
+## 水面瓦片（回退绘制）：深青蓝 + 波纹颗粒
+static func _paint_water(img: Image, ox: int, ts: int,
+		rng: RandomNumberGenerator) -> void:
 	for y in range(ts):
 		for x in range(ts):
-			_set_rgb(img, ox + x, y, bcol * rng.randf_range(0.86, 1.14))
-	match variant:
-		1:  # 砖缝：两条横向暗线 + 交错竖缝
-			for line_y in [ts / 3, ts * 2 / 3]:
-				for x in range(ts):
-					_set_rgb(img, ox + x, line_y, bcol * 0.55)
-			var sx := ts / 2 if (variant % 2 == 0) else ts / 4
-			for y in range(ts / 3):
-				_set_rgb(img, ox + sx, y, bcol * 0.6)
-		2:  # 铆钉：四角亮点 + 下方暗边
-			for p in [Vector2i(2, 2), Vector2i(ts - 3, 2),
-					  Vector2i(2, ts - 3), Vector2i(ts - 3, ts - 3)]:
-				_set_rgb(img, ox + p.x, p.y, C_RUST)
-				_set_rgb(img, ox + p.x, p.y + 1, bcol * 0.5)
-		3:  # 竖管道：中间一条铜锈凸管
-			var px := ts / 2 - 1
-			for y in range(ts):
-				_set_rgb(img, ox + px, y, C_RUST * rng.randf_range(0.9, 1.1))
-				_set_rgb(img, ox + px + 1, y, bcol * 0.6)
-		_:
-			pass
-	if is_top:
-		for x in range(ts):
-			_set_rgb(img, ox + x, 0, bcol.lightened(0.45))
+			var wave: float = 0.5 + 0.5 * sin(float(x) / float(ts) * TAU * 2.0)
+			var c := Color(0.10, 0.24, 0.34).lerp(Color(0.18, 0.40, 0.52), wave)
+			c = c * rng.randf_range(0.94, 1.06)
+			_set_rgba(img, ox + x, y, Color(c.r, c.g, c.b, 1.0))
 
 
 ## ------------------------------------------------------------
@@ -1225,48 +1394,91 @@ static func _paint_band(kind: int, prefix: String, terrain: Array, biome: Array,
 
 ## 共享装饰贴图入口：2D（地图生成）与 3D（MapRender3D）都从这里取，
 ## 保证两个入口用的是同一张图、同一份缓存。kind 见 DECOR_*，未知类别返回 null。
+## 单个 Texture2D 版本给 3D 用（3D 只按类别建 instanced mesh，不做形态变化）。
 static func decor_texture(kind: int) -> Texture2D:
-	return _decor_texture(kind)
+	var list := _decor_textures(kind)
+	return list[0] if not list.is_empty() else null
 
 
-static func _decor_texture(kind: int) -> Texture2D:
+## 取某类装饰的**全部**贴图（按 DECOR_PATH_LISTS 的顺序）。未知类别返回空数组。
+## 贴图与 Image 两份缓存同步装载，索引一一对应（预览合成用 Image）。
+static func _decor_textures(kind: int) -> Array:
 	if _decor_tex.has(kind):
 		return _decor_tex[kind]
+	var tex_list: Array = []
+	var img_list: Array = []
 
-	# 优先加载 AI 生成的透明精灵
-	var path: String = DECOR_PATHS.get(kind, "")
-	if path != "" and ResourceLoader.exists(path):
+	# 1) 官方素材（一组 PNG）
+	for path in DECOR_PATH_LISTS.get(kind, []):
+		if not ResourceLoader.exists(path):
+			push_warning("[Map] 装饰贴图缺失：" + str(path))
+			continue
 		var res: Resource = load(path)
 		if res is Texture2D:
-			var tex2: Texture2D = res
-			_decor_tex[kind] = tex2
-			var im: Image = tex2.get_image()
+			var t: Texture2D = res
+			tex_list.append(t)
+			var im: Image = t.get_image()
 			if im != null:
 				if im.is_compressed():
 					im.decompress()
 				im.convert(Image.FORMAT_RGBA8)
-				_decor_img[kind] = im
-			return tex2
+				img_list.append(im)
+			else:
+				img_list.append(null)
 
-	# ---- 回退：程序化逐像素绘制 ----
-	var img: Image
+	# 2) 河水/裂缝没有 PNG：裂缝纯程序化，河水取官方水面底色（整格可平铺）
+	if tex_list.is_empty():
+		var proc := _make_procedural_decor(kind)
+		if proc == null:
+			_decor_tex[kind] = []
+			_decor_img[kind] = []
+			return []
+		tex_list.append(ImageTexture.create_from_image(proc))
+		img_list.append(proc)
+
+	_decor_tex[kind] = tex_list
+	_decor_img[kind] = img_list
+	return tex_list
+
+
+## 无 PNG 素材的装饰类别的程序化版本（裂缝 / 河水）
+static func _make_procedural_decor(kind: int) -> Image:
 	match kind:
-		DECOR_TREE:
-			img = _make_tree()
-		DECOR_ROCK:
-			img = _make_rock()
-		DECOR_DEBRIS:
-			img = _make_debris()
 		DECOR_CRACK:
-			img = _make_crack()
+			return _make_crack()
 		DECOR_WATER:
-			img = _make_water()
-		_:
-			return null
-	_decor_img[kind] = img
-	var tex := ImageTexture.create_from_image(img)
-	_decor_tex[kind] = tex
-	return tex
+			# 官方水面底色是 64x64 可平铺瓦片；缺失时回退程序化波纹。
+			var w := _load_image(TERRAIN_DIR + WATER_SRC)
+			if w != null:
+				w.convert(Image.FORMAT_RGBA8)
+				return _shallow_water(w)
+			return _make_water()
+	return null
+
+
+## 把深水底色提亮成"可涉水的浅滩"：与不可通行的深水拉开亮度差，
+## 玩家一眼能看出哪片水走得过去。等官方浅滩瓦片到位后可替换（见缺失清单）。
+static func _shallow_water(src: Image) -> Image:
+	var img: Image = src.duplicate()
+	img.convert(Image.FORMAT_RGBA8)
+	# 【2026-09-16 修正】原实现是 k = 0.40 + 0.16*sin(x / width * TAU * 2.0)，
+	# 即在**每一格 64px 内画两整周期**正弦亮带，想冒充波纹。后果是灾难性的：
+	#   ① 每格图案完全相同 ⇒ 全图水面条纹相位一致、跨格严丝合缝，连成一整片
+	#      "印刷网纹"（实测周期 32px、亮度在 86↔117 之间来回摆），
+	#      看上去像贴图坏了，而不像水；
+	#   ② 振幅最大 +0.31（单 R 通道约 +79），远超"浅滩"该有的亮度差；
+	#   ③ 只跟 x 有关 ⇒ 纵向恒定、横向高频闪烁，最刺眼的方向正好朝人。
+	# 浅滩要解决的是"整片水换个色调、让人看出能走"，不是"每格画波纹"。
+	# 波浪/岸线的活儿应由官方 water_foam / 动画水面瓦片承担（见缺失清单）。
+	# 这里改为**整片恒定提亮**：相邻水格颜色完全一致 → 河面连成一片，
+	# 既没有格子缝也没有条纹。
+	var k := 0.30
+	for y in range(img.get_height()):
+		for x in range(img.get_width()):
+			var c := img.get_pixel(x, y)
+			img.set_pixel(x, y, Color(minf(c.r + k * 0.55, 1.0),
+					minf(c.g + k * 0.50, 1.0), minf(c.b * 1.0 + k * 0.35, 1.0), c.a))
+	return img
 
 
 ## 装饰物落地投影：按物件宽度生成椭圆软影（中心最暗、边缘羽化）。
@@ -1293,68 +1505,6 @@ static func _decor_shadow_texture(kind: int, base_width: float) -> Texture2D:
 	var tex := ImageTexture.create_from_image(img)
 	_decor_shadow_tex[kind] = tex
 	return tex
-
-
-## 蒸汽朋克枯树（回退）：暗棕树干 + 铜锈色枯枝 + 稀疏暗绿树冠 + 脚下投影
-static func _make_tree() -> Image:
-	var w := 26
-	var h := 34
-	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0, 0, 0, 0))
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 776241
-	# 脚下投影（贴地感）
-	_ellipse(img, w / 2, h - 3, 8, 3, Color(0, 0, 0, 0.35), rng, 0.0)
-	# 树干：下粗上细
-	for y in range(13, h - 2):
-		var tw: int = 3 if y > 25 else 2
-		for x in range(w / 2 - tw, w / 2 + tw + 1):
-			_set_rgba(img, x, y, Color(0.26, 0.19, 0.13) * rng.randf_range(0.85, 1.15))
-	# 树冠：四团错落，暗绿偏枯
-	var blobs: Array = [[13, 11, 9, 8], [8, 15, 6, 5], [18, 14, 6, 6], [13, 4, 6, 5]]
-	for b in blobs:
-		_ellipse(img, b[0], b[1], b[2], b[3], Color(0.22, 0.26, 0.17), rng, 0.12)
-	# 枯枝点缀：铜锈色短线，破掉纯绿树冠
-	for _i in range(6):
-		var bx: int = rng.randi_range(6, 19)
-		var by: int = rng.randi_range(4, 18)
-		_set_rgba(img, bx, by, C_RUST * 0.8)
-		_set_rgba(img, bx + 1, by, C_RUST * 0.6)
-	return img
-
-
-## 石头（回退）：灰岩团块 + 左上受光 + 右下暗部
-static func _make_rock() -> Image:
-	var w := 20
-	var h := 16
-	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0, 0, 0, 0))
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 512927
-	_ellipse(img, w / 2, h - 3, 7, 2, Color(0, 0, 0, 0.32), rng, 0.0)
-	_ellipse(img, w / 2, h / 2 - 1, 8, 5, Color(0.35, 0.35, 0.38), rng, 0.10)
-	_ellipse(img, w / 2 - 3, h / 2 - 4, 4, 2, Color(0.52, 0.52, 0.55), rng, 0.06)
-	_ellipse(img, w / 2 + 3, h / 2 + 2, 5, 3, Color(0.20, 0.20, 0.22), rng, 0.06)
-	return img
-
-
-## 地面残骸（回退）：齿轮碎片 / 断管，贴地不阻挡
-static func _make_debris() -> Image:
-	var w := 16
-	var h := 12
-	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0, 0, 0, 0))
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 314159
-	for y in range(5, 8):
-		for x in range(2, 9):
-			_set_rgba(img, x, y, C_RUST * rng.randf_range(0.7, 1.0))
-	for y in range(6, 10):
-		for x in range(9, 12):
-			_set_rgba(img, x, y, C_RUST * rng.randf_range(0.6, 0.85))
-	_ellipse(img, 12, 5, 3, 3, Color(0.42, 0.38, 0.30), rng, 0.14)
-	_ellipse(img, 12, 5, 1, 1, Color(0.16, 0.14, 0.12), rng, 0.0)
-	return img
 
 
 ## 地表裂缝：32×32，**四向贯通**的碎裂纹。
@@ -1428,14 +1578,25 @@ static func _make_water() -> Image:
 	return img
 
 
-## 矿脉露头贴图（缓存）：铁灰 / 金黄 / 油黑，含落地投影与高光矿点
-static func _ore_texture(kind: int) -> Texture2D:
-	if _ore_tex.has(kind):
-		return _ore_tex[kind]
-	var img := _make_ore(kind)
-	var tex := ImageTexture.create_from_image(img)
-	_ore_tex[kind] = tex
-	return tex
+## 矿脉露头贴图（缓存）：按 ORE_PATH_LISTS 抽形态；素材缺失时回退程序化。
+## gx/gy 用于确定性取形态（同一处矿脉每次生成长得一样）。
+static func _ore_texture(kind: int, gx: int = 0, gy: int = 0) -> Texture2D:
+	var list: Array = _ore_tex.get(kind, [])
+	if list.is_empty():
+		var paths: Array = ORE_PATH_LISTS.get(kind, [])
+		for path in paths:
+			if not ResourceLoader.exists(path):
+				push_warning("[Map] 矿脉贴图缺失：" + str(path))
+				continue
+			var res: Resource = load(path)
+			if res is Texture2D:
+				list.append(res)
+		if list.is_empty():
+			# 回退：程序化矿石露头
+			list.append(ImageTexture.create_from_image(_make_ore(kind)))
+		_ore_tex[kind] = list
+	var idx: int = _decor_variant(gx, gy, list.size())
+	return list[idx]
 
 
 static func _make_ore(kind: int) -> Image:

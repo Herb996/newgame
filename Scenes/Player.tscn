@@ -1,11 +1,11 @@
 [gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://Scripts/player.gd" id="1_player"]
-[ext_resource type="Texture2D" path="res://Assets/Art/Sprites/Player/player_idle_down_00.png" id="2_tex_down"]
+[ext_resource type="Texture2D" path="res://Assets/Art/Sprites/Units/blue_warrior/idle_00.png" id="2_tex_down"]
 [ext_resource type="Script" path="res://Scripts/select_icon.gd" id="3_selecticon"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
-radius = 3.0
+radius = 16.0
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_select"]
 radius = 16.0
@@ -21,8 +21,7 @@ shape = SubResource("CircleShape2D_body")
 
 [node name="Body" type="Sprite2D" parent="."]
 texture = ExtResource("2_tex_down")
-scale = Vector2(0.5, 0.5)
-offset = Vector2(0, -24)
+offset = Vector2(0, -41)
 
 [node name="SelectArea" type="Area2D" parent="."]
 input_pickable = true
@@ -32,7 +31,7 @@ shape = SubResource("CircleShape2D_select")
 
 [node name="SelectIcon" type="Node2D" parent="."]
 visible = false
-position = Vector2(0, -54)
+position = Vector2(0, -100)
 z_index = 5
 script = ExtResource("3_selecticon")
 

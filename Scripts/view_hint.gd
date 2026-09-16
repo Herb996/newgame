@@ -9,8 +9,11 @@ extends CanvasLayer
 ##   基地自带仓库/雕像面板），但滚轮缩放在基地与局内都能用，
 ##   提示必须两种模式都看得见 —— 挂在 HUD 下就等于基地里永远不显示。
 ##
-## 相机通过 "iso_cam" 组找到（进局会重建相机，所以每帧校验有效性）。
-## 开关读 config：camera3d.zoom_hud。
+## 相机通过 "iso_cam" 组找到（进基地/进局都会重建相机，所以每帧校验有效性）。
+## 两条渲染线共用本文件：2D 的 camera_controller.gd 与 3D 的 iso_camera_3d.gd
+## 都挂同一个组、都实现 zoom_ratio / zoom_hud_idle / zoom_hud_active / zoom_hud_enabled。
+## 「要不要显示」问相机自己 —— 两条线的配置项不同（camera.zoom_hud / camera3d.zoom_hud），
+## 写死成其中一个会让另一条线的开关失效。
 ## ============================================================
 
 const CAM_GROUP := &"iso_cam"
@@ -22,9 +25,6 @@ var _cam: Node = null
 
 
 func _ready() -> void:
-	if not bool(Config.get_value("camera3d.zoom_hud", true)):
-		set_process(false)
-		return
 	var l := Label.new()
 	l.name = "ZoomHint"
 	l.add_theme_font_size_override("font_size", 14)
@@ -54,6 +54,9 @@ func _process(_delta: float) -> void:
 	if _cam == null or not is_instance_valid(_cam):
 		_label.visible = false
 		return
+	if not _hud_enabled(_cam):
+		_label.visible = false
+		return
 	if not bool(_cam.zoom_hud_active()):
 		_label.visible = false
 		return
@@ -62,3 +65,11 @@ func _process(_delta: float) -> void:
 	_label.modulate = Color(1.0, 1.0, 1.0,
 			1.0 if idle < FADE_AT else clampf((HOLD - idle) / (HOLD - FADE_AT), 0.0, 1.0))
 	_label.visible = true
+
+
+## 关掉提示的开关由相机提供：2D 读 camera.zoom_hud，3D 读 camera3d.zoom_hud。
+## 相机没实现该方法时（旧版本）默认显示，不算错。
+func _hud_enabled(cam: Node) -> bool:
+	if cam.has_method("zoom_hud_enabled"):
+		return bool(cam.zoom_hud_enabled())
+	return true

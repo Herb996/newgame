@@ -45,6 +45,9 @@ func setup(root: Node2D, map_data: Dictionary) -> void:
 	# 把墙体网格注入噪音系统（供隔墙衰减），只注一次
 	NoiseSystem.setup(walls, tile_size)
 
+	var types := _type_pool()
+	var tally := {}
+
 	# 洗牌抽取，保证不重复
 	candidates.shuffle()
 	for i in range(count):
@@ -53,7 +56,25 @@ func setup(root: Node2D, map_data: Dictionary) -> void:
 		enemy.position = Vector2(c) * tile_size + Vector2(tile_size * 0.5, tile_size * 0.5)
 		root.add_child(enemy)
 		# 入树后再注入导航数据，保证 global_position（= 巡逻中心）已正确
-		enemy.setup(walls, tile_size, astar)
+		var t: Dictionary = types[randi() % types.size()]
+		enemy.setup(walls, tile_size, astar, t)
+		var tid := str(t.get("id", "?"))
+		tally[tid] = int(tally.get(tid, 0)) + 1
 
-	print("[Enemy] 敌人生成完成：%d 个（距出生点 ≥ %.0f 格，AI = 巡逻 + 追击）" % [
-		count, min_d])
+	print("[Enemy] 敌人生成完成：%d 个（距出生点 ≥ %.0f 格，AI = 巡逻 + 追击）｜兵种 %s"
+			% [count, min_d, str(tally)])
+
+
+## 按 enemy_types.types[*].weight 展开成抽样池；未配置则回退成"单一匿名类型"，
+## 这样 config 里删掉 enemy_types 也不会让敌人变成没有贴图的白方块。
+func _type_pool() -> Array:
+	var out: Array = []
+	for t in Config.get_value("enemy_types.types", []):
+		if not (t is Dictionary):
+			continue
+		var w: int = maxi(1, int((t as Dictionary).get("weight", 1)))
+		for _k in range(w):
+			out.append(t)
+	if out.is_empty():
+		out.append({})
+	return out

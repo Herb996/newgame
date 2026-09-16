@@ -81,12 +81,15 @@ func _draw() -> void:
 		# 撤离进度弧（警示橙，从 12 点方向顺时针）
 		if hold_progress > 0.0:
 			var frac: float = clampf(hold_progress / maxf(hold_seconds, 0.001), 0.0, 1.0)
-			draw_arc(Vector2.ZERO, radius + 5.0, -PI / 2.0, -PI / 2.0 + TAU * frac, 48,
-				Color(1.0, 0.55, 0.15, 0.9), 5.0)
-		draw_circle(Vector2.ZERO, 6.0, Color(0.91, 0.90, 0.86))
+			draw_arc(Vector2.ZERO, radius + radius * 0.05, -PI / 2.0,
+				-PI / 2.0 + TAU * frac, 48, Color(1.0, 0.55, 0.15, 0.9), radius * 0.05)
+		draw_circle(Vector2.ZERO, radius * 0.07, Color(0.91, 0.90, 0.86))
 	else:
-		# 关闭态：暗警示红圆圈 + 叉
+		# 关闭态：暗警示红圆圈 + 叉。以下尺寸全部按 radius 取比例——
+		# 触发半径会随地图格尺寸等比缩放（16px 格时代是 24，现在 64px 格是 96），
+		# 写死像素值会让"叉"缩成一个点、或把整圈撑爆。
 		var dim := Color(0.45, 0.14, 0.10, 0.85)
-		draw_arc(Vector2.ZERO, radius, 0.0, TAU, 48, dim, 2.0)
-		draw_line(Vector2(-8, -8), Vector2(8, 8), dim, 3.0)
-		draw_line(Vector2(8, -8), Vector2(-8, 8), dim, 3.0)
+		var a := radius * 0.13
+		draw_arc(Vector2.ZERO, radius, 0.0, TAU, 48, dim, maxf(2.0, radius * 0.025))
+		draw_line(Vector2(-a, -a), Vector2(a, a), dim, maxf(2.0, radius * 0.035))
+		draw_line(Vector2(a, -a), Vector2(-a, a), dim, maxf(2.0, radius * 0.035))

@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://Scripts/building.gd" id="1_bld"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
-size = Vector2(72, 72)
+size = Vector2(256, 256)
 
 [node name="Building" type="Area2D"]
 script = ExtResource("1_bld")
@@ -11,22 +11,20 @@ script = ExtResource("1_bld")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("RectangleShape2D_1")
 
-[node name="Body" type="Polygon2D" parent="."]
-color = Color(0.55, 0.33, 0.16, 1)
-polygon = PackedVector2Array(-32, -32, 32, -32, 32, 32, -32, 32)
+[node name="Body" type="Sprite2D" parent="."]
 
 [node name="NameLabel" type="Label" parent="."]
-offset_left = -60.0
-offset_top = -46.0
-offset_right = 60.0
-offset_bottom = -26.0
+offset_left = -80.0
+offset_top = -300.0
+offset_right = 80.0
+offset_bottom = -276.0
 horizontal_alignment = 1
 text = "建筑"
 
 [node name="HintLabel" type="Label" parent="."]
-offset_left = -70.0
-offset_top = -72.0
-offset_right = 70.0
-offset_bottom = -52.0
+offset_left = -90.0
+offset_top = -278.0
+offset_right = 90.0
+offset_bottom = -254.0
 horizontal_alignment = 1
 text = "按 E"
