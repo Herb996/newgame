@@ -16,7 +16,6 @@ var map_h := 0
 var radius_cells := 10
 var vision_px := 160.0
 var _explored: Dictionary = {}
-var _player: Node2D
 var _active := false  # 仅局内激活（基地无雾）
 
 
@@ -24,7 +23,6 @@ var _active := false  # 仅局内激活（基地无雾）
 func setup(root: Node2D, map_data: Dictionary) -> void:
 	_active = true
 	_explored.clear()
-	_player = null
 	tile_size = int(map_data["tile_size"])
 	var walls: Array = map_data["walls"]
 	map_w = walls[0].size()
@@ -60,12 +58,25 @@ func disable() -> void:
 func _process(_delta: float) -> void:
 	if not _active or fog_layer == null:
 		return
-	if _player == null:
-		_player = get_tree().get_first_node_in_group("player")
-		if _player == null:
-			return
-	_reveal_around(_player.position)
-	_update_enemy_visibility(_player.position)
+	var players := _alive_players()
+	if players.is_empty():
+		return
+	# 小队模式：每名存活成员各自揭示一圈（探索记忆全队共享）
+	var positions: Array = []
+	for p in players:
+		positions.append((p as Node2D).position)
+	for pos in positions:
+		_reveal_around(pos)
+	_update_entity_visibility(positions)
+
+
+## 全部存活玩家（死亡成员不再揭示视野/不再照亮敌人）
+func _alive_players() -> Array:
+	var out: Array = []
+	for p in get_tree().get_nodes_in_group("player"):
+		if is_instance_valid(p) and not bool(p.is_dead()):
+			out.append(p)
+	return out
 
 
 ## 揭开玩家周围的圆形区域（已揭开的跳过，探索记忆永久保留）
@@ -89,10 +100,16 @@ func _reveal_around(pos: Vector2) -> void:
 const VISION_GROUPS := ["enemies", "animals", "loot_nodes"]
 
 
-func _update_enemy_visibility(player_pos: Vector2) -> void:
+func _update_entity_visibility(positions: Array) -> void:
 	for g in VISION_GROUPS:
 		for n in get_tree().get_nodes_in_group(g):
-			n.visible = n.position.distance_to(player_pos) <= vision_px
+			# 在任一存活成员的视野内即显示
+			var vis := false
+			for pos in positions:
+				if n.position.distance_to(pos) <= vision_px:
+					vis = true
+					break
+			n.visible = vis
 
 
 ## 黑色不透明遮罩瓦片集（1 格）

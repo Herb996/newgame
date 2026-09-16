@@ -53,15 +53,14 @@ var _last_map: Dictionary = {}     # 最近一次生成的地图结果（供 Soa
 @onready var statue_panel: CanvasLayer = $StatuePanel
 @onready var character_panel: CanvasLayer = $CharacterPanel
 
-## 本次会话里最近一次选中的角色 id（供大门面板标注「上次选择」）。
-## 选中的角色只存会话内存（Config override player.weapon），不落盘：
-## 每次从大门出发都要过一遍选人面板，重开游戏回到 config 的 characters.default。
-var _selected_character_id := ""
+## 本次会话里大门选中的角色 id 列表（可多选，构成进局小队）。
+## 只存会话内存不落盘；空数组 = 未选过（命令行/回归路径按 characters.default 单人进局）。
+var _selected_character_ids: Array = []
 
 
 func _ready() -> void:
 	base_system.building_interacted.connect(_on_building_interacted)
-	character_panel.character_selected.connect(_on_character_selected)
+	character_panel.launch_requested.connect(_on_launch)
 	if Config.get_value("debug.smoke_test", false):
 		_smoke_test()
 		return
@@ -339,6 +338,9 @@ func _clear_game_root() -> void:
 
 
 ## 进入局外基地
+## 基地不再生成玩家角色（2026-09-16 改）：角色在大门选人后才于局内生成。
+## 建筑交互 = 鼠标左键点击建筑本体（building.gd 的 input_event）；
+## 相机 WASD/方向键/边缘滚屏自由平移（不绑玩家）。
 func _enter_base() -> void:
 	mode = Mode.BASE
 	hud.visible = false
@@ -348,29 +350,16 @@ func _enter_base() -> void:
 	statue_panel.close()
 	character_panel.close()
 	_clear_game_root()
-	var spawn: Vector2 = base_system.setup(game_root)
+	base_system.setup(game_root)
 	var tile_size: int = int(Config.get_value("map.tile_size", 16))
 	var base_size: int = int(Config.get_value("base.map_size", 64))
-	# 基地 walls：外圈 1 圈墙，内部全是地板（除了墙没有障碍物）
-	var base_walls: Array = []
-	for y in range(base_size):
-		var row: Array = []
-		row.resize(base_size)
-		for x in range(base_size):
-			row[x] = (x == 0 or y == 0 or x == base_size - 1 or y == base_size - 1)
-		base_walls.append(row)
-	var player: CharacterBody2D = PLAYER_SCENE.instantiate()
-	player.position = spawn
-	player.setup_navigation(base_walls, tile_size)
-	game_root.add_child(player)
-	# 独立相机
 	var cam := Camera2D.new()
 	cam.set_script(CAMERA_SCRIPT)
 	cam.position_smoothing_enabled = true
 	cam.position_smoothing_speed = 8.0
 	game_root.add_child(cam)
 	cam.make_current()
-	cam.setup(Vector2i(base_size * tile_size, base_size * tile_size), player)
+	cam.setup(Vector2i(base_size * tile_size, base_size * tile_size), null)
 
 
 ## 进入一局
@@ -395,14 +384,30 @@ func _enter_run() -> void:
 	# 采集资源注册表：把地图上的树/石登记进 ResourceRegistry（供采集/小地图/HUD 查询）
 	ResourceRegistry.build_from_map(result)
 	print("[ResourceRegistry] 已登记资源节点：", ResourceRegistry.count_by_type())
-	var player: CharacterBody2D = PLAYER_SCENE.instantiate()
-	player.position = result.spawn
-	player.setup_navigation(result.walls, int(Config.get_value("map.tile_size", 16)))
-	game_root.add_child(player)
-	# --weapon 覆盖必须放在 add_child 之后：_ready() 里已经按 config 的 player.weapon
-	# 装好默认武器与贴图集，这里再切一次即可（switch_weapon 会重载帧序列 + 重设判定框）。
+	# 小队进局：按大门选人结果生成 1~N 名角色（未选人路径 = config 默认角色 ×1，
+	# 保证 auto_enter_run / 命令行回归的行为不变）。
+	var squad := _squad_characters()
+	var tile_size: int = int(Config.get_value("map.tile_size", 16))
+	var players: Array = []
+	for i in range(squad.size()):
+		var c: Dictionary = squad[i]
+		var player: CharacterBody2D = PLAYER_SCENE.instantiate()
+		player.character_name = str(c.get("name", c.get("id", "")))
+		player.initial_weapon = str(c.get("weapon", ""))
+		# 多人时在出生点横向排开（各偏 0.8 格），避免挤在同一格互相顶
+		player.position = result.spawn \
+				+ Vector2((float(i) - float(squad.size() - 1) * 0.5) * tile_size * 0.8, 0.0)
+		player.setup_navigation(result.walls, tile_size)
+		game_root.add_child(player)
+		players.append(player)
+	# 首名角色默认选中（RTS 点选可随时切换指挥对象）
+	if not players.is_empty():
+		(players[0] as CharacterBody2D).select()
+	# --weapon 覆盖必须放在 add_child 之后：_ready() 里已按角色装好武器与贴图集，
+	# 这里再切一次即可（switch_weapon 会重载帧序列 + 重设判定框）。
 	if _weapon_override != "":
-		player.switch_weapon(StringName(_weapon_override))
+		for p in players:
+			(p as CharacterBody2D).switch_weapon(StringName(_weapon_override))
 	# 独立相机：局内地图尺寸 = width × height × tile_size
 	var cam := Camera2D.new()
 	cam.set_script(CAMERA_SCRIPT)
@@ -414,7 +419,8 @@ func _enter_run() -> void:
 		float(int(Config.get_value("map.width", 128))) * float(int(Config.get_value("map.tile_size", 16))),
 		float(int(Config.get_value("map.height", 128))) * float(int(Config.get_value("map.tile_size", 16))),
 	)
-	cam.setup(map_size, player)
+	# F 键"回到玩家"锚定首名角色；平时靠 WASD/边缘滚屏自由平移（RTS 手感）
+	cam.setup(map_size, players[0] if not players.is_empty() else null)
 	extraction_system.setup(game_root, result)
 	enemy_system.setup(game_root, result)
 	animal_system.setup(game_root, result)
@@ -425,13 +431,13 @@ func _enter_run() -> void:
 	minimap.setup(result)
 
 
-## 建筑交互路由（base_system 转发）
+## 建筑交互路由（base_system 转发；基地无角色后，触发方式 = 鼠标左键点建筑）
 func _on_building_interacted(building_id: String) -> void:
 	match building_id:
 		"gate":
-			# 出发前先选角色：面板「出击」→ _on_character_selected 才进局；
-			# E/ESC 取消则留在基地。交互立刻复位，取消后可再按 E 重开面板。
-			character_panel.open(_selected_character_id)
+			# 出发前先选人（可多选组成小队）：面板「出击」→ _on_launch 才进局；
+			# E/ESC 取消则留在基地。交互立刻复位，取消后可再点一次重开面板。
+			character_panel.open(_selected_character_ids)
 			base_system.reset_interaction(building_id)
 		"warehouse":
 			warehouse_panel.open()
@@ -444,18 +450,37 @@ func _on_building_interacted(building_id: String) -> void:
 			base_system.reset_interaction(building_id)
 
 
-## 大门面板「出击」回调：记住选择 → 应用武器覆盖 → 进局。
-## 角色的武器走 Config override（player.weapon）而不是直接 switch_weapon：
-## 这样玩家 _ready 解析初始武器时就已拿到所选角色（含贴图集绑定，
-## 弓自动切 sprites_archer），回基地重建玩家也保持所选外观。
-## 命令行 --weapon 优先级仍更高：_enter_run 里会再 switch_weapon 压回去。
-func _on_character_selected(character: Dictionary) -> void:
-	_selected_character_id = str(character.get("id", ""))
-	var weapon := str(character.get("weapon", ""))
-	if weapon != "":
-		Config.set_override("player.weapon", weapon)
-	print("[Main] 已选择角色 %s（武器 %s），出发进局" % [_selected_character_id, weapon])
+## 大门面板「出击」回调：记住本局小队 → 进局。
+## 武器/贴图集由每个玩家实例的 initial_weapon 注入（player._resolve_initial_weapon），
+## 不再走 Config override —— 基地已无角色，无需全局换装。
+func _on_launch(characters: Array) -> void:
+	_selected_character_ids.clear()
+	var names: Array = []
+	for c in characters:
+		_selected_character_ids.append(str(c.get("id", "")))
+		names.append(str(c.get("name", "")))
+	print("[Main] 出击小队：%s" % "、".join(names))
 	_enter_run()
+
+
+## 大门选角结果 → 角色配置列表。
+## 没选过（命令行 / 无头回归 / auto_enter_run）时回落 characters.default 单人，
+## 保证这些路径的行为与改版前一致。
+func _squad_characters() -> Array:
+	var ids: Array = _selected_character_ids
+	if ids.is_empty():
+		var def := str(Config.get_value("characters.default", ""))
+		if def != "":
+			ids = [def]
+	var out: Array = []
+	for entry in Config.get_value("characters.list", []):
+		if entry is Dictionary and ids.has(str(entry.get("id", ""))):
+			out.append(entry)
+	if out.is_empty():
+		var list: Array = Config.get_value("characters.list", [])
+		if not list.is_empty():
+			out.append(list[0])   # 存档里留了已删除的角色 id 时兜底
+	return out
 
 
 # ------------------------------------------------------------

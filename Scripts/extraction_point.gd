@@ -45,11 +45,19 @@ func _physics_process(delta: float) -> void:
 	if _run == null:
 		_run = get_tree().get_first_node_in_group("run_manager")
 
-	var player_inside := false
-	for body in get_overlapping_bodies():
-		if body.is_in_group("player"):
-			player_inside = true
-			break
+	# 小队撤离：**全部存活角色**都在圈内才累计进度（任一人缺席则清零）；
+	# 死亡的成员不计入 —— 死一名后，剩下的人照样能撤。
+	var alive: Array = []
+	for p in get_tree().get_nodes_in_group("player"):
+		if is_instance_valid(p) and not bool(p.is_dead()):
+			alive.append(p)
+	var player_inside := not alive.is_empty()
+	if player_inside:
+		var bodies := get_overlapping_bodies()
+		for p in alive:
+			if not bodies.has(p):
+				player_inside = false
+				break
 
 	if player_inside:
 		hold_progress += delta

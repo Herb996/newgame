@@ -10,7 +10,6 @@ extends CanvasLayer
 ## ============================================================
 
 var _run: Node
-var _player: Node
 var _time_label: Label
 var _phase_label: Label
 var _result_label: Label
@@ -78,15 +77,20 @@ func _process(_delta: float) -> void:
 		_refresh_survival()
 
 
-## 血量条："HP 80/100"
+## 血量条：小队全员一行——"枪剑士 HP 80/100 | 弓手 倒下"
 func _refresh_hp() -> void:
-	# 进局会重建 Player 节点，这里按需重新抓取
-	if _player == null or not is_instance_valid(_player):
-		_player = get_tree().get_first_node_in_group("player")
-	if _player == null or not is_instance_valid(_player):
-		_hp_label.text = ""
-		return
-	_hp_label.text = "HP %d/%d" % [int(_player.hp), int(_player.max_hp)]
+	var parts: Array = []
+	for p in get_tree().get_nodes_in_group("player"):
+		if not is_instance_valid(p):
+			continue
+		var nm := str(p.character_name)
+		if nm == "":
+			nm = "角色"
+		if bool(p.is_dead()):
+			parts.append("%s 倒下" % nm)
+		else:
+			parts.append("%s HP %d/%d" % [nm, int(p.hp), int(p.max_hp)])
+	_hp_label.text = "  |  ".join(parts)
 
 
 ## 生存栏："食物 x30   下次进食 42s"（饥饿时标红并提示持续掉血）
@@ -129,8 +133,6 @@ func _phase_text() -> String:
 
 func _on_run_started() -> void:
 	_result_label.text = ""
-	# 每局玩家节点会重建，清空引用让 _refresh_hp 重新抓取
-	_player = null
 
 
 func _on_run_ended(result: String, banked: Dictionary) -> void:

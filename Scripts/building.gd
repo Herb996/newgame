@@ -23,6 +23,16 @@ func _ready() -> void:
 	add_to_group("buildings")
 	_hint_label = $HintLabel
 	_hint_label.visible = false
+	# 基地无玩家角色（2026-09-16 改）：交互主方式 = 鼠标左键点击建筑本体。
+	# 下方按 E 靠近交互逻辑保留，日后若在基地重新放置代理角色仍可用。
+	input_event.connect(_on_area_input)
+
+
+## 鼠标点击建筑 → 触发交互（由 main 路由：仓库/升级/选人面板）
+func _on_area_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
+	if event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT:
+		interacted.emit(building_id)
 
 
 func setup(id: String, b_name: String, hint_text: String, sprite_path: String = "") -> void:

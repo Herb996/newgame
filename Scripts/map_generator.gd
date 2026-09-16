@@ -79,7 +79,9 @@ static func biome_speed(i: int) -> float:          # 基础移速系数（雪原
 	return clampf(float(_biome_at(i).get("speed", 1.0)), 0.05, 4.0)
 
 static func biome_weight(i: int) -> float:         # 噪声区间权重（越大越常见）
-	return maxf(0.0001, float(_biome_at(i).get("weight", 1.0)))
+	# 比例唯一来源：map.biome_weights.<id>；缺键回退 biomes[].weight，再兜底 1.0。
+	return maxf(0.0001, float(Config.get_value(
+			"map.biome_weights." + str(i), _biome_at(i).get("weight", 1.0))))
 
 static func atlas_wall_start() -> int:      # 水面起始列 = 全群系地形 blob 列之后
 	return BLOB_N * biome_count()
@@ -192,12 +194,12 @@ static func biome_weight_edges() -> Array:
 	var edges: Array = []
 	var total := 0.0
 	for i in range(n):
-		total += float(_biome_at(i).get("weight", 1.0))
+		total += biome_weight(i)
 	if total <= 0.0:
 		total = 1.0
 	var acc := 0.0
 	for i in range(n):
-		acc += float(_biome_at(i).get("weight", 1.0))
+		acc += biome_weight(i)
 		edges.append(acc / total)
 	return edges
 
@@ -1051,6 +1053,105 @@ static func _remove_biome_islands(biome: Array, w: int, h: int, min_region: int)
 				biome[p.y][p.x] = best
 			changed = true
 	return changed
+
+
+## 某格能否作为资源簇的一格：地板 + 指定群系 + 未被占(decor/occ) + 离出生点够远。
+static func _cluster_cell_ok(x: int, y: int, biome: Array, terrain: Array,
+		decor: Array, occ: Dictionary, w: int, h: int, center: Vector2i,
+		clear_r: int, biome_id: int) -> bool:
+	if x < 1 or y < 1 or x >= w - 1 or y >= h - 1:
+		return false
+	if bool(terrain[y][x]):
+		return false
+	if int(decor[y][x]) != DECOR_NONE:
+		return false
+	if occ.has("%d,%d" % [x, y]):
+		return false
+	if int(biome[y][x]) != biome_id:
+		return false
+	if abs(x - center.x) <= clear_r and abs(y - center.y) <= clear_r:
+		return false
+	return true
+
+
+## 在 biome_id 群系里长出一坨 size 格的 4 邻相连簇。凑不够 size 就整簇放弃（返回空），
+## 保证「最小聚合单位」成立。
+static func _grow_cluster(biome: Array, terrain: Array, decor: Array, occ: Dictionary,
+		w: int, h: int, center: Vector2i, clear_r: int,
+		rng: RandomNumberGenerator, biome_id: int, size: int) -> Array:
+	var d4: Array = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	var seed_cell := Vector2i(-1, -1)
+	for _t in range(60):
+		var x: int = rng.randi_range(1, w - 2)
+		var y: int = rng.randi_range(1, h - 2)
+		if _cluster_cell_ok(x, y, biome, terrain, decor, occ, w, h, center, clear_r, biome_id):
+			seed_cell = Vector2i(x, y)
+			break
+	if seed_cell.x < 0:
+		return []
+	var cells: Array = [seed_cell]
+	var inset := {}
+	inset[seed_cell] = true
+	var stall := 0
+	while cells.size() < size and stall < size * 6 + 20:
+		var anchor: Vector2i = cells[rng.randi_range(0, cells.size() - 1)]
+		var d: Vector2i = d4[rng.randi_range(0, 3)]
+		var n := Vector2i(anchor.x + d.x, anchor.y + d.y)
+		if inset.has(n):
+			stall += 1
+			continue
+		if _cluster_cell_ok(n.x, n.y, biome, terrain, decor, occ, w, h, center, clear_r, biome_id):
+			cells.append(n)
+			inset[n] = true
+			stall = 0
+		else:
+			stall += 1
+	if cells.size() < size:
+		return []
+	return cells
+
+
+## 地图资源成簇放置：读 map.resource_clusters，对 tree/rock/iron/oil 每种，
+## 在每个 weight>0 的群系放 count 个相连簇，每簇 size = weight[群系]。
+## tree/rock 写进 decor 并设为阻挡；iron/oil 追加进 veins（res_id,gx,gy）供采集/渲染。
+## 返回 veins 数组。
+static func _place_clustered_resources(decor: Array, terrain: Array, biome: Array,
+		walls: Array, w: int, h: int, center: Vector2i,
+		rng: RandomNumberGenerator) -> Array:
+	var veins: Array = []
+	var occ := {}
+	var clear_r: int = int(Config.get_value("map.decor.clear_spawn_radius_cells", 3))
+	var cfg: Dictionary = Config.get_value("map.resource_clusters", {})
+	for res_key in cfg.keys():
+		var rc: Dictionary = cfg[res_key]
+		var count: int = int(rc.get("count", 0))
+		var weight: Dictionary = rc.get("weight", {})
+		if count <= 0:
+			continue
+		var is_vein: bool = res_key == "iron" or res_key == "oil" or res_key == "gold"
+		var decor_kind: int = DECOR_NONE
+		if res_key == "tree":
+			decor_kind = DECOR_TREE
+		elif res_key == "rock":
+			decor_kind = DECOR_ROCK
+		for bk in weight.keys():
+			var bid: int = int(bk)
+			var size: int = int(weight[bk])
+			if size <= 0:
+				continue
+			for _c in range(count):
+				var cells: Array = _grow_cluster(biome, terrain, decor, occ, w, h,
+						center, clear_r, rng, bid, size)
+				for cell in cells:
+					var p: Vector2i = cell
+					occ["%d,%d" % [p.x, p.y]] = true
+					if is_vein:
+						veins.append({"res_id": str(res_key), "gx": p.x, "gy": p.y})
+					else:
+						decor[p.y][p.x] = decor_kind
+						if DECOR_BLOCKING.has(decor_kind):
+							walls[p.y][p.x] = true
+	return veins
 
 
 ## 读出 PNG 的 Image（未导入的 PNG 会返回 null，交给调用方回退）。

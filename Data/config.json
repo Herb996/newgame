@@ -13,11 +13,11 @@
         "biome_smooth_iterations": 3,
         "biome_remove_islands": true,
         "biome_min_region_cells": 40,
+        "biome_weights": {"0": 3.4, "1": 1.05, "2": 1.25, "3": 0.95},
         "biomes": [
             {
                 "id": 0,
                 "name": "草地",
-                "weight": 3.4,
                 "speed": 1.0,
                 "floor": [
                     0.3,
@@ -44,7 +44,6 @@
             {
                 "id": 1,
                 "name": "荒原",
-                "weight": 1.05,
                 "speed": 1.0,
                 "floor": [
                     0.33,
@@ -71,7 +70,6 @@
             {
                 "id": 2,
                 "name": "森林",
-                "weight": 1.25,
                 "speed": 1.0,
                 "floor": [
                     0.2,
@@ -98,7 +96,6 @@
             {
                 "id": 3,
                 "name": "沼泽",
-                "weight": 0.95,
                 "speed": 0.62,
                 "floor": [
                     0.82,
@@ -223,7 +220,7 @@
         "sprite_pixel_unit": 10.0
     },
     "characters": {
-        "_comment": "出发大门的角色选择表（靠近大门按 E 弹面板，选中后才进局）。weapon 指向 combat.weapons 的 id —— 贴图集跟着武器走（sword → player.sprite_set = sprites_lancer 8 向；bow → 锁 sprites_archer），所以角色 = 选武器/打法。default 是面板未做选择时的预选项；选择本身只存会话内存（Config override player.weapon），不落盘，下次打开面板默认回到 default。新增角色往 list 里加即可，面板自动多一行。",
+        "_comment": "出发大门的选人表（鼠标点大门弹面板，**可多选**组成小队，点「出击」才进局）。weapon 指向 combat.weapons 的 id —— 贴图集跟着武器走（sword → player.sprite_set = sprites_lancer 8 向；bow → 锁 sprites_archer），所以角色 = 选武器/打法。default 是无人选择路径（命令行/无头回归/auto_enter_run）的兜底单人；选择名单只存会话内存不落盘。进图后 RTS 点选指挥：点角色选中，左键点地移动、右键/J 攻击、空格闪避，未选中的成员原地待命；全员站入撤离圈才可撤离，全队倒下才算失败。新增角色往 list 里加即可，面板自动多一行。",
         "default": "lancer",
         "list": [
             {

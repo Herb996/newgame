@@ -17,7 +17,6 @@ var _size_px := 220.0
 var _show_remaining := 0.0
 var _closing_point: Node2D = null
 var _blink_t := 0.0
-var _player: Node2D
 
 
 ## 绘制代理：CanvasLayer 不能自绘，用内部 Control 转发 _draw
@@ -74,8 +73,6 @@ func _process(delta: float) -> void:
 	if _show_remaining <= 0.0:
 		visible = false
 		return
-	if _player == null:
-		_player = get_tree().get_first_node_in_group("player")
 	_panel.queue_redraw()  # 玩家绿点实时移动，每帧重绘
 
 
@@ -100,8 +97,10 @@ func _render(panel: Control) -> void:
 			panel.draw_arc(pos, 8.0, 0.0, TAU, 32,
 				Color(1.0, 0.55, 0.15, 0.4 + 0.6 * blink), 2.0)
 
-	# 玩家：绿点（蒸汽白描边保证暗色背景可辨）
-	if _player != null:
-		var pos: Vector2 = _player.position * scale
+	# 小队成员：每人一个绿点（蒸汽白描边保证暗色背景可辨）
+	for p in get_tree().get_nodes_in_group("player"):
+		if not is_instance_valid(p):
+			continue
+		var pos: Vector2 = p.position * scale
 		panel.draw_circle(pos, 5.0, Color(0.2, 0.85, 0.35))
 		panel.draw_arc(pos, 5.0, 0.0, TAU, 32, Color(0.91, 0.90, 0.86), 1.5)

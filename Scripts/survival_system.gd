@@ -24,7 +24,6 @@ var starving := false
 var next_meal_in := 60.0
 
 var _run: Node = null
-var _player: Node = null
 var _starve_timer := 0.0
 var _eat_cooldown := 0.0
 
@@ -68,7 +67,6 @@ func _on_run_started() -> void:
 	next_meal_in = _meal_interval()
 	_starve_timer = 0.0
 	_eat_cooldown = 0.0
-	_player = null
 	_set_starving(false)
 
 
@@ -88,12 +86,13 @@ func _meal_tick() -> void:
 
 
 func _apply_starvation() -> void:
-	var p := _get_player()
-	if p == null:
+	var players := _alive_players()
+	if players.is_empty():
 		return
 	var dmg := int(Config.get_value("survival.starvation_damage", 5))
-	p.apply_direct_damage(dmg)
-	print("[Survival] 饥饿：损失 %d 生命" % dmg)
+	for p in players:
+		p.apply_direct_damage(dmg)
+	print("[Survival] 饥饿：全队各损失 %d 生命" % dmg)
 
 
 ## 主动进食：消耗 1 食物回血（满血/无食物/冷却中都会失败）
@@ -102,7 +101,7 @@ func eat() -> bool:
 		return false
 	if _eat_cooldown > 0.0:
 		return false
-	var p := _get_player()
+	var p := _heal_target()
 	if p == null:
 		return false
 	if int(p.hp) >= int(p.max_hp):
@@ -126,8 +125,21 @@ func _set_starving(value: bool) -> void:
 	starving_changed.emit(starving)
 
 
-## 进局会重建 Player 节点，这里按需重新抓取
-func _get_player() -> Node:
-	if _player == null or not is_instance_valid(_player):
-		_player = get_tree().get_first_node_in_group("player")
-	return _player
+## 全部存活玩家（小队共享同一份背包，饥饿按人扣血）
+func _alive_players() -> Array:
+	var out: Array = []
+	for p in get_tree().get_nodes_in_group("player"):
+		if is_instance_valid(p) and not bool(p.is_dead()):
+			out.append(p)
+	return out
+
+
+## 主动进食的回血目标：优先当前被指挥的角色，否则第一名存活角色
+func _heal_target() -> Node:
+	var players := _alive_players()
+	if players.is_empty():
+		return null
+	for p in players:
+		if bool(p.selected):
+			return p
+	return players[0]

@@ -31,6 +31,12 @@ var _active := 0
 var _awaiting_path := ""
 var _awaiting_button: Button = null
 
+# 暂存改动：面板里所有编辑先进这两个字典，点「确认应用」才落盘 + 生效；返回则丢弃。
+var _pending_set: Dictionary = {}
+var _pending_clear: Dictionary = {}
+var _confirm_btn: Button = null
+var _dirty_label: Label = null
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -49,20 +55,24 @@ func _ready() -> void:
 func _build_ui() -> void:
 	add_child(UiKit.overlay())
 
-	var center := CenterContainer.new()
-	UiKit.stretch(center)
-	add_child(center)
+	# 全屏：外层 Margin 撑满整屏并留边距，面板填满剩余区域。
+	var margin := MarginContainer.new()
+	UiKit.stretch(margin)
+	for side in ["margin_left", "margin_top", "margin_right", "margin_bottom"]:
+		margin.add_theme_constant_override(side, 28)
+	add_child(margin)
 
-	var panel := UiKit.panel(UiKit.COL_PANEL, 20)
-	panel.custom_minimum_size = Vector2(940, 620)
-	center.add_child(panel)
+	var panel := UiKit.panel(UiKit.COL_PANEL, 22)
+	margin.add_child(panel)
 
 	var col := UiKit.vbox(10)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_child(col)
 
 	col.add_child(UiKit.title("参数配置"))
 
-	var sub := UiKit.dim("改动即时保存 · 标「下次进局」的项要重新进一局才读到")
+	var sub := UiKit.dim("改动先暂存，点右下「确认应用」才生效并保存 · 标「下次进局」的项要重新进一局才读到")
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(sub)
 
@@ -87,7 +97,8 @@ func _build_ui() -> void:
 	col.add_child(UiKit.spacer(4))
 
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 400)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	col.add_child(scroll)
 
@@ -99,7 +110,6 @@ func _build_ui() -> void:
 
 	# --- 底部 ---
 	var footer := UiKit.hbox(10)
-	footer.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(footer)
 
 	var reset := UiKit.button("恢复默认设置", 0, UiKit.FS_SMALL)
@@ -111,9 +121,21 @@ func _build_ui() -> void:
 		OS.shell_open(ProjectSettings.globalize_path("user://")))
 	footer.add_child(open_file)
 
+	footer.add_child(_expander())
+
+	_dirty_label = UiKit.label("", UiKit.FS_SMALL, UiKit.COL_AMBER)
+	footer.add_child(_dirty_label)
+
+	_confirm_btn = UiKit.button("确认应用", 140)
+	_confirm_btn.pressed.connect(_on_confirm)
+	_confirm_btn.disabled = true
+	footer.add_child(_confirm_btn)
+
 	var back := UiKit.button("返回", 120)
-	back.pressed.connect(func(): close_requested.emit())
+	back.pressed.connect(_on_back)
 	footer.add_child(back)
+
+	_update_footer()
 
 
 func _show_tab(index: int) -> void:
@@ -122,6 +144,7 @@ func _show_tab(index: int) -> void:
 		c.queue_free()
 	for entry in _tabs[_active]["entries"]:
 		_content.add_child(_make_entry(entry))
+	_update_footer()
 
 
 # ------------------------------------------------------------
@@ -137,24 +160,29 @@ func _make_entry(entry: Dictionary) -> Control:
 	if kind == "info":
 		var l := UiKit.dim(str(entry["label"]))
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.custom_minimum_size = Vector2(840, 0)
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		return l
 
 	var box := UiKit.vbox(2)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	# 用 get 而不是 []：action 之类没有对应配置键的条目没有 path
 	var path := str(entry.get("path", ""))
 
 	var row := UiKit.hbox(10)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(row)
 
 	var name_label := UiKit.label(str(entry["label"]), UiKit.FS_BODY)
-	name_label.custom_minimum_size = Vector2(200, 0)
+	name_label.custom_minimum_size = Vector2(240, 0)
 	row.add_child(name_label)
+
+	# 数值行滑条自己撑满；其它类型加弹性空隙把控件推到右边 → 两边对齐
+	if kind != "number":
+		row.add_child(_expander())
 
 	match kind:
 		"bool":
-			var cb := UiKit.checkbox("", bool(Config.get_value(path, false)))
-			cb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var cb := UiKit.checkbox("", bool(_eff(path)))
 			cb.toggled.connect(func(v: bool): _commit(entry, v))
 			row.add_child(cb)
 		"number":
@@ -164,7 +192,7 @@ func _make_entry(entry: Dictionary) -> Control:
 			o.item_selected.connect(func(i: int): _commit(entry, _enum_value(entry, i)))
 			row.add_child(o)
 		"key":
-			var b := UiKit.button(UiKit.key_name(int(Config.get_value(path, 0))), 160)
+			var b := UiKit.button(UiKit.key_name(int(_eff(path))), 160)
 			b.pressed.connect(func(): _begin_key_capture(path, b))
 			row.add_child(b)
 		"action":
@@ -173,13 +201,18 @@ func _make_entry(entry: Dictionary) -> Control:
 				b.pressed.connect(entry["handler"])
 			row.add_child(b)
 
-	# 只有真的"有值可重置"的类型才挂 ↺
+	# 只有真的"有值可重置"的类型才挂 默认
 	if kind in ["bool", "number", "enum", "key"]:
 		row.add_child(_make_reset_button(entry))
-	if path != "" and Config.has_user_value(path):
-		var badge := UiKit.label("已改", UiKit.FS_SMALL, UiKit.COL_AMBER)
-		badge.custom_minimum_size = Vector2(38, 0)
-		row.add_child(badge)
+	if path != "":
+		if _is_dirty(path):
+			var pb := UiKit.label("未确认", UiKit.FS_SMALL, UiKit.COL_AMBER)
+			pb.custom_minimum_size = Vector2(52, 0)
+			row.add_child(pb)
+		elif Config.has_user_value(path):
+			var badge := UiKit.label("已改", UiKit.FS_SMALL, UiKit.COL_DIM)
+			badge.custom_minimum_size = Vector2(38, 0)
+			row.add_child(badge)
 
 	if str(entry.get("note", "")) != "":
 		var note := UiKit.note(str(entry["note"]))
@@ -193,7 +226,8 @@ func _make_entry(entry: Dictionary) -> Control:
 func _make_number(entry: Dictionary) -> HBoxContainer:
 	var path := str(entry["path"])
 	var step := float(entry.get("step", 1.0))
-	var cur := float(Config.get_value(path, entry.get("min", 0.0)))
+	var _e = _eff(path)
+	var cur := float(_e) if _e != null else float(entry.get("min", 0.0))
 	var box := UiKit.hbox(10)
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
@@ -214,12 +248,13 @@ func _make_number(entry: Dictionary) -> HBoxContainer:
 func _make_reset_button(entry: Dictionary) -> Button:
 	# 别用 "↺" 这类符号字符：默认字体里没有这个字形，屏上只剩一个"小方块/小三角"，
 	# 玩家根本不知道是什么按钮。用中文字更稳。
+	var path := str(entry["path"])
 	var b := UiKit.button("默认", 60, UiKit.FS_SMALL)
-	b.tooltip_text = "把这一项恢复成出厂值"
-	b.disabled = not Config.has_user_value(str(entry["path"]))
+	b.tooltip_text = "把这一项恢复成出厂值（点「确认应用」后生效）"
+	b.disabled = not (Config.has_user_value(path) or _pending_set.has(path) or _pending_clear.has(path))
 	b.pressed.connect(func():
-		Config.clear_user_setting(str(entry["path"]))
-		_after_change(entry)
+		_pending_clear[path] = true
+		_pending_set.erase(path)
 		_show_tab(_active))
 	return b
 
@@ -252,14 +287,79 @@ func _typed(entry: Dictionary, v: float) -> Variant:
 
 
 func _commit(entry: Dictionary, value: Variant) -> void:
-	Config.set_user_value(str(entry["path"]), value)
-	_after_change(entry)
+	var path := str(entry.get("path", ""))
+	if path == "":
+		return
+	# 只暂存，不落盘、不即时生效；点「确认应用」才写进 user://settings.json 并 apply。
+	_pending_set[path] = value
+	_pending_clear.erase(path)
+	_update_footer()
 
 
-## live=true 的项改完立刻作用到引擎（窗口模式、帧率、音量这些）
-func _after_change(entry: Dictionary) -> void:
-	if bool(entry.get("live", false)):
-		DisplaySettings.apply_all()
+# ------------------------------------------------------------
+# 暂存 / 生效辅助
+# ------------------------------------------------------------
+
+## 横向弹性空隙：把后面的控件推到右边（两边对齐）。
+func _expander() -> Control:
+	var c := Control.new()
+	c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return c
+
+
+## 某项当前应显示的值：暂存清除→出厂值；暂存写入→暂存值；否则走 Config 合并值。
+func _eff(path: String):
+	if _pending_clear.has(path):
+		return Config.get_base_value(path, null)
+	if _pending_set.has(path):
+		return _pending_set[path]
+	return Config.get_value(path, null)
+
+
+func _is_dirty(path: String) -> bool:
+	return _pending_set.has(path) or _pending_clear.has(path)
+
+
+func _any_dirty() -> bool:
+	return _pending_set.size() > 0 or _pending_clear.size() > 0
+
+
+func _update_footer() -> void:
+	if _confirm_btn != null:
+		_confirm_btn.disabled = not _any_dirty()
+	if _dirty_label != null:
+		var n := _pending_set.size() + _pending_clear.size()
+		_dirty_label.text = ("%d 处未确认" % n) if n > 0 else ""
+
+
+## 确认应用：把暂存批量落盘 + 存盘 + 生效，然后关闭面板。
+func _on_confirm() -> void:
+	if not _any_dirty():
+		return
+	for p in _pending_set.keys():
+		Config.set_user_value(p, _pending_set[p], false)
+	for p in _pending_clear.keys():
+		Config.clear_user_setting(p, false)
+	Config.save_user_settings()
+	_pending_set.clear()
+	_pending_clear.clear()
+	DisplaySettings.apply_all()
+	_update_footer()
+	close_requested.emit()
+
+
+## 返回：有未确认改动先确认是否放弃，否则直接关。
+func _on_back() -> void:
+	if _any_dirty():
+		_confirm("放弃未确认的修改？",
+				"你有 %d 处改动还没点「确认应用」。\n返回会丢弃这些改动。确定返回？" % (_pending_set.size() + _pending_clear.size()),
+				"放弃并返回", func():
+					_pending_set.clear()
+					_pending_clear.clear()
+					close_requested.emit())
+		return
+	close_requested.emit()
 
 
 func _on_reset_all() -> void:
@@ -267,6 +367,8 @@ func _on_reset_all() -> void:
 			"将清空 user://settings.json 里全部自定义项，\n所有参数回到 Data/config.json 的出厂值。确定吗？",
 			"恢复默认", func():
 				Config.reset_user_settings()
+				_pending_set.clear()
+				_pending_clear.clear()
 				DisplaySettings.apply_all()
 				_show_tab(_active))
 
@@ -312,19 +414,21 @@ func _input(event: InputEvent) -> void:
 	if k.physical_keycode == KEY_ESCAPE:
 		_cancel_key_capture()
 		return
-	# 与消费端一致：存 physical_keycode
-	Config.set_user_value(_awaiting_path, int(k.physical_keycode))
+	# 与消费端一致：存 physical_keycode（先暂存，点确认才落盘）
+	_pending_set[_awaiting_path] = int(k.physical_keycode)
+	_pending_clear.erase(_awaiting_path)
 	if _awaiting_button != null and is_instance_valid(_awaiting_button):
 		_awaiting_button.text = UiKit.key_name(int(k.physical_keycode))
 	_awaiting_path = ""
 	_awaiting_button = null
+	_update_footer()
 	_show_tab(_active)
 
 
 func _cancel_key_capture() -> void:
 	if _awaiting_button != null and is_instance_valid(_awaiting_button):
 		_awaiting_button.text = UiKit.key_name(
-				int(Config.get_value(_awaiting_path, 0)))
+				int(_eff(_awaiting_path)))
 	_awaiting_path = ""
 	_awaiting_button = null
 
@@ -355,7 +459,7 @@ func _enum_value(entry: Dictionary, index: int) -> Variant:
 
 
 func _enum_index(entry: Dictionary) -> int:
-	var cur = Config.get_value(str(entry["path"]), null)
+	var cur = _eff(str(entry["path"]))
 	var items := _enum_items(entry)
 	for i in range(items.size()):
 		if _same(items[i][1], cur):
@@ -382,6 +486,7 @@ func _make_schema() -> Array:
 		{"name": "性能", "entries": _schema_performance()},
 		{"name": "音频", "entries": _schema_audio()},
 		{"name": "玩法", "entries": _schema_gameplay()},
+		{"name": "资源", "entries": _schema_resources()},
 		{"name": "操作", "entries": _schema_controls()},
 		{"name": "语言", "entries": _schema_language()},
 		{"name": "调试", "entries": _schema_debug()},
@@ -539,31 +644,17 @@ func _schema_performance() -> Array:
 
 
 func _apply_perf_preset() -> void:
-	var lines := ""
 	for k in _PERF_BUNDLE.keys():
-		lines += "%s → %s\n" % [k, str(_PERF_BUNDLE[k])]
-	_confirm("性能优先",
-			"将把以下参数写入用户层（可随时用「恢复均衡」或底部「恢复默认」撤销）：\n\n"
-			+ lines + "\n多数项要重新进一局 / 重新生成地图才生效。确定？",
-			"应用",
-			func():
-				for k in _PERF_BUNDLE.keys():
-					Config.set_user_value(k, _PERF_BUNDLE[k], false)
-				Config.save_user_settings()
-				DisplaySettings.apply_all()
-				_show_tab(_active))
+		_pending_set[k] = _PERF_BUNDLE[k]
+		_pending_clear.erase(k)
+	_show_tab(_active)
 
 
 func _clear_perf_preset() -> void:
-	_confirm("恢复均衡",
-			"清除「性能优先」写下的全部用户层覆盖，回到出厂值？",
-			"清除",
-			func():
-				for k in _PERF_BUNDLE.keys():
-					Config.clear_user_setting(k, false)
-				Config.save_user_settings()
-				DisplaySettings.apply_all()
-				_show_tab(_active))
+	for k in _PERF_BUNDLE.keys():
+		_pending_clear[k] = true
+		_pending_set.erase(k)
+	_show_tab(_active)
 
 
 func _schema_audio() -> Array:
@@ -650,6 +741,32 @@ func _schema_gameplay() -> Array:
 		{"path": "enemy.vision_cells", "label": "视野（格）", "type": "number",
 			"min": 2, "max": 30, "step": 1},
 	]
+
+
+func _schema_resources() -> Array:
+	var out: Array = []
+	out.append({"type": "divider", "label": "地形出现比例（面积∝此值）"})
+	out.append({"type": "info", "label": "四个群系按这里的权重瓜分地图面积（相对值，不用归一；越大越占地方）。下次生成地图生效。"})
+	out.append({"path": "map.biome_weights.0", "label": "草地", "type": "number", "min": 0.1, "max": 8.0, "step": 0.05})
+	out.append({"path": "map.biome_weights.1", "label": "荒原", "type": "number", "min": 0.1, "max": 8.0, "step": 0.05})
+	out.append({"path": "map.biome_weights.2", "label": "森林", "type": "number", "min": 0.1, "max": 8.0, "step": 0.05})
+	out.append({"path": "map.biome_weights.3", "label": "沼泽", "type": "number", "min": 0.1, "max": 8.0, "step": 0.05})
+	out.append({"type": "divider", "label": "地图资源成簇（树/石/铁/油）"})
+	out.append({"type": "info", "label": "每种资源在每个群系放「簇数」个相连簇，每簇格数 = 该群系的 weight。"
+		+ "weight 同时决定「最小聚合格数」和「各群系之间的总量比例」（0 = 该群系不出这种）。全部下次生成地图才生效。"})
+	var biome_cols: Array = [["草地", "0"], ["荒原", "1"], ["森林", "2"], ["沼泽", "3"]]
+	var res_defs: Array = [["tree", "树木"], ["rock", "石头"], ["iron", "钢铁"], ["oil", "魔法油潭"]]
+	for rd in res_defs:
+		var key: String = str(rd[0])
+		out.append({"type": "divider", "label": str(rd[1])})
+		out.append({"path": "map.resource_clusters.%s.count" % key, "label": "每群系簇数", "type": "number",
+			"min": 0, "max": 40, "step": 1,
+			"note": "在每个 weight>0 的群系各放这么多簇。调大=该资源更多。"})
+		for bc in biome_cols:
+			out.append({"path": "map.resource_clusters.%s.weight.%s" % [key, str(bc[1])],
+				"label": "  %s（聚合/比例）" % str(bc[0]), "type": "number",
+				"min": 0, "max": 12, "step": 1})
+	return out
 
 
 func _schema_controls() -> Array:

@@ -66,7 +66,6 @@ var _path_index := 0
 var _has_target := false
 var _repath_timer := 0.0
 
-var _player: Node2D = null
 var _dormant := false
 var _dormant_check := 0.0
 
@@ -174,10 +173,21 @@ func _apply_type(type_cfg: Dictionary) -> void:
 # 感知
 # ------------------------------------------------------------
 
+## 最近的一名存活玩家。小队模式下感知/追击/休眠距离都按最近者算；
+## 全队覆灭后返回 null（AI 自然停摆，等待超时结算）。
 func _get_player() -> Node2D:
-	if _player == null or not is_instance_valid(_player):
-		_player = get_tree().get_first_node_in_group("player")
-	return _player
+	var best: Node2D = null
+	var best_d := INF
+	for p in get_tree().get_nodes_in_group("player"):
+		if not is_instance_valid(p):
+			continue
+		if p.has_method("is_dead") and bool(p.is_dead()):
+			continue
+		var d: float = global_position.distance_squared_to((p as Node2D).global_position)
+		if d < best_d:
+			best_d = d
+			best = p
+	return best
 
 
 ## 与玩家的距离（单位：格）

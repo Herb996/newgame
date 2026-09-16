@@ -110,7 +110,7 @@
 - 标题「王国废墟：拾荒撤离」+ 副标 `SteamPunk Extraction` + 版本行「开发版 · Tiny Swords 2D 线」。
 - 入口非「开始游戏」按钮，而是**新建存档 / 历史存档** → 打开 6 槽面板（`slot_panel.gd`）→ 选槽 `SaveSlots.activate()` → `launch_requested` → 切场景到 `menu.game_scene`（Main.tscn）。
 - `menu.enter_base_from_menu = true`：点开始后**先落主基地**（运行时把 `debug.auto_enter_run` 覆盖为 false，绕过 config 出厂的 true）。`ESC` 返回上一级 / 关子面板。
-- 设置改动即时写 `user://settings.json`。
+- 设置改动**先暂存**，点面板右下「确认应用」才写 `user://settings.json` 并生效；返回则丢弃未确认改动。
 
 ### 2.3 存档槽（`save_slots.gd` / `meta_progression.gd`）
 - 6 槽 `user://saves/slot_%02d.json`；`user://saves/state.json` 记 last_slot / migrated。
@@ -164,10 +164,12 @@
 - **撤离点**：站入 `extraction.trigger_radius=96` 保持 `session.extraction_hold_seconds=3` → 撤离；离开或点关闭则进度清零。
 - **敌人**：身体接触造成伤害（`enemy.contact_cooldown_seconds=1.0`）。
 
-### 3.3 设置面板（7 页，表驱动，`settings_panel.gd`）
-- 页签：**画面 / 性能 / 音频 / 玩法 / 操作 / 语言 / 调试**。
+### 3.3 设置面板（8 页，表驱动，`settings_panel.gd`）
+- 页签：**画面 / 性能 / 音频 / 玩法 / 资源 / 操作 / 语言 / 调试**。
+- **「资源」页**：上半「地形出现比例」= 四群系面积权重 `map.biome_weights.0~3`（草地/荒原/森林/沼泽，越大越占地方）；下半「地图资源成簇」= `tree/rock/iron/oil` 各自的 `count`（每群系簇数）+ 四群系 `weight`（最小聚合格数兼总量比例）。均下次生成地图生效。
 - **「性能」页（降配提速）**：暴露此前未进面板、但被 2D 代码消费的降配杠杆——`enemy.ai_active_radius_cells`（休眠半径，每帧读取即生效）、`enemy.los_step_cells`（视线采样步长，即生效）、`player.vision_radius_cells`（迷雾揭示半径，下次进局）、`map.decor.shadow`（装饰投影，下次生成地图）；并给 **「性能优先」/「恢复均衡」一键预设**（`_PERF_BUNDLE`：一次性把 `decor.shadow/density`、`macro_light/grade.enabled`、`vision_radius`、`ai_active_radius`、`los_step`、`enemy.count`、`animals.count`、`loot.density`、`max_fps` 写入**用户层**，恢复均衡逐项清除回落出厂）。其余降配项散在「玩法」（资源点密度/敌人中立数量/装饰密度）与「画面」（明暗/调色/帧率上限/垂直同步）。
-- **`live=true` 即时生效**：仅 `display.*`（窗口/分辨率/垂直同步/帧率/拉伸）与 `audio.*`（主/音乐/音效/静音），改后 `DisplaySettings.apply_all()`。其余项标「下次进局 / 下次生成地图」才生效（「玩法」页整页下次进局）。
+- **暂存 + 确认生效**：面板内所有编辑先进内存暂存（`_pending_set`/`_pending_clear`），**点右下「确认应用」才批量落盘 `user://settings.json` 并 `DisplaySettings.apply_all()`**（`display.*`/`audio.*` 即时作用，其余项下次进局 / 生成地图读到）；未确认前不写盘、不生效。每行右上有「默认」把该项暂存回出厂值。
+- **界面形态**：全屏铺满（外层 Margin 留 28px）；每行标签左对齐、控件右对齐（两边对齐）；底部「确认应用」主按钮（无改动时禁用）+「N 处未确认」计数；「返回」若有未确认改动会弹二次确认再丢弃。
 - 可改键 = 「操作」页 4 键 + 1 鼠标键；底层写用户层嵌套 JSON（如 `{"combat":{"input":{"attack_key":…}}}`），与 config 同构。
 - 语言页**非真 i18n**：选择存 `language.current`，但无翻译表，界面仍中文（`available` 仅 `zh_CN` ready，`zh_TW/en/ja` 未 ready）。
 
@@ -244,11 +246,12 @@
 - 地图 128×128，tile 64；`force_seed=20260915`（固定测试）；`noise_freq 0.03 / threshold 0.25`；`biome_freq 0.008`、`border_freq 0.08`、`spread 1.35`、`edge_blend 0.45`。
 - **群系聚合/去飞地**（`map_generator.gd` 后处理）：`biome_smooth_iterations=3`（3×3 多数投票，同类聚团）→ `biome_remove_islands=true` + `biome_min_region_cells=40`（把不接边缘、被别的群系包住且 <40 格的孤立碎块并入周围主导群系；≥40 格的大块保留，避免整片群系被吃掉）。效果：每个群系成几大块、可互相接壤、但无“一个地形包含另一个”。
 - 可达性兜底：`cluster_freq 0.05 / threshold 0.5`、`min_reachable_ratio 0.3`、`max_regen_attempts 10`。
-- **群系**（`map.biomes`）：id0 草地 w3.4（`color1`）、id1 荒原 w1.05（`color4`，**矿脉仅在此**）、id2 森林 w1.25（`color3`，tree .08）、id3 沼泽 w0.95（`color5`，`speed 0.62`，暖色 tint）。
+- **群系**（`map.biomes` 存 tileset/speed/floor/tint 等；**面积权重已迁到 `map.biome_weights`**，唯一真相源、设置面板「资源」页可调）：id0 草地 w3.4（`color1`）、id1 荒原 w1.05（`color4`，铁/油主要聚在此）、id2 森林 w1.25（`color3`）、id3 沼泽 w0.95（`color5`，`speed 0.62`，暖色 tint）。占比 ≈ 权重/Σ ≈ 草51%/荒16%/林19%/沼14%。
 - **河流：已彻底删除**。`_place_water` 及全部辅助函数（`_pick_water_start`/`_grow_river`/`_grow_lake`/`_water_ok`/`_enforce_water_sizes`）与 `generate()` 里的调用均已移除，`map.river` 只剩 `slow`（涉水减速系数，供 `speed_mult` 兜底，无水源时不触发）。`DECOR_WATER` 类型与水面渲染仍保留，但已无任何逻辑生成水格 → 地图无水。
 - **裂缝：已删除**（`map.crack.enabled=false`，`generate()` 不再调用裂缝绘制）。
 - 观感：`grade.enabled=false`（对比 1.12/饱和 0.92 待启用）；`macro_light.enabled=true`（freq 0.013 strength 0.1）；`decor.density 1.05`、`clear_spawn 3` 格、`shadow=true`、`decor_collision.enabled=true`；`nav.snap_radius 3 / unstick 4`。
-- **矿脉**（`map.veins`，仅 biome 1）：iron 22（距出生 ≥10）、gold 9（≥14）、oil 10（≥10）。
+- **地图资源成簇**（`map.resource_clusters`，替代旧 `map.veins`）：`tree/rock/iron/oil` 四种，每种给 `count`（每个 weight>0 群系放几簇）+ `weight{0草/1荒/2林/3沼}`（**同时是最小聚合格数与该资源在各群系的总量比例**，0=不出）。`_place_clustered_resources` 对每群系放 `count` 个 4 邻相连簇、每簇 `size=weight`，凑不够 size 整簇丢弃。树/石写进 `decor`（`DECOR_TREE/ROCK`，阻挡）；铁/油追加进 `veins`（`{res_id,gx,gy}`，非阻挡、可采集）。默认：树 18×{草3,荒1,林6}、石 12×{草2,荒6,林2}、铁 6×{草1,荒8,林1}、油 5×{草1,荒1,林1}，沼泽均 0 → 实测 树180/石120/矿脉75(铁60+油15)，比例即 weight 比。
+- **灌木/碎石**：仍按 `map.decor.density` + 群系 `bush/pebble` 概率逐格点缀撒（不参与上面的成簇比例）。**金币不再作为地图矿脉**（仅可能从 loot 拾取/敌人掉落获得）。
 - **资源**（`resources`）：
 
 | id | 稀有度 | 价值 | per_node | 采集秒 | 颜色 |

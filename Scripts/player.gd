@@ -47,6 +47,12 @@ var _run: Node = null
 # 空 = 不启用武器表，一切走 combat.attack 全局值（改造前的行为）。
 var current_weapon: StringName = &""
 
+# --- 大门选角注入（main.gd 在 add_child 前设置）---
+# character_name：HUD/日志显示名；initial_weapon：本角色初始武器 id（combat.weapons 键），
+# 空则回落 config 的 player.weapon（命令行 / 无头回归路径没有选人面板，走回落）。
+var character_name := ""
+var initial_weapon := ""
+
 
 # 导航数据：由 main.gd 注入
 var _walls: Array = []
@@ -224,6 +230,10 @@ func _physics_process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if get_tree().paused or _dead:
 		return
+	# 小队 RTS 指挥：攻击/闪避/移动指令只发给当前选中的那名角色，
+	# 未选中的角色不受键鼠影响（各自继续执行状态机里的既有行为）。
+	if not selected:
+		return
 	var attack_button := int(Config.get_value("combat.input.attack_mouse_button", 2))
 	var attack_key := int(Config.get_value("combat.input.attack_key", 74))   # J
 	var dodge_key := int(Config.get_value("combat.input.dodge_key", 32))     # Space
@@ -312,9 +322,12 @@ func _sprite_set_for_weapon() -> String:
 	return str(Config.get_value("player.sprite_set", "sprites"))
 
 
-## 进局时按 config 的 player.weapon 选武器；值非法则保持"无武器"并告警。
+## 进局时按「大门选角注入的 initial_weapon → config 的 player.weapon」顺序选武器；
+## 都为空/非法则保持"无武器"并告警。
 func _resolve_initial_weapon() -> void:
-	var want := str(Config.get_value("player.weapon", ""))
+	var want := initial_weapon
+	if want == "":
+		want = str(Config.get_value("player.weapon", ""))
 	if want == "":
 		return
 	if weapon_ids().has(want):
@@ -645,7 +658,8 @@ func apply_direct_damage(amount: int) -> void:
 		state_machine.force_transition(&"dead")
 
 
-## 死亡结算：通知 RunManager（本局资源全丢）
+## 死亡结算：小队模式下只要还有队友存活本局就继续（全队倒下才算失败）。
+## 死者若正被指挥，控制权自动移交给第一名存活队友。
 func on_death() -> void:
 	if _dead:
 		return
@@ -653,6 +667,15 @@ func on_death() -> void:
 	stop_moving()
 	velocity = Vector2.ZERO
 	move_and_slide()
+	if selected:
+		for p in get_tree().get_nodes_in_group("player"):
+			if p != self and is_instance_valid(p) and not bool(p.is_dead()):
+				p.select()
+				break
+	for p in get_tree().get_nodes_in_group("player"):
+		if p != self and is_instance_valid(p) and not bool(p.is_dead()):
+			print("[Combat] %s 倒下，队友仍在，本局继续（背包全队共享）" % character_name)
+			return
 	if _run == null:
 		_run = get_tree().get_first_node_in_group("run_manager")
 	if _run != null:
@@ -872,12 +895,27 @@ func _unstick_radius() -> int:
 func _on_select_area_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
 	if event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
-		_set_selected(not selected)
+		_set_selected(true)   # 点角色 = 选中指挥它（RTS 惯例，不再做"点一下取消"）
 
 
 func _set_selected(value: bool) -> void:
 	selected = value
 	_select_icon.visible = value
-	if not value:
+	if value:
+		# 小队互斥：同一时刻只有一名角色被选中，后点的顶掉先前的
+		for p in get_tree().get_nodes_in_group("player"):
+			if p != self and p.has_method("deselect"):
+				p.deselect()
+	else:
 		stop_moving()
 	_path_line.visible = value and not _cached_path.is_empty()
+
+
+## 供 main / 死亡移交控制权时选中本角色
+func select() -> void:
+	_set_selected(true)
+
+
+## 取消选中（小队互斥由 _set_selected(true) 触发）
+func deselect() -> void:
+	_set_selected(false)
