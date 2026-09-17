@@ -562,19 +562,30 @@ func _schema_display() -> Array:
 			"note": "滚轮时右下角淡入的「视野 ×N」，松手 1.5 秒后自动淡出。"},
 
 		{"path": "player.weapon", "label": "当前武器", "type": "enum",
-			"items": [["剑（近战）", "sword"], ["弓（远程）", "bow"],
-				["狙击枪（穿透）", "sniper"]],
-			"note": "决定攻击方式与动作：剑 = 原来的扇形挥击；弓 = 判定帧发射箭矢（会飞、撞墙消失、命中结算）；"
-				+ "狙击枪 = 瞬间命中 + 曳光，高伤穿透 2 个目标、射程 900，但前摇长、后摇长、枪声极大（240）。"
-				+ "「弓」会强制使用弓手贴图集；「狙击枪」用挂点贴图（跟随瞄准方向旋转），角色贴图集不受影响。下次进局生效。"},
+			"items": [["剑士（剑·近战）", "sword"], ["枪手（长枪·近战）", "spear"],
+				["弓兵（弓·远程）", "bow"], ["强弩（穿透）", "sniper"]],
+			"note": "决定攻击方式与动作：剑士 = 原来的扇形挥击（战士贴图）；枪手 = 长枪突刺（枪兵 8 向贴图，射程更长）；"
+				+ "弓 = 判定帧发射箭矢（会飞、撞墙消失、命中结算）；强弩 = 瞬间命中 + 曳光，高伤穿透 2 个目标、射程 900，"
+				+ "但上弦慢、后摇长、声响极大（240）。「弓」会强制使用弓兵贴图集；「强弩」用完整角色帧（弩画在手里，blue_crossbowman）。"
+				+ "下次进局生效。"},
 
 		{"path": "player.sprite_set", "label": "玩家贴图集（近战用）", "type": "enum",
-			"items": [["枪兵 8 向", "sprites_lancer"], ["弓手 单向", "sprites_archer"],
-				["战士 单向", "sprites_ts"], ["HD 手绘", "sprites_hd"], ["早期 48px", "sprites"]],
-			"note": "只有「枪兵」有真正的 8 向素材：待机/受击按朝向播不同帧，攻击也按朝向出招；"
+			"items": [["枪手 8 向", "sprites_lancer"], ["弓兵 单向", "sprites_archer"],
+				["剑士 单向", "sprites_ts"], ["HD 手绘", "sprites_hd"], ["早期 48px", "sprites"]],
+			"note": "只有「枪手」有真正的 8 向素材：待机/受击按朝向播不同帧，攻击也按朝向出招；"
 				+ "其余四套是单向或仅四向，斜向与朝向差异会自动回退。"
 				+ "画布参数（缩放/脚底偏移）已随贴图集自动切换，不用手调。"
 				+ "当前武器是「弓」时本项无效（弓锁定弓手贴图）。下次进局生效。"},
+
+		{"type": "divider", "label": "局内界面（下次进局生效）"},
+		{"path": "menu_bar.enabled", "label": "底部菜单栏", "type": "bool",
+			"note": "局内最下面 1/5 那条栏：左 = 小地图（常驻）、中 = 选中单位的指令、"
+				+ "右 = 噪音读数（当前/累积/被惊动数）。关掉后小地图与指令入口都不显示 —— "
+				+ "自动战斗照常跑，只是没有手动指令（指定攻击 / 巡逻 / 索敌策略）。"},
+		{"path": "menu_bar.height_ratio", "label": "菜单栏高度占比", "type": "number",
+			"min": 0.12, "max": 0.3, "step": 0.01, "fmt": "percent",
+			"note": "占屏幕高度的比例，默认 20%（= 最下面 1/5）。小地图边长随栏高自适应，"
+				+ "HUD 的背包/血量/生存三行也会跟着让位。"},
 
 		{"type": "divider", "label": "风格化（下次生成地图生效）"},
 		{"path": "map.macro_light.enabled", "label": "宏观明暗层", "type": "bool",
@@ -716,6 +727,16 @@ func _schema_gameplay() -> Array:
 			"note": "每过这么久消耗 1 份食物。"},
 
 		{"type": "divider", "label": "玩家与战斗"},
+		{"path": "combat.auto_attack.enabled", "label": "自动战斗", "type": "bool",
+			"note": "开启后角色自动索敌开打：只打「观察视野 ∩ 攻击距离」内的敌人，"
+				+ "够不着的不追、原地不动；关掉则完全不开火（只能靠走位）。"},
+		{"path": "player.vision_radius_cells", "label": "观察视野（格）", "type": "number",
+			"min": 1, "max": 40, "step": 1,
+			"note": "能看见多远。实际攻击距离取「武器射程与观察视野的较小值」，"
+				+ "所以调小它等于同时削所有武器的射程；设计上应大于攻击距离。"},
+		{"path": "combat.auto_attack.scan_interval_seconds", "label": "索敌间隔", "type": "number",
+			"min": 0.05, "max": 1.0, "step": 0.05, "fmt": "times",
+			"note": "每隔多久重扫一次附近敌人（秒）。越小索敌越灵敏、开销越大。"},
 		{"path": "player.speed", "label": "移动速度", "type": "number",
 			"min": 100, "max": 2000, "step": 20, "note": "像素/秒。"},
 		{"path": "combat.player.max_hp", "label": "基础生命上限", "type": "number",
@@ -773,13 +794,12 @@ func _schema_controls() -> Array:
 	return [
 		{"type": "info", "label": "键位一律用「物理键码」记录（与游戏内消费端一致），"
 			+ "所以非 QWERTY 键盘也不会错位。点按钮后按任意键即可改；ESC 取消。"},
+		{"type": "info", "label": "攻击没有键位 —— 2026-09-17 起战斗全自动："
+			+ "敌人进入「观察视野 ∩ 攻击距离」就自动起手，够不着的不会追。想关掉去「玩法」页的自动战斗开关。"},
 		{"type": "divider", "label": "动作"},
-		{"path": "combat.input.attack_key", "label": "普通攻击", "type": "key"},
 		{"path": "combat.input.dodge_key", "label": "闪避", "type": "key"},
 		{"path": "survival.eat_key", "label": "进食", "type": "key"},
 		{"path": "camera.return_key", "label": "相机回到玩家", "type": "key"},
-		{"path": "combat.input.attack_mouse_button", "label": "攻击鼠标键", "type": "enum",
-			"items": [["鼠标左键", 1], ["鼠标右键", 2], ["鼠标中键", 3]]},
 	]
 
 

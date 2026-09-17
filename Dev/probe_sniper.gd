@@ -1,13 +1,12 @@
 extends Node
 ## ============================================================
-## probe_sniper — 「狙击枪」这条链路的验证探针（headless 可跑）
+## probe_sniper — 「强弩」这条链路的验证探针（headless 可跑）
 ##
 ## 验四件事：
-##   A) config：sniper 进了武器表、hitscan/rifle 段齐全、噪音档就位
+##   A) config：sniper 进了武器表、hitscan 段齐全、无 rifle 挂点（弩已画进帧）、噪音档就位
 ##   B) 纯函数：first_wall_point（射线截断）/ targets_on_segment（按沿线先后排序）
-##   C) 真实 Main.tscn 里切狙击枪：kind/radius/时长/噪音/挂点/精灵集不受影响
-##   D) 端到端：fire_hitscan 命中线上目标（穿透 2 个）、曳光节点生成并自毁、
-##      挂点跟随朝向、切回剑后挂点回收
+##   C) 真实 Main.tscn 里切强弩：kind/radius/时长/噪音/精灵集=sprites_crossbowman
+##   D) 端到端：fire_hitscan 命中线上目标（穿透 2 个）、曳光节点生成并自毁、切回剑正常
 ##
 ## 为什么 headless 能跑：与弓同一理由 —— 墙查 walls 格子表、命中查节点距离，
 ## 全是纯数据判定（见 projectile.gd 头注释）。
@@ -65,14 +64,14 @@ func _section_a() -> void:
 	for k in table.keys():
 		if not str(k).begins_with("_"):
 			ids.append(str(k))
-	_check(ids == ["sword", "bow", "sniper"], "武器 id = [sword, bow, sniper]（实得 %s）"
+	_check(ids == ["sword", "spear", "bow", "sniper"], "武器 id = [sword, spear, bow, sniper]（实得 %s）"
 			% str(ids))
 
 	var sn: Dictionary = table.get("sniper", {})
 	_check(not sn.is_empty(), "sniper 段存在")
 	_check(str(sn.get("kind", "")) == "hitscan", "sniper.kind = hitscan")
-	_check(str(sn.get("sprite_set", "x")) == "",
-			"sniper.sprite_set = \"\"（角色贴图集不受影响，Lancer 8 向照用）")
+	_check(str(sn.get("sprite_set", "x")) == "sprites_crossbowman",
+			"sniper.sprite_set = sprites_crossbowman（2026-09-17 起弩画进角色帧）")
 	_check(is_equal_approx(float(sn.get("damage", 0.0)), 90.0), "sniper.damage = 90")
 	_check(is_equal_approx(float(sn.get("windup_seconds", 0.0)), 0.55),
 			"sniper.windup = 0.55（长瞄准）")
@@ -87,11 +86,9 @@ func _section_a() -> void:
 	_check(int(hc.get("pierce", 0)) == 2, "hitscan.pierce = 2（穿透两个）")
 	_check(float(hc.get("hit_radius_px", 0.0)) > 0.0, "hitscan.hit_radius_px > 0")
 
-	var rf: Dictionary = sn.get("rifle", {})
-	_check(not rf.is_empty(), "sniper 有 rifle 段（挂点贴图）")
-	var tex := str(rf.get("texture", ""))
-	_check(tex.ends_with("sniper_rifle.png"), "rifle.texture 指向 sniper_rifle.png")
-	_check(ResourceLoader.exists(tex), "挂点贴图已导入（ResourceLoader 找得到）")
+	_check(sn.get("rifle", null) == null, "sniper 无 rifle 段（弩已烘焙进角色帧，不再挂点叠加）")
+	_check(ResourceLoader.exists("res://Assets/Art/Sprites/Units/blue_crossbowman/idle_00.png"),
+			"blue_crossbowman 角色帧已导入")
 	_check(is_equal_approx(float(Config.get_value("noise.sources.sniper_shot", 0.0)), 240.0),
 			"noise.sources.sniper_shot = 240（独立噪音档就位）")
 
@@ -148,7 +145,7 @@ func _section_b() -> void:
 # ------------------------------------------------------------
 func _section_c() -> void:
 	_say("")
-	_say("--- C 段：真实 Main.tscn 里切狙击枪 ---")
+	_say("--- C 段：真实 Main.tscn 里切强弩 ---")
 	var main: Node = load("res://Scenes/Main.tscn").instantiate()
 	add_child(main)
 	for _i in range(120):
@@ -158,8 +155,8 @@ func _section_c() -> void:
 	_check(_player != null, "场景里找到 group=player 的节点")
 	if _player == null:
 		return
-	_check(_player.weapon_ids() == ["sword", "bow", "sniper"],
-			"weapon_ids() = [sword, bow, sniper]（实得 %s）" % str(_player.weapon_ids()))
+	_check(_player.weapon_ids() == ["sword", "spear", "bow", "sniper"],
+			"weapon_ids() = [sword, spear, bow, sniper]（实得 %s）" % str(_player.weapon_ids()))
 
 	var switched: bool = _player.switch_weapon(&"sniper")
 	_check(switched, "switch_weapon(sniper) 返回 true")
@@ -171,17 +168,11 @@ func _section_c() -> void:
 	_check(is_equal_approx(_player.attack_noise(), 240.0),
 			"噪音 = 240（实得 %.1f）" % _player.attack_noise())
 	_check(is_equal_approx(_player._animator._scale, 0.6),
-			"角色贴图集不受影响：仍是枪兵 scale=0.6（实得 %.3f）" % _player._animator._scale)
+			"角色 scale=0.6（sprites_crossbowman，实得 %.3f）" % _player._animator._scale)
 
-	# 挂点：存在、贴图 72x24、锚在机匣
+	# 弩已画进角色帧：不应再有 Rifle 挂点节点
 	var rifle: Node = _player.get_node_or_null("Rifle")
-	_check(rifle != null and rifle is Sprite2D, "挂点 Rifle 节点已创建")
-	if rifle != null and rifle is Sprite2D:
-		var tex: Texture2D = (rifle as Sprite2D).texture
-		_check(tex != null and tex.get_width() == 72 and tex.get_height() == 24,
-				"枪贴图 72x24（实得 %s）"
-				% ("null" if tex == null else "%dx%d" % [tex.get_width(), tex.get_height()]))
-		_check((rifle as Sprite2D).centered == false, "挂点 centered=false（锚点算过机匣）")
+	_check(rifle == null, "强弩无挂点节点（弩在 blue_crossbowman 帧里）")
 
 
 func _hitbox_radius() -> float:
@@ -245,21 +236,16 @@ func _section_d() -> void:
 			ring_found = true
 	_check(ring_found, "命中点生成过冲击环（fx_ring）")
 
-	# 挂点跟随朝向。注意要等 **两** 帧：process_frame 信号在 process 阶段开始时发出，
-	# 此刻本帧的 _process 还没跑 —— 只等一帧读到的还是旧值（实测踩过）。
+	# 2026-09-17 起弩画进角色帧、无挂点 —— 原来的 flip_v/rotation 跟随断言已删。
+	# 这里只验证朝向切换本身不影响 hitscan 状态。
 	_player.facing = Vector2.LEFT
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var rifle: Node = _player.get_node_or_null("Rifle")
-	_check(rifle != null and (rifle as Sprite2D).flip_v,
-			"朝左持枪 flip_v=true（不倒持）")
-	_check(rifle != null and absf((rifle as Sprite2D).rotation - PI) < 0.001,
-			"朝左 rotation ≈ PI（实得 %.3f）"
-			% ((rifle as Sprite2D).rotation if rifle != null else -9.0))
+	_check(rifle == null, "朝左时同样无挂点（弩在帧里）")
 	_player.facing = Vector2.RIGHT
 	await get_tree().process_frame
 	await get_tree().process_frame
-	_check(rifle != null and not (rifle as Sprite2D).flip_v, "朝右 flip_v=false")
 
 	for t in [a, b, c]:
 		if is_instance_valid(t):

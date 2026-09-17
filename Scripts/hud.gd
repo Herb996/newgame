@@ -18,11 +18,20 @@ var _hp_label: Label
 var _survival_label: Label
 var _survival: Node = null
 
+## 局内底部菜单栏占了最下面 1/5 屏（背包/血量/生存三行原本就在那一带），
+## 必须整体上移让位，否则会被栏压住。高度与菜单栏同源（UiKit.menu_bar_height），
+## 不各算一份 —— 否则改 ratio 时一边挪一边不挪，文字正好卡在栏的边框上。
+var _bottom_lift := 0.0
+var _bottom_rows: Array = []   # [{label, margin}]：窗口缩放后重新贴一次
+
 
 func _ready() -> void:
 	_run = get_tree().get_first_node_in_group("run_manager")
 	_run.run_started.connect(_on_run_started)
 	_run.run_ended.connect(_on_run_ended)
+	_bottom_lift = UiKit.menu_bar_height(get_viewport().get_visible_rect().size.y) \
+			if UiKit.menu_bar_enabled() else 0.0
+	get_viewport().size_changed.connect(_reflow_bottom)
 
 	_time_label = _make_label(26, Control.PRESET_CENTER_TOP)
 	_time_label.offset_top = 10
@@ -61,10 +70,28 @@ const _BOTTOM_BOX := 64.0
 
 func _bottom_label(size: int, margin: float, preset: int) -> Label:
 	var l := _make_label(size, preset)
-	l.offset_top = -margin - _BOTTOM_BOX
-	l.offset_bottom = -margin
 	l.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_bottom_rows.append({"label": l, "margin": margin})
+	_apply_bottom_row(l, margin)
 	return l
+
+
+## 把一行贴到「距底 margin + 让开菜单栏」的位置
+func _apply_bottom_row(l: Label, margin: float) -> void:
+	var lift := margin + _bottom_lift
+	l.offset_top = -lift - _BOTTOM_BOX
+	l.offset_bottom = -lift
+
+
+## 窗口尺寸变了 → 菜单栏高度跟着变（它按视口高比例算），让位距离要重贴
+func _reflow_bottom() -> void:
+	var lift := UiKit.menu_bar_height(get_viewport().get_visible_rect().size.y) \
+			if UiKit.menu_bar_enabled() else 0.0
+	if is_equal_approx(lift, _bottom_lift):
+		return
+	_bottom_lift = lift
+	for row in _bottom_rows:
+		_apply_bottom_row(row["label"], float(row["margin"]))
 
 
 func _process(_delta: float) -> void:
@@ -77,7 +104,7 @@ func _process(_delta: float) -> void:
 		_refresh_survival()
 
 
-## 血量条：小队全员一行——"枪剑士 HP 80/100 | 弓手 倒下"
+## 血量条：小队全员一行——"枪手 HP 80/100 | 弓兵 倒下 | 剑士 倒下"
 func _refresh_hp() -> void:
 	var parts: Array = []
 	for p in get_tree().get_nodes_in_group("player"):

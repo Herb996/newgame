@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b4pimnr8y1wwh"
-path="res://.godot/imported/_dump_biome.png-1b18fa3cb2c1fbaabf022cbc9597af2a.ctex"
+path="res://.godot/imported/_dump_biome.png-32d16cf1a5b3a244f06eb49c4befce94.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://_dump_biome.png"
-dest_files=["res://.godot/imported/_dump_biome.png-1b18fa3cb2c1fbaabf022cbc9597af2a.ctex"]
+source_file="res://generated_images/terrain/_dump_biome.png"
+dest_files=["res://.godot/imported/_dump_biome.png-32d16cf1a5b3a244f06eb49c4befce94.ctex"]
 
 [params]
 

@@ -107,6 +107,10 @@ func _end_run(result: String) -> void:
 	if result == "extracted":
 		banked = loot.duplicate()
 		Meta.bank_loot(banked)
+		# 撤离成功 = 唯一的经验来源（progression.xp.per_extraction）。
+		# 发经验只认**活着的名册成员**：阵亡的已经在 player.on_death() 里除名了，
+		# 这里再按 is_dead() 兜一道；没有名册身份的临时角色（命令行 / 无头回归）跳过。
+		Meta.grant_xp_to_survivors()
 	# died / timeout：banked 保持为空 —— 全部丢失
 	run_ended.emit(result, banked)
 	print("[Run] 一局结束：%s | 带回资源 %s | 丢弃资源 %s" % [result, banked, loot if banked.is_empty() else {}])

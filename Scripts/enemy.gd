@@ -20,6 +20,67 @@ extends Area2D
 ##   死亡时按 enemy.drop.chance 概率在原地生成一个 LootNode（复用资源点场景），
 ##   种类按 enemy.drop.weights 加权随机，数量在 amount_min~amount_max 之间。
 ##
+## 死亡特性（2026-09-17 用户定，目前只有掠夺者带）：
+##   config 里兵种可以写 traits[]（特性池）或旧式 trait（单个）。**每个实例在生成时
+##   按 weight 从池里随机分配一个**——一个角色只有一种特性（用户原话：「死亡一个角色
+##   只能有一个特性，随机分配」）；特性刷出来的孩子**继承父的特性**。
+##   已知两种：death_split（死亡分裂，同一批的**最后一个**才触发下一代、逐代递进）
+##              death_regen（死亡再生，**每次死亡都独立判定**，不看「最后一个」）
+##   本文件不认识细节——敌人只负责「我死了 + 我是什么特性」上报，策略全在
+##   enemy_system.gd::notify_death_split() / notify_death_regen()。
+##
+## 非死亡特性（2026-09-17 用户定，邪术师「爆裂鼓手」burst_drum）：
+##   不死也能持续生效，所以行为挂在「发声」与「受击」两个既有钩子上：
+##     · noise_amplify    —— 放大**小队自己**造成的噪音。光环：按发声点距离线性加权，
+##                           见 noise_amplify_gain()；由 noise_system.gd 在 emit() 里
+##                           遍历 "noise_amplifiers" 组求和（没邪术师时组为空，零开销）。
+##     · damage_reduction —— 血量越低受到的伤害越少，见 incoming_damage()；有 min_damage
+##                           保底，残血也会被打死，不会变成无敌。
+##
+## 幻影分身（2026-09-17 用户定，同日改规格；弓手 phantom_double「幻影分身」）：
+##   用户原话：「每个只随机召唤一到两个，召唤的分身只有本体20%的血量，分身不会再召唤分身，
+##     本体每隔5秒会再随机召唤1到2个，最多8个分身，分身越多，自身受到伤害越少」
+##   ＋「这批角色（本体加召唤）按最低血条展示，不管攻击哪个，显示血条最低的，迷惑玩家」。
+##   实现要点（本文件 + enemy_system.gd::notify_phantom_summon）：
+##     · 分身 = 同一兵种的普通敌人实例，带 _phantom_pool（与本体**共享同一个 Dictionary**，
+##       引用语义；池里 owner 指向本体、members 收全部活分身）。池只用来**记账与广播**，
+##       不再是血量权威 —— 那是早先「共享血池」版本的写法，已被用户改掉。
+##     · 血量：分身有**自己的一份**（= 本体 max_hp × hp_ratio_of_owner，默认 20%），
+##       出生满血、挨打扣自己的、打光就自己消失（vanish_as_phantom），**不**转嫁给本体。
+##     · 血条：**整组按组内最低血量显示** —— display_hp_ratio() 取
+##       min(本体 hp, 全部分身 hp) ÷ 本体 max_hp；组内谁掉血都 refresh_group_hp_bar() 广播全组。
+##       分身天生只有本体 20% 的血 ⇒ 场上有分身时整组血条一直是「残血」的样子，
+##       打哪个都是同一条、都像快死了（这就是"迷惑玩家"的核心）。
+##     · 分身 `damage = 0` 且 _on_body_entered 里的接触伤害直接返回 ⇒ 打玩家不掉血。
+##     · 本体每跨过一个 swap_hp_step_ratio(20%) 台阶 → _swap_with_random_phantom()
+##       随机挑一个活着的分身**交换坐标**（本体/分身各自的巡逻中心也跟着挪，
+##       否则本体一步走回原地就露馅了）。
+##     · 本体每隔 resummon_interval_seconds(默认 5s) 再补召 1~2 具；
+##       名额由 enemy_system.gd 按 max_phantoms_per_owner(8) / max_live_phantoms 把关。
+##     · 分身越多本体越硬：phantom_damage_reduction()，见 incoming_damage()。
+##     · 本体死亡 → 分身一起消失（vanish_as_phantom()），不报特性、不掉落、不淡出成尸体。
+##   血条本体件见 Scripts/enemy_hp_bar.gd（**颜色尺寸本体/分身完全一致** —— 别按 is_phantom 改色）。
+##
+## 劫掠者（brigand）的 AI（2026-09-17 用户定）：
+##   「他的机制就是满地图随机游走，并且遇到同类会一起移动，上限先做到 5 个吧，
+##     所以其他怪只在一个固定的范围内移动，受到攻击或者噪音，再移动，劫掠者对声音更敏感」
+##   三件事全部**配置驱动**：全局默认在 enemy.ai，兵种用 enemy_types.types[*].ai 按键覆盖
+##   （劫掠者三项都覆盖了，其余兵种不写 ai 段 = 老行为）。取值统一走下面这几个访问器，
+##   不要在业务代码里直接读 config 的键。
+##     · roam.mode = whole_map —— 巡逻时在**整张地图**上随机挑一个可达点走过去
+##       （pick_roam_target）；home_radius 是其他兵种的老行为：只在出生点周围
+##       patrol_radius_cells 内游荡 —— 即用户说的「其他怪只在一个固定的范围内移动」。
+##     · pack（成群）—— 同类靠近到 join_radius_px 内即结伙，之后**跟着群主一起移动**；
+##       max_members(5) 是每群硬上限，装满了不再收人。群 = 全群**共享同一个 Dictionary**
+##       （引用语义，与幻影分身的池同一套写法）：{"leader": Node2D, "members": Array}。
+##       群主负责选目标（全地图游走），成员只跟队形（follow_distance_px 之外才启程）；
+##       群主死亡时由同群下一个活着的成员自动接任（_promote_pack_leader）。
+##     · noise_sensitivity = 听力倍率（劫掠者 1.8）—— 唯一落点在 noise_system.gd::emit
+##       的派发循环：按听者把「等效听力半径」放大，于是听得更远、同距离也更清。
+##   「受到攻击也要动」是**所有敌人共用**的规则（不只劫掠者）：玩家造成伤害后由调用方
+##   补一句 alert_from_attacker(攻击者位置)，敌人立刻转「调查」朝攻击者走（见 §5.5）。
+##   刻意不塞进 take_damage()：那会改签名，且探针里那些「单纯测伤害数值」的假敌人不必跟。
+##
 ## 性能保护（一局 100 个敌人）：
 ##   1. AStarGrid2D 由 EnemySystem 构建一次，全体敌人共享（绝不每人建网格）
 ##   2. 追击时按 repath_interval_seconds 节流重算路径，不是每帧重算
@@ -34,6 +95,10 @@ extends Area2D
 
 const DROP_SCENE := preload("res://Scenes/LootNode.tscn")
 
+## 带噪音放大特性（burst_drum）的敌人才进这个组；NoiseSystem 发声时只遍历它。
+## 字符串必须与 noise_system.gd 里的同名常量一致（两边都写死，改动请一起改）。
+const GROUP_NOISE_AMPLIFIERS := "noise_amplifiers"
+
 var hp := 0
 var max_hp := 0
 var damage := 10                   # 接触伤害（由类型覆盖）
@@ -46,14 +111,39 @@ var _last_known := Vector2.ZERO   # 玩家最后被看到的位置（跟丢后�
 # --- 表现层 ---
 var _body: Sprite2D = null
 var _animator: PlayerAnimator = null
+var _hp_bar: Node = null           # 头顶血条（enemy_hp_bar.gd）；受伤才显示
 var _anim_state := PlayerAnimator.Anim.IDLE
 var _attack_timer := 0.0           # >0 表示正在播攻击动作，播完回 idle/walk
 var _hit_flash := 0.0              # 受击泛红剩余秒数
 var _dying := false                # 已进入死亡淡出，不再参与 AI/受伤
 
+# --- 死亡特性（判定与派发在 enemy_system.gd）---
+var _type_cfg: Dictionary = {}     # 本实例的兵种配置（特性池在它的 traits[] 里）
+var _feat: Dictionary = {}         # 本实例**分配到的**那个特性（生成时随机挑，见 pick_feature）
+var _from_trait := false           # true = 本实例是特性刷出来的（分裂体/再生体），非开局怪
+var _split: Dictionary = {}        # 与同批兄弟**共享同一个字典**（引用语义）；空 = 不是特性刷出来的
+var _system: Node = null           # EnemySystem：刷怪交回它统一做；探针可不注入
+
+# --- 幻影分身（phantom_double，2026-09-17）---
+# _phantom_pool：本体与全部分身**共享同一个字典**（引用语义）——
+#   {"owner": Node2D, "members": Array}。只用于记账与「整组血条广播」。
+#   血量各自独立：分身那一份在 _setup_phantom 里按 hp_ratio_of_owner 现开。
+var _phantom_pool: Dictionary = {}
+var _is_phantom := false           # true = 我是一具分身（不是本体）——分身不再召唤、不掉落、不造成伤害
+var _swap_step := 0                # 本体已触发的「掉 20% 血」台阶数（每跨一个台阶，和分身换一次位置）
+var _resummon_timer := 0.0         # 本体「每隔 N 秒再补召 1~2 具」的倒计时（只有本体在跑）
+
 # --- 噪音警觉度（DESIGN.md 第二部分 噪音机制）---
 var noise_alertness := 0.0
 var _noise_source := Vector2.ZERO   # 最后听到的声源位置（调查状态前往这里）
+
+# --- 成群（pack，2026-09-17；劫掠者专属，靠 config 的 ai.pack.enabled 开关）---
+# 全群**共享同一个字典**（引用语义）：{"leader": Node2D, "members": Array}。
+# 只有 pack.enabled 的兵种才会建群；空字典 = 没成群（绝大多数敌人，零开销）。
+var _pack: Dictionary = {}
+var _pack_scan_timer := 0.0         # 「找同类结伙」的节流计时
+var _follow_timer := 0.0            # 「跟群主」的寻路节流计时
+var _ai_cache: Dictionary = {}      # 合并后的 ai 配置缓存（enemy.ai ← 兵种 ai，见 ai_cfg）
 
 # --- 导航（由 EnemySystem 注入） ---
 var _walls: Array = []
@@ -76,6 +166,7 @@ func _ready() -> void:
 	add_to_group("enemies")
 	visible = false  # 初始隐藏，等雾系统第一帧判定
 	_body = get_node_or_null("Body") as Sprite2D
+	_hp_bar = get_node_or_null("HpBar")
 	# 兜底：类型由 setup() 注入，但 _ready 早于 setup，先用全局默认值起手
 	max_hp = int(Config.get_value("enemy.max_hp", 40))
 	hp = max_hp
@@ -93,6 +184,9 @@ func _physics_process(delta: float) -> void:
 		_attack_timer -= delta
 	if _hit_flash > 0.0:
 		_hit_flash -= delta
+	# 幻影分身：本体活着就每隔 resummon_interval_seconds 再补召 1~2 具。
+	# 名额把关全在 enemy_system.gd（单只上限 8 + 全场兜底），满了自然召不出来。
+	_tick_phantom_resummon(delta)
 	# 噪音警觉度随时间衰减（听到动静→去查看→没发现→慢慢放松）
 	if noise_alertness > 0.0:
 		noise_alertness = maxf(0.0, noise_alertness
@@ -101,10 +195,10 @@ func _physics_process(delta: float) -> void:
 	_dormant_check += delta
 	if _dormant_check >= 0.5:
 		_dormant_check = 0.0
-	_dormant = distance_to_player_cells() \
-			> float(Config.get_value("enemy.ai_active_radius_cells", 32))
+	_dormant = distance_to_player_cells() > ai_active_radius_cells()
 	if _dormant:
 		return
+	_tick_pack(delta)          # 成群：找同类结伙 + 成员跟上群主（只有带 pack 的兵种有开销）
 	state_machine.physics_update(delta)
 	_update_anim(delta)
 	# 染色必须在动画器之后：动画器每帧会写 modulate，放前面会被覆盖掉
@@ -125,13 +219,278 @@ func _init_state_machine() -> void:
 
 ## 由 EnemySystem 调用：注入地图导航数据（共享 A* 网格）+ 本实例的兵种配置。
 ## type_cfg 为空时退化为 config 的 enemy.max_hp / enemy.contact_damage 单一敌人类型。
+## split_batch：死亡分裂的「同批」共享状态（只有特性刷出来的个体才非空，见 enemy_system.gd）。
+## system：EnemySystem 自己；刷怪要在那边做（那边有 walls/tile_size/astar 与刷怪队列）。
+## feat：本实例的特性。**留空 = 从兵种的特性池随机分配一个**（开局刷怪就是这个路径）；
+##       特性刷出来的孩子由 EnemySystem 把父的特性原样递回来 ⇒ 继承同一个特性。
+## phantom：幻影分身的**共享记账池**（见 _setup_phantom）。只有分身非空；留空 = 本体。
 func setup(walls: Array, tile_size: int, astar: AStarGrid2D,
-		type_cfg: Dictionary = {}) -> void:
+		type_cfg: Dictionary = {}, split_batch: Dictionary = {},
+		system: Node = null, feat: Dictionary = {}, phantom: Dictionary = {}) -> void:
 	_walls = walls
 	_tile_size = tile_size
 	_astar = astar
 	_home = global_position
+	_type_cfg = type_cfg
+	_ai_cache = {}          # 兵种配置到手 → 合并缓存作废（_ready 里的状态机起手可能已经问过一次）
+	_split = split_batch
+	_system = system
+	_from_trait = not feat.is_empty()
+	_feat = feat if _from_trait else pick_feature(type_cfg)
 	_apply_type(type_cfg)
+	_setup_phantom(phantom)
+	_register_feature_groups()
+	_ensure_pack()                     # 成群：带 pack 的兵种一出生就自建一个只有自己的群
+	_summon_phantoms_if_needed()
+
+
+## 把「需要被别的系统按组遍历」的特性实例登记进对应的组。
+## 目前只有 burst_drum（噪音放大）：NoiseSystem 在玩家每次发声时都要问一遍放大器，
+## 挂进组后**没有邪术师时组是空的 → 零开销**（不然每次发声都得扫全场敌人做 has_method）。
+func _register_feature_groups() -> void:
+	if feature_id() == "burst_drum":
+		add_to_group(GROUP_NOISE_AMPLIFIERS)
+
+
+# ------------------------------------------------------------
+# 幻影分身（phantom_double，弓手；详见文件头说明）
+# 用户原话：「随机召唤 1-2 个分身，分身无法造成伤害，本体每掉 20% 的血，就会随机
+# 和分身互换，迷惑玩家，本体和分身的血条同步改变。」
+# ------------------------------------------------------------
+
+## 接住共享记账池（由 EnemySystem 在刷分身时传入本体那一份）。
+## 分身：登记进 pool.members，并按 hp_ratio_of_owner 开出**自己那份**血（满血）。
+## 本体：自己建一个空池（owner = 自己），等着分身进来，并起手补召计时。
+func _setup_phantom(pool: Dictionary) -> void:
+	_is_phantom = not pool.is_empty()
+	if _is_phantom:
+		_phantom_pool = pool
+		damage = 0                  # 分身无法造成伤害（_on_body_entered 里还会再拦一道）
+		var members = _phantom_pool.get("members", null)
+		if members is Array:
+			members.append(self)
+		# 分身只有本体的一小份血（用户定：本体 max_hp 的 20%），出生满血、独立结算。
+		var own = _phantom_pool.get("owner", null)
+		if is_instance_valid(own):
+			var share := float(_feat.get("hp_ratio_of_owner",
+					Config.get_value("enemy_traits.phantom.hp_ratio_of_owner", 0.2)))
+			max_hp = maxi(1, int(round(float(own.get("max_hp")) * maxf(0.01, share))))
+			hp = max_hp
+	else:
+		_phantom_pool = {"owner": self, "members": []}
+		_resummon_timer = _resummon_interval()
+	# 刷新整组血条：分身一出生，整组立刻按「组内最低」变成残血的样子
+	# （本体身边没分身时 shown 仍是 1.0，不会平白闪一条满血条出来）。
+	refresh_group_hp_bar(false)
+
+
+## 本体「每隔 5 秒再随机召唤 1~2 具」的节拍（用户 2026-09-17 定）。
+## 分身不参与（用户明确要求「分身不会再召唤分身」）；间隔 <= 0 视为关闭。
+func _tick_phantom_resummon(delta: float) -> void:
+	if _is_phantom or feature_id() != "phantom_double":
+		return
+	var iv := _resummon_interval()
+	if iv <= 0.0:
+		return
+	_resummon_timer -= delta
+	if _resummon_timer > 0.0:
+		return
+	_resummon_timer = iv
+	_summon_phantoms_if_needed()
+
+
+## 补召间隔（秒）。特性里没写就看全局段，默认 5 秒；<= 0 = 不补召。
+func _resummon_interval() -> float:
+	var v := float(_feat.get("resummon_interval_seconds", -1.0))
+	if v < 0.0:
+		v = float(Config.get_value("enemy_traits.phantom.resummon_interval_seconds", 5.0))
+	return v
+
+
+## 让 EnemySystem 把分身排进刷怪队列：开局出生走一次，之后由 _tick_phantom_resummon 按节拍再走。
+## 分身（_is_phantom）不再召唤 —— 否则会指数繁殖；探针不注入 system 时也不召唤，
+## 这样纯逻辑断言可以在没有刷怪队列的场景里跑。
+## 名额（单只本体的 8 具上限 / 全场兜底）不在本文件判，统一交给 enemy_system.gd。
+func _summon_phantoms_if_needed() -> void:
+	if _is_phantom or feature_id() != "phantom_double":
+		return
+	if _system == null or not is_instance_valid(_system):
+		return
+	if not _system.has_method("notify_phantom_summon"):
+		return
+	_system.notify_phantom_summon(self, _type_cfg, _feat, global_position)
+
+
+## 我是真人还是幻影（探针/HUD/统计用）
+func is_phantom() -> bool:
+	return _is_phantom
+
+
+## 本体的共享记账池（分身与本体是**同一个 Dictionary 实例**，引用语义）。
+## 注意：它**不是**血量权威 —— 全组血量各自独立，池只用来数人头与广播血条。
+func phantom_pool() -> Dictionary:
+	return _phantom_pool
+
+
+## 活着的分身（排除正在消失的）。本体调用；分身调用返回空数组。
+func live_phantoms() -> Array:
+	var out: Array = []
+	if _is_phantom:
+		return out
+	var members = _phantom_pool.get("members", [])
+	if not (members is Array):
+		return out
+	for m in members:
+		if not is_instance_valid(m):
+			continue
+		if bool(m.get("_dying")):
+			continue
+		out.append(m)
+	return out
+
+
+func phantom_count() -> int:
+	return live_phantoms().size()
+
+
+## 自己这条血的比例（血条**不**直接用这个 —— 见 display_hp_ratio）。
+func hp_ratio() -> float:
+	return clampf(float(hp) / float(maxi(1, max_hp)), 0.0, 1.0)
+
+
+## 血条要显示的比例 —— **「整组按最低血条展示」的落点**（用户 2026-09-17 定：
+## 「这批角色（本体加召唤）按最低血条展示，不管攻击哪个，显示血条最低的，迷惑玩家」）。
+## 本体与它的全部分身算一组，统一显示「组内最低血量 ÷ 本体 max_hp」。
+## 分母恒用本体 max_hp：分身天生只有本体 20% 的血，所以场上一有分身，
+## 整组血条就固定落在 20% 以下的「残血」区间 —— 这就是迷惑玩家的地方。
+## 分身侧直接问本体要（本体是组里唯一算这个数的人），拿不到就退回自己的比例。
+func display_hp_ratio() -> float:
+	if _is_phantom:
+		var own = _phantom_pool.get("owner", null)
+		if is_instance_valid(own) and own.has_method("display_hp_ratio"):
+			return float(own.call("display_hp_ratio"))
+		return hp_ratio()
+	var members = _phantom_pool.get("members", [])
+	if not (members is Array) or (members as Array).is_empty():
+		return hp_ratio()
+	var lowest := hp
+	for m in members:
+		if not is_instance_valid(m):
+			continue
+		if bool(m.get("_dying")):
+			continue
+		lowest = mini(lowest, int(m.get("hp")))
+	return clampf(float(lowest) / float(maxi(1, max_hp)), 0.0, 1.0)
+
+
+## 组内任一成员的血量变了 → 把新比例广播给**整组**并让血条亮起。
+## 本体调用：刷自己 + 全部分身；分身调用：转交本体（本体是组里唯一算数的人）。
+func refresh_group_hp_bar(force_show := true) -> void:
+	if _is_phantom:
+		var own = _phantom_pool.get("owner", null)
+		if is_instance_valid(own) and own.has_method("refresh_group_hp_bar"):
+			own.call("refresh_group_hp_bar", force_show)
+			return
+		_update_hp_bar(force_show)
+		return
+	_update_hp_bar(force_show)
+	var members = _phantom_pool.get("members", [])
+	if not (members is Array):
+		return
+	for m in members:
+		if is_instance_valid(m) and m.has_method("_update_hp_bar"):
+			m.call("_update_hp_bar", force_show)
+
+
+
+
+## 刷新头顶血条：比例 + 位置（位置可被 config 调）+ 是否该显示。
+## 比例走 display_hp_ratio()（**整组按组内最低血量显示**），不是自己的 hp_ratio ——
+## 分身一出生，整组血条就会一起变成「残血」样，这正是幻影分身要的迷惑效果。
+## force_show：出生 / 挨打 / 组内血量变动时亮一下。
+func _update_hp_bar(force_show := false) -> void:
+	if _hp_bar == null or not is_instance_valid(_hp_bar):
+		return
+	if not bool(Config.get_value("enemy.hp_bar.enabled", true)):
+		return
+	var shown := display_hp_ratio()
+	if _hp_bar.has_method("set_ratio"):
+		_hp_bar.call("set_ratio", shown)
+		_hp_bar.position = Vector2(0.0, float(Config.get_value("enemy.hp_bar.offset_y", -68.0)))
+	if (force_show or shown < 1.0) and _hp_bar.has_method("flash"):
+		_hp_bar.call("flash")
+
+
+func _hide_hp_bar() -> void:
+	if _hp_bar != null and is_instance_valid(_hp_bar) and _hp_bar.has_method("hide_bar"):
+		_hp_bar.call("hide_bar")
+
+
+## 本体每跨过一个「掉 swap_hp_step_ratio(默认 20%)」的台阶，就和随机一个分身换一次位置。
+## 例：满血 → 掉到 80% 触发第 1 次、60% 第 2 次、40% 第 3 次、20% 第 4 次。
+## 用**整数血量**算台阶（`已掉 / (max_hp × 比例)`）而不是浮点血量比：
+## 24/30 这种比例在二进制里是 0.19999999999999996，用 hp_ratio() 会 floor 成 0、
+## 白白吞掉一次互换（实测踩过）。末尾那个 1e-6 是给整除情形兜底的。
+## 一次伤害哪怕跨多个台阶也只换一次（连换多次等于同帧内随机打乱，没有意义）。
+func _check_phantom_swap() -> void:
+	if _is_phantom:
+		return
+	var step_ratio := float(_feat.get("swap_hp_step_ratio", 0.2))
+	if step_ratio <= 0.0:
+		return
+	var lost := float(maxi(0, max_hp - hp))
+	var step_size := maxf(1.0, float(max_hp) * step_ratio)
+	var step := int(floor(lost / step_size + 1e-6))
+	if step <= _swap_step:
+		return
+	_swap_step = step
+	if live_phantoms().is_empty():
+		return      # 没分身可换：台阶照样记下，不攒着等分身出生后连闪
+	_swap_with_random_phantom()
+
+
+## 本体 ↔ 随机一具分身**交换坐标**。两边的巡逻中心(_home)也跟着换，
+## 否则本体一步走回自己的老窝，玩家一眼就看穿了。
+func _swap_with_random_phantom() -> void:
+	var alive := live_phantoms()
+	if alive.is_empty():
+		return
+	var other = alive[randi() % alive.size()]
+	if not is_instance_valid(other):
+		return
+	var mine := global_position
+	var theirs: Vector2 = other.global_position
+	global_position = theirs
+	other.global_position = mine
+	# 巡逻中心与路径都要跟着挪（不然双方都会往原地跑回去）
+	_home = global_position
+	other._home = other.global_position
+	clear_move_target()
+	other.clear_move_target()
+
+
+## 分身消失。两个调用方：① 本体死亡时连带收拾；② 分身自己那 20% 的血被打光。
+## 都不上报特性、不掉落、不走"尸体淡出"（身后不留任何结算）。
+## 注意：分身消失不改本体血量（血量各自独立），只会让本体的减伤少一档。
+func vanish_as_phantom() -> void:
+	if _dying:
+		return
+	_dying = true
+	_hide_hp_bar()
+	_fade_out()
+
+
+## 本体死亡 → 所有分身一起消失（用户没明说，但不这样做会剩一堆孤儿幻影满地跑）
+func _vanish_phantoms() -> void:
+	if _is_phantom:
+		return
+	var members = _phantom_pool.get("members", [])
+	if not (members is Array):
+		return
+	for m in members:
+		if is_instance_valid(m) and m.has_method("vanish_as_phantom"):
+			m.vanish_as_phantom()
+	members.clear()
 
 
 ## 套用兵种：属性 + 帧序列 + 脚底偏移。所有数值都能在 config 的 enemy_types 里调。
@@ -247,6 +606,24 @@ func hear_noise(source_pos: Vector2, intensity: float) -> void:
 	_noise_source = source_pos
 
 
+## 被玩家打中 → 记住**打我的那个人在哪**，立刻朝那边去。
+## 用户 2026-09-17 定的规则：「其他怪只在一个固定的范围内移动，受到攻击或者噪音，再移动」
+## —— 所以「挨打」和「听见」在系统里走同一条路：涨警觉度 → 过阈值 → 转「调查」走向声源。
+## 攻击者位置只能由调用方给（近战 = 玩家位置、箭 = 出膛点、强弩 = 玩家位置），
+## 因此这是个**独立入口**，而不是塞进 take_damage() 的签名：探针里那些只测伤害数值的
+## 假敌人（自定义 take_damage）不必跟着改签名。全部敌人通用，不只劫掠者。
+## 强度取 noise.sources.hurt（写 0 = 关掉这条反应）。
+func alert_from_attacker(from_pos: Vector2) -> void:
+	if _dying or from_pos == Vector2.ZERO:
+		return
+	var gain := float(Config.get_value("noise.sources.hurt", 0.0))
+	if gain <= 0.0:
+		return
+	_noise_source = from_pos
+	noise_alertness = minf(noise_alertness + gain,
+			float(Config.get_value("noise.max_alertness", 150.0)))
+
+
 ## 调查目标位置（最后听到的声源）
 func noise_source() -> Vector2:
 	return _noise_source
@@ -307,6 +684,297 @@ func _update_alert_visual() -> void:
 
 
 # ------------------------------------------------------------
+# AI 参数（兵种级「怎么走」的开关：游走范围 / 听力 / 成群）
+# 全局默认写在 config 的 enemy.ai，兵种用 enemy_types.types[*].ai 按键覆盖
+# （劫掠者三项都覆盖了；不写 ai 段的兵种 = 老行为）。见文件头「劫掠者」段。
+# 合并只做一次（_ai_cache，setup 后第一次访问时算），热点路径不重复读 config。
+# ------------------------------------------------------------
+
+## 合并后的 AI 配置：enemy.ai（全局默认）← 兵种 ai（按键覆盖，两个子树各自浅合并一层）。
+## **只在拿到兵种配置之后才缓存**：_ready() 早于 setup()，而 _ready 里的状态机起手就会
+## 问一次 roam.mode（patrol.enter → pick_patrol_target）——那时 _type_cfg 还是空的，
+## 若把那次结果缓存下来，后面真正注入兵种配置也永远读不到（2026-09-17 踩过，全兵种都退回默认）。
+func ai_cfg() -> Dictionary:
+	if not _ai_cache.is_empty():
+		return _ai_cache
+	var base = Config.get_value("enemy.ai", {})
+	var merged: Dictionary = (base as Dictionary).duplicate(true) if base is Dictionary else {}
+	var over = _type_cfg.get("ai", {})
+	if over is Dictionary:
+		for k in over:
+			var v = over[k]
+			if v is Dictionary and merged.get(k) is Dictionary:
+				var sub: Dictionary = merged[k]
+				for kk in v:
+					sub[kk] = v[kk]
+			else:
+				merged[k] = v
+	if not _type_cfg.is_empty():
+		_ai_cache = merged         # 兵种配置在手，结果才算定稿
+	return merged
+
+
+func _ai_sub(key: String) -> Dictionary:
+	var v = ai_cfg().get(key, {})
+	return v if v is Dictionary else {}
+
+
+## 游走范围策略："whole_map"（满地图随机游走，劫掠者）| "home_radius"（出生点周围，默认）
+func roam_mode() -> String:
+	return str(_ai_sub("roam").get("mode", "home_radius"))
+
+
+## 听力倍率（>1 = 听得更远也更清）。劫掠者「对声音更敏感」就是它。
+## **真正的使用点在 noise_system.gd::emit 的派发循环**（按听者放大等效听力半径），
+## 本函数只负责把配置读出来 —— 全工程只有那一个消费点，改口径只改一处。
+func noise_sensitivity() -> float:
+	return maxf(0.01, float(ai_cfg().get("noise_sensitivity", 1.0)))
+
+
+## AI 活跃半径（格）：超过它的敌人整帧不跑 AI（性能保护，见文件头）。
+## 兵种可用 ai.roam.active_radius_cells 单独放宽：劫掠者要「满地图游走」，
+## 全局那 32 格（=512px）会把它圈在玩家附近，所以给它放宽到 48 格。
+## 不写 / 写 0 = 沿用全局 enemy.ai_active_radius_cells。
+func ai_active_radius_cells() -> float:
+	var v := float(_ai_sub("roam").get("active_radius_cells", 0.0))
+	if v > 0.0:
+		return v
+	return float(Config.get_value("enemy.ai_active_radius_cells", 32.0))
+
+
+# ------------------------------------------------------------
+# 成群（pack）：同类相遇后一起移动，每群上限 max_members（默认 5）
+#
+# 用户原话：「遇到同类会一起移动，上限先做到 5 个」。
+# 结构 = 全群**共享同一个 Dictionary**（引用语义，与幻影分身的池同一套写法）：
+#   {"leader": Node2D, "members": Array}   —— members 含群主自己。
+# 语义是「后来者加入先到者的群」（活物世界里的自然顺序），不是两群对等合并；
+# 于是每群的规模单调逼近 max_members，且**永远不会超**（cap 是硬闸）。
+# 分工：群主选目标（按 roam 模式满地图游走），成员只跟队形（follow_pack_leader）。
+# ------------------------------------------------------------
+
+func pack_enabled() -> bool:
+	return bool(_ai_sub("pack").get("enabled", false))
+
+
+func pack_max_members() -> int:
+	return maxi(1, int(_ai_sub("pack").get("max_members", 5)))
+
+
+func pack_join_radius_px() -> float:
+	return maxf(0.0, float(_ai_sub("pack").get("join_radius_px", 160.0)))
+
+
+func pack_follow_distance_px() -> float:
+	return maxf(0.0, float(_ai_sub("pack").get("follow_distance_px", 48.0)))
+
+
+func pack_scan_interval() -> float:
+	return maxf(0.05, float(_ai_sub("pack").get("scan_interval_seconds", 1.0)))
+
+
+func pack_repath_interval() -> float:
+	return maxf(0.05, float(_ai_sub("pack").get("repath_interval_seconds",
+			Config.get_value("enemy.repath_interval_seconds", 0.4))))
+
+
+## 全群共享的那个字典（同群两边是**同一个实例**）。探针/统计用；空 = 没成群。
+func pack_dict() -> Dictionary:
+	return _pack
+
+
+## 本群活着的成员（含群主）：尸体、正在淡出的、以及已释放的都会被过滤掉。
+func pack_members() -> Array:
+	var out: Array = []
+	var members = _pack.get("members", null)
+	if not (members is Array):
+		return out
+	for m in members:
+		if not is_instance_valid(m):
+			continue
+		if bool(m.get("_dying")):
+			continue
+		out.append(m)
+	return out
+
+
+func pack_size() -> int:
+	return pack_members().size()
+
+
+## 群主（负责选目标、满地图游走的那只）。群主死了就**就地**推举一个继承者
+## （懒惰修复：在读取处补一次，省得为"群主阵亡"到处埋钩子）。
+func pack_leader() -> Node2D:
+	if _pack.is_empty():
+		return null
+	var l = _pack.get("leader", null)
+	if l != null and is_instance_valid(l) and not bool(l.get("_dying")):
+		return l
+	_promote_pack_leader(pack_members())
+	l = _pack.get("leader", null)
+	if l != null and is_instance_valid(l) and not bool(l.get("_dying")):
+		return l
+	return null
+
+
+func is_pack_leader() -> bool:
+	return bool(pack_leader() == self)
+
+
+## 我是不是「跟着别人走」的成员（成群、群里不止我一个、且群主不是我）。
+## 巡逻状态靠它决定：自己选目标（群主）还是跟队形（成员）。
+func is_pack_follower() -> bool:
+	if _dying or not pack_enabled() or _pack.is_empty():
+		return false
+	var l := pack_leader()
+	return l != null and l != self
+
+
+## 建一个只有自己的群（群主 = 自己）。已经在群里就什么都不做。
+## setup() 里调一次 ⇒ 带 pack 的兵种一出生就「有群」，不需要等第一次扫描。
+func _ensure_pack() -> void:
+	if not pack_enabled() or not _pack.is_empty():
+		return
+	_pack = {"leader": self, "members": [self]}
+
+
+## 加入某一群。会先把「我」从原来的群里摘出去（原群群主若是我 → 先移交给别人）。
+func attach_to_pack(pack: Dictionary) -> void:
+	if pack.is_empty() or pack == _pack:
+		return
+	_leave_pack()
+	_pack = pack
+	var members = pack.get("members", null)
+	if members is Array and not (members as Array).has(self):
+		(members as Array).append(self)
+	_follow_timer = 0.0
+	clear_move_target()          # 换群了：旧队形作废，下一帧按新群主重新寻路
+
+
+## 把另一只同类收进**我的**群（后来者加入先到者）。返回是否真的收下了。
+## 满了 / 对方无效 / 已在本群 → 一律拒绝（cap 就是在这里兜住的）。
+func absorb_into_pack(other: Node2D) -> bool:
+	if other == null or not is_instance_valid(other) or other == self:
+		return false
+	if not other.has_method("attach_to_pack"):
+		return false
+	_ensure_pack()
+	if pack_members().size() + 1 > pack_max_members():
+		return false             # 满了：不再收人（用户定的「上限先做到 5 个」）
+	other.call("attach_to_pack", _pack)
+	return true
+
+
+## 退出当前群（投靠别的群 / 死亡时调用）。我是群主就先移交，然后清空自己那份。
+func _leave_pack() -> void:
+	if _pack.is_empty():
+		return
+	var members = _pack.get("members", null)
+	if not (members is Array):
+		_pack = {}
+		return
+	var arr: Array = members
+	var was_leader: bool = _pack.get("leader", null) == self
+	arr.erase(self)
+	if was_leader:
+		_promote_pack_leader(arr)
+	_pack = {}
+
+
+## 群主没了 → 由 arr 里第一只活着的接管（members 顺序 = 入群先后，先到者优先）。
+## 全群覆灭就把 leader 置空（之后各自 _leave_pack 时那份字典也会被丢掉）。
+func _promote_pack_leader(arr: Array) -> void:
+	if _pack.is_empty():
+		return
+	var next: Node2D = null
+	for m in arr:
+		if not is_instance_valid(m):
+			continue
+		if bool(m.get("_dying")):
+			continue
+		next = m
+		break
+	_pack["leader"] = next
+
+
+## 成群守护：定期找附近的同类结伙（跟随逻辑在巡逻状态里，见 follow_pack_leader）。
+## 每帧都会被调，但内部按 scan_interval_seconds 节流；不带 pack 的兵种第一句就返回。
+func _tick_pack(delta: float) -> void:
+	if _dying or not pack_enabled():
+		return
+	if _pack.is_empty():
+		_ensure_pack()
+	_pack_scan_timer += delta
+	if _pack_scan_timer < pack_scan_interval():
+		return
+	_pack_scan_timer = 0.0
+	_try_join_nearby_pack()
+
+
+## 「遇到同类会一起移动」的落点：找**最近的同类**（同 type_id、同样带 pack、非分身、
+## 没在淡出），只要它那个群**不小于我的、且还装得下我**，我就投奔它。
+## 「不小于」这条是必需的：不加的话，一个小群里的人会为了再找一个落单的而退出旧群，
+## 于是小群之间互相拆伙、群主每秒换一次（实测 6 只聚在一起只会晃出 4+2 而不是 5+1）。
+## 只投奔更大的群 ⇒ 群规模单调往上走，收敛到 5 就停。
+## 节流跑（默认 1 秒一次）：这是 O(全场敌人数) 的扫描，不能每帧做。
+func _try_join_nearby_pack() -> void:
+	var radius := pack_join_radius_px()
+	if radius <= 0.0:
+		return
+	var best: Node2D = null
+	var best_d := INF
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e == self or not is_instance_valid(e):
+			continue
+		var n := e as Node2D
+		if n == null or not n.has_method("pack_enabled"):
+			continue
+		if not bool(n.call("pack_enabled")):
+			continue
+		if bool(n.get("_dying")) or bool(n.call("is_phantom")):
+			continue
+		if str(n.get("type_id")) != str(type_id):
+			continue                                  # 只跟**同类**结伙
+		if n.call("pack_dict") == _pack:
+			continue                                  # 已经是一伙的
+		var theirs := int(n.call("pack_size"))
+		if theirs < pack_size():
+			continue                                  # 只投奔**不小于**自己的群
+		if theirs + 1 > int(n.call("pack_max_members")):
+			continue                                  # 那群装不下我（cap 在这里兜住）
+		var d := global_position.distance_to(n.global_position)
+		if d > radius:
+			continue
+		if d < best_d:
+			best_d = d
+			best = n
+	if best != null:
+		best.call("absorb_into_pack", self)
+
+
+## 跟队形（成员在巡逻状态下每帧调用）：与群主保持在 follow_distance_px 之内。
+## 返回 true = 已经就位（站着待命，不用动）；false = 正在赶路。
+## 群主自己不跟（返回 false），照常 pick_patrol_target 去满地图游走。
+func follow_pack_leader() -> bool:
+	if not is_pack_follower():
+		return false
+	var l := pack_leader()
+	if l == null:
+		return false
+	if global_position.distance_to(l.global_position) <= pack_follow_distance_px():
+		if has_move_target():
+			clear_move_target()
+		return true
+	_follow_timer += get_physics_process_delta_time()
+	if _follow_timer >= pack_repath_interval() or not has_move_target():
+		_follow_timer = 0.0
+		if not _set_path_to(l.global_position):
+			clear_move_target()
+	follow_path(patrol_speed())
+	return false
+
+
+# ------------------------------------------------------------
 # 移动（功能层：只管沿路径推进，不管为什么走）
 # ------------------------------------------------------------
 
@@ -342,14 +1010,69 @@ func follow_path(speed: float) -> bool:
 	return false
 
 
-## 巡逻：在出生点附近随机选一个可达点
+## 巡逻：选下一个要走过去的点。两路（按兵种的 ai.roam.mode）：
+##   home_radius（默认，大多数敌人）= 出生点周围那一小片 —— 用户说的「其他怪只在
+##     一个固定的范围内移动」；
+##   whole_map（劫掠者）= 整张地图任意可走格 —— 「满地图随机游走」。
+## 两者都只在**没动静**时用：听到噪音/挨了打会立刻转调查（见 hear_noise / alert_from_attacker）。
 func pick_patrol_target() -> void:
-	var radius := float(Config.get_value("enemy.patrol_radius_cells", 6))
+	if roam_mode() == "whole_map":
+		pick_roam_target()
+		return
+	pick_home_radius_target()
+
+
+## 满地图随机游走：在整张地图上随机挑一个可走格走过去。
+## min_target_distance_px 保证新目标离当前位置足够远 —— 否则会挑到脚边几格，
+## 表现就是"原地小幅抖动"而不是"游走"（walk 动画一直在播但看不出在挪地方）。
+## max_target_distance_px > 0 可以把范围再收回来（默认 0 = 不限）。
+## 挑不到（地图没注入 / 起手被围）就退回出生点附近的老行为，绝不空转。
+func pick_roam_target() -> void:
+	var cfg := _ai_sub("roam")
+	var attempts := maxi(1, int(cfg.get("sample_attempts", 24)))
+	var min_d := maxf(0.0, float(cfg.get("min_target_distance_px", 320.0)))
+	var max_d := maxf(0.0, float(cfg.get("max_target_distance_px", 0.0)))
+	var half := float(_tile_size) * 0.5
+	for _i in range(attempts):
+		var cell := _random_open_cell()
+		if cell.x < 0:
+			break
+		var pos := Vector2(float(cell.x) * _tile_size + half, float(cell.y) * _tile_size + half)
+		var d := global_position.distance_to(pos)
+		if d < min_d:
+			continue
+		if max_d > 0.0 and d > max_d:
+			continue
+		if _set_path_to(pos):
+			return
+	pick_home_radius_target()
+
+
+## 老行为（也是绝大多数敌人的行为）：在出生点附近随机选一个可达点（矩形范围）。
+func pick_home_radius_target() -> void:
+	var radius := float(_ai_sub("roam").get("patrol_radius_cells",
+			Config.get_value("enemy.patrol_radius_cells", 6)))
 	for _attempt in range(8):
 		var offset := Vector2(randf_range(-radius, radius), randf_range(-radius, radius))
 		if _set_path_to(_home + offset * float(_tile_size)):
 			return
 	clear_move_target()   # 周围选不到点（被墙包围）就原地待着
+
+
+## 随机取一个**可走格**（最多试 16 次，避免在石头/树密的地方死磕）。
+## 地图没注入 / 整张图都被墙填满时返回 (-1,-1)，由调用方兜底。
+func _random_open_cell() -> Vector2i:
+	var h: int = _walls.size()
+	if h == 0:
+		return Vector2i(-1, -1)
+	var w: int = _walls[0].size()
+	if w <= 0:
+		return Vector2i(-1, -1)
+	for _i in range(16):
+		var c := Vector2i(randi_range(0, w - 1), randi_range(0, h - 1))
+		if not _walls[c.y][c.x]:
+			return c
+	return Vector2i(-1, -1)
 
 
 ## 追击：把路径指向玩家当前位置
@@ -421,22 +1144,214 @@ func _in_bounds(cell: Vector2i) -> bool:
 func take_damage(amount: int) -> void:
 	if hp <= 0 or _dying:
 		return
-	hp -= amount
+	# 【幻影分身】分身有**自己的一份血**（= 本体 max_hp 的 20%，见 _setup_phantom），
+	# 扣的是自己的；打光就自己消失（vanish_as_phantom），**不**把伤害转嫁给本体。
+	# 但血条是**整组按组内最低血量**显示的 ⇒ 打分身也会让全组的条一起动，
+	# 玩家看到的永远是"这群人快死了"的同一条血 —— 这就是迷惑点。
+	if _is_phantom:
+		_hit_flash = float(Config.get_value("enemy.hit_flash_seconds", 0.18))
+		hp = maxi(0, hp - maxi(1, amount))
+		refresh_group_hp_bar()      # 整组血条跟着刷新（组内最低值可能变了）
+		if hp <= 0:
+			vanish_as_phantom()     # 分身就这一小份血，打光即散，不走本体的死亡结算
+		return
+	hp -= incoming_damage(amount)      # 特性减伤（爆裂鼓手 / 幻影分身）都在这句里算
 	_hit_flash = float(Config.get_value("enemy.hit_flash_seconds", 0.18))
+	refresh_group_hp_bar()             # 挨打才显示血条；整组一起按最低值显示
 	if hp <= 0:
 		_die()
 		return
+	_check_phantom_swap()              # 每掉 20% 血，随机和一具分身交换位置
 
 
-## 死亡结算：按概率掉落资源 → 淡出 → 移除自身。
+# ------------------------------------------------------------
+# 特性：受击减伤（burst_drum「爆裂鼓手」的后一半）
+# 血量越低，受到的伤害越少 —— 越到残血越难磨死，逼玩家靠爆发而不是慢慢耗。
+# ------------------------------------------------------------
+
+## 实际承受的伤害 = 原始伤害 × (1 − 减伤比例)，并有 min_damage 点保底。
+## 没带减伤子段的敌人（绝大多数）原样返回 —— 等于这两段代码不存在。
+## 两条通道依次相乘：① 爆裂鼓手（血越少越难打，有 min_damage 保底）
+##                    ② 幻影分身（场上分身越多越难打，1 点保底）
+## 一个实例只有一个特性，实际只会命中其中一条；两条并列是为了将来能叠加。
+func incoming_damage(amount: int) -> int:
+	var out := amount
+	var red := damage_reduction_ratio()
+	if red > 0.0:
+		out = maxi(_dr_min_damage(), int(round(float(out) * (1.0 - red))))
+	var pred := phantom_damage_reduction()
+	if pred > 0.0:
+		out = maxi(1, int(round(float(out) * (1.0 - pred))))
+	return out
+
+
+## 当前血量下的减伤比例（0 = 不减伤）。**纯计算**，探针改 hp 后直接调用即可。
+## 公式：max_reduction × (1 − hp/max_hp)^exponent —— 满血 0，血越少越接近 max_reduction，
+## 但永远 < 1（再配 min_damage 保底 ⇒ 残血也打得死，不会出现无敌怪）。
+func damage_reduction_ratio() -> float:
+	var cfg := _sub_feat("damage_reduction")
+	if cfg.is_empty():
+		return 0.0
+	var ratio := clampf(float(hp) / float(maxi(1, max_hp)), 0.0, 1.0)
+	var red := float(cfg.get("max_reduction", 0.0)) * pow(1.0 - ratio, maxf(0.05, float(cfg.get("exponent", 1.0))))
+	return clampf(red, 0.0, 0.999)
+
+
+func _dr_min_damage() -> int:
+	var cfg := _sub_feat("damage_reduction")
+	if cfg.is_empty():
+		return 1
+	return maxi(1, int(cfg.get("min_damage", 1)))
+
+
+## 幻影分身：「分身越多，自身受到伤害越少」（用户 2026-09-17 定）。
+## 公式：per_phantom × 场上活分身数，封顶 max_reduction；另有 1 点保底伤害（不会无敌）。
+## 分身被打光就没了 ⇒ 想少挨减伤，玩家得先把分身清干净（这正是这条的设计意图）。
+## 只有本体吃这条减伤（分身自己不算），**纯计算**，探针直接调用即可。
+func phantom_damage_reduction() -> float:
+	if _is_phantom or feature_id() != "phantom_double":
+		return 0.0
+	var cfg := _sub_feat("damage_reduction")
+	if cfg.is_empty():
+		return 0.0
+	var n := phantom_count()
+	if n <= 0:
+		return 0.0
+	return clampf(float(n) * float(cfg.get("per_phantom", 0.0)),
+			0.0, float(cfg.get("max_reduction", 0.0)))
+
+
+# ------------------------------------------------------------
+# 特性：噪音放大（burst_drum「爆裂鼓手」的前一半）
+# 小队的动静在它身边被"鼓"放大 —— 逼玩家要么先点掉它，要么用不出声的手段。
+# ------------------------------------------------------------
+
+## 本实例对「发声点 at」贡献的噪音增幅（0 = 不贡献）。**纯计算**，供探针直接调用。
+## noise_system.gd 在玩家发声时遍历 "noise_amplifiers" 组求和就是这个（见 emit）。
+## 距离线性加权：贴着 = per_enemy 全量，到 radius_px 边缘 = 0。
+## radius_px ≤ 0 视为关闭（想全图生效就把半径设得比地图大）。
+func noise_amplify_gain(at: Vector2) -> float:
+	if _dying:
+		return 0.0                      # 正在消失的尸体不再鼓噪
+	var cfg := _sub_feat("noise_amplify")
+	if cfg.is_empty():
+		return 0.0
+	var radius := float(cfg.get("radius_px", 0.0))
+	if radius <= 0.0:
+		return 0.0
+	var d := global_position.distance_to(at)
+	if d >= radius:
+		return 0.0
+	return maxf(0.0, float(cfg.get("per_enemy", 0.0))) * (1.0 - d / radius)
+
+
+## 本实例特性里的某个子配置段（没这个特性 / 没这一段 → 空字典）。
+## 「一个实例只有一个特性」，所以直接看 _feat 就够。
+func _sub_feat(key: String) -> Dictionary:
+	var sub = _feat.get(key, {})
+	return sub if sub is Dictionary else {}
+
+
+## 死亡结算：上报死亡分裂 → 按概率掉落资源 → 淡出 → 移除自身。
 ## 不再"瞬间消失"：淡出期间 _dying=true，AI、受伤、接触伤害全部停摆，
 ## 敌人不会在倒下动画里还能打人，也不会被重复结算掉落。
 func _die() -> void:
 	if _dying:
 		return
 	_dying = true
+	_leave_pack()            # 退出成群：我是群主就把位置让给同群下一个活着的
+	_report_death()          # 先上报：判定越早，刷出来的个体出来得越干脆
 	_spawn_drop()
+	_hide_hp_bar()
+	_vanish_phantoms()       # 本体倒下 → 幻影一并消失（分身自己不会单独死）
 	_fade_out()
+
+
+## 死亡特性上报：把「我死了 + 我是哪个特性」交回 EnemySystem，由它决定刷不刷、刷几个。
+## **一个实例只带一个特性**（生成时随机分配），所以这里按 id 分派，两个特性不会同时触发。
+## 概率 / 数量 / 一个一个出来的节奏全不在这（见 enemy_system.gd::notify_death_*）。
+func _report_death() -> void:
+	if _system == null or not is_instance_valid(_system):
+		return
+	match str(_feat.get("id", "")):
+		"death_split":
+			_system.notify_death_split(global_position, _type_cfg, _split, _feat)
+		"death_regen":
+			_system.notify_death_regen(global_position, _type_cfg, _feat)
+		_:
+			pass     # 没特性的兵种（绝大多数）走这里
+
+
+## 本实例分配到的特性（没特性 = 空字典）
+func _trait_cfg() -> Dictionary:
+	return _feat
+
+
+## 本实例的特性 id（"" = 无特性）。探针 / 调试用。
+func feature_id() -> String:
+	return str(_feat.get("id", ""))
+
+
+## 本实例有没有特性（任何特性都算，包括与数量无关的「爆裂鼓手」）。
+func has_feature() -> bool:
+	return not _feat.is_empty()
+
+
+## 本实例的特性是否参与「数量缩放」（enemy_traits.population_scaling）的计数。
+## 判据：特性自己（或它的某一代）写了 chance_max ⇒ 它会随数量滑动，才该被数。
+## 于是「掠夺者越少 → 概率越高」的口径只数掠夺者系；
+## **与数量无关的特性（如邪术师的爆裂鼓手）不会把计数搅浑**（2026-09-17 修）。
+func counts_toward_population() -> bool:
+	if _feat.is_empty():
+		return false
+	var stages = _feat.get("stages", null)
+	if stages is Array:
+		for s in stages:
+			if s is Dictionary and (s as Dictionary).has("chance_max"):
+				return true
+		return false                       # 有 stages 但没一代带缩放 → 不参与
+	return _feat.has("chance_max")
+
+
+## 从兵种的特性池里**随机分配一个**（按 traits[*].weight 加权）。
+## 没写 traits[] 时回落单数 trait（旧写法）；都没有 → 空字典 = 无特性。
+## 这就是「一个角色只能有一个特性，随机分配」的落点：调一次定终身，之后不再变。
+func pick_feature(type_cfg: Dictionary) -> Dictionary:
+	var pool := feature_pool(type_cfg)
+	if pool.is_empty():
+		return {}
+	return pool[randi() % pool.size()]
+
+
+## 兵种的候选特性展开成抽样池：traits[] 按各自 weight 展开；没有 traits[] 但写了
+## 单数 trait 时，把那个 trait 当成「只有一个候选」的池（向后兼容旧 config）。
+func feature_pool(type_cfg: Dictionary) -> Array:
+	var out: Array = []
+	var arr = type_cfg.get("traits", [])
+	if arr is Array:
+		for f in arr:
+			if not (f is Dictionary):
+				continue
+			var w: int = maxi(1, int((f as Dictionary).get("weight", 1)))
+			for _k in range(w):
+				out.append(f)
+	if out.is_empty():
+		var one = type_cfg.get("trait", {})
+		if one is Dictionary and not (one as Dictionary).is_empty():
+			out.append(one)
+	return out
+
+
+## 是否是「特性刷出来的个体」（开局刷的原始怪 = false）。这些默认不掉落，见 _spawn_drop。
+## 判据是"生成时是否由 EnemySystem 递回了特性"；另外把"带批次"也算进来，
+## 这样老探针直接塞 split_batch 造的分裂体依旧被认。
+func is_split_spawn() -> bool:
+	return _from_trait or not _split.is_empty()
+
+
+## 同上，语义更准的名字（再生体也叫 is_split_spawn() 有点误导）。EnemySystem 两个都能用。
+func is_trait_spawn() -> bool:
+	return is_split_spawn()
 
 
 ## 死亡淡出：同时做 透明 / 缩小 / 下沉，读起来像"倒下了"而不是"被抠掉"。
@@ -456,6 +1371,13 @@ func _fade_out() -> void:
 
 ## 掉落：在原地生成一个资源点（复用 LootNode 场景，玩家走近自动拾取）
 func _spawn_drop() -> void:
+	# 幻影分身不掉落：它连独立个体都不算（随本体消失），掉一地资源等于白送
+	if _is_phantom:
+		return
+	# 分裂体默认不掉落：一只掠夺者能裂成 1+2+4+8+64 个，逐个掉落会把地面直接铺满
+	# （要开就改 config 的 trait.drop_from_splits）
+	if is_split_spawn() and not bool(_trait_cfg().get("drop_from_splits", false)):
+		return
 	if randf() > float(Config.get_value("enemy.drop.chance", 0.75)):
 		return
 	var res_id := _pick_drop_resource()
@@ -503,6 +1425,10 @@ func apply_knockback(impulse: Vector2) -> void:
 ## 玩家碰到敌人 → 接触伤害（带冷却，避免每帧掉血）
 func _on_body_entered(body: Node) -> void:
 	if _dying:
+		return
+	# 【幻影分身】分身无法造成伤害（用户明确要求）—— 撞上玩家也不掉血、也不播挥击动作，
+	# 玩家被"打了半天没掉血"会立刻明白这只不是真身（这是设计要的效果，别改成能打）。
+	if _is_phantom:
 		return
 	if not body.is_in_group("player"):
 		return

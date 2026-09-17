@@ -6,8 +6,8 @@
 
 读取  docs/requirements.json
 产出  docs/requirements.html   （可编辑可视化页面，导出即回写 JSON）
-      docs/03_REQUIREMENTS.md （人类/AI 可读归档，由 JSON 自动生成，勿手改）
 
+需求文档统一维护在 docs/DESIGN.md，本脚本不再单独生成 md。
 项目搬家后无需改本脚本：路径全部相对脚本自身推导。
 """
 import json
@@ -19,7 +19,7 @@ HERE = Path(__file__).resolve().parent          # <root>/tools
 ROOT = HERE.parent                              # <root>
 SRC = ROOT / "docs" / "requirements.json"
 OUT_HTML = ROOT / "docs" / "requirements.html"
-OUT_MD = ROOT / "docs" / "03_REQUIREMENTS.md"
+OUT_MD = None  # 需求文档统一维护在 docs/DESIGN.md，本脚本不再单独生成 md
 
 SM = {"done": "✅ 已完成", "doing": "🔄 进行中", "planned": "⏳ 已拍板未做",
       "design": "❓ 待设计", "blocked": "⛔ 素材阻塞", "p0": "⚠️ P0阻塞", "paused": "⏸ 暂缓"}
@@ -27,7 +27,7 @@ SM = {"done": "✅ 已完成", "doing": "🔄 进行中", "planned": "⏳ 已拍
 
 def build_md(data):
     L = []
-    L.append("# 03_REQUIREMENTS.md — 需求全景（自动生成，勿手改）\n")
+    L.append("# requirements.md — 需求全景（自动生成，勿手改）\n")
     L.append("> 本文件由 `docs/requirements.json` 生成。修改需求请编辑 JSON，")
     L.append("> 或直接在网页 `docs/requirements.html` 中编辑后导出覆盖 JSON，")
     L.append("> 再运行 `python tools/gen_requirements_html.py` 同步本文件。\n")

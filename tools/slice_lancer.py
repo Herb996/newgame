@@ -25,26 +25,32 @@ ALIGN_FEET 开关保留，若要人工微调再打开。
     sprite_offset_y = -(197 - 320/2) = -37
     sprite_scale    = 192/320 = 0.6   （才能与 Warrior 视觉等大）
 
-用法：python tools/slice_lancer.py
+用法：python tools/slice_lancer.py [Blue|Purple|Black|Yellow]
 """
 from __future__ import annotations
 
 import json
 import os
+import sys
 
 from PIL import Image
 
-SRC = r"D:\SteamPunkExtraction\images\Tiny Swords (Free Pack)\Units\Blue Units\Lancer"
-DST = r"D:\SteamPunkExtraction\Assets\Art\Sprites\Units\blue_lancer"
-CONFIG_SNIPPET = r"C:\Users\Administrator\WorkBuddy\2026-09-15-23-06-42\_lancer_frames.json"
-FEET_REPORT = r"C:\Users\Administrator\WorkBuddy\2026-09-15-23-06-42\_lancer_feet.txt"
+## 等级档位配色（2026-09-17 方案三）：Blue 之外还要给 Purple / Black / Yellow 各切一份。
+## 四套源图同骨架同帧数、只换颜色，切片逻辑零改动，只换 SRC/DST。
+FACTION = sys.argv[1] if len(sys.argv) > 1 else "Blue"
+TAG = FACTION.lower()          # blue / purple / black / yellow
+
+SRC = r"D:\SteamPunkExtraction\images\Tiny Swords (Free Pack)\Units\%s Units\Lancer" % FACTION
+DST = r"D:\SteamPunkExtraction\Assets\Art\Sprites\Units\%s_lancer" % TAG
+CONFIG_SNIPPET = r"C:\Users\Administrator\WorkBuddy\2026-09-15-23-06-42\_%s_lancer_frames.json" % TAG
+FEET_REPORT = r"C:\Users\Administrator\WorkBuddy\2026-09-15-23-06-42\_%s_lancer_feet.txt" % TAG
 
 FW = FH = 320
 FEET_TARGET = 197      # 对齐目标（Idle / Run / Right 系的共同下沿）
 ALIGN_FEET = False     # 见文件头说明：默认不自动对齐，只出探测报告
 WIDE = 25              # 「身体」行宽阈值
 NARROW = 15            # 「只剩枪杆」行宽阈值
-RES_DIR = "res://Assets/Art/Sprites/Units/blue_lancer/"
+RES_DIR = "res://Assets/Art/Sprites/Units/%s_lancer/" % TAG
 
 # (源文件, 输出前缀)
 JOBS: list[tuple[str, str]] = [

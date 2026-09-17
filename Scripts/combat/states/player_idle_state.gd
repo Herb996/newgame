@@ -16,10 +16,12 @@ func enter(_msg: Dictionary = {}) -> void:
 
 
 func physics_update(_delta: float) -> void:
-	# 输入缓冲：先按下的指令不会被丢掉（蓝图 2.1 Input Buffer）
-	if actor.consume_input(&"attack"):
+	# 自动战斗（2026-09-17）：锁定到「视野内 ∩ 攻击距离内」的敌人就自动起手，
+	# 不再需要手动按攻击键。够不着的敌人不会触发 —— 角色不自动追击。
+	if actor.auto_target() != null:
 		request_transition(&"attack")
 		return
+	# 输入缓冲：先按下的指令不会被丢掉（蓝图 2.1 Input Buffer）
 	if actor.can_dodge() and actor.consume_input(&"dodge"):
 		request_transition(&"dodge")
 		return

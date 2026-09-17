@@ -43,6 +43,25 @@ var _input_buffer: Array = []        # 输入缓冲：[{action, age}]
 var _hit_targets: Dictionary = {}    # 同一次挥击已命中的目标（去重）
 var _run: Node = null
 
+# --- 自动战斗：观察视野 / 攻击距离 / 当前锁定目标 ---
+# 锁定目标由 _update_auto_target() 节流刷新（默认 0.15s 一次），
+# 状态机只在 idle / move 里读 auto_target() 决定是否起手，不每帧遍历全组。
+var _auto_target: Node2D = null
+var _scan_timer := 0.0
+
+# --- 局内指令（菜单栏下发的指挥状态，2026-09-17）---
+# 这些字段全由 Scripts/menu_bar.gd 的指令面板读写；玩家自己不动它们，
+# 所以「谁在指挥」只有一处真相：玩家实例上的这几个开关。
+var auto_attack_on := true                       # 自动攻击开关（出厂默认 = combat.auto_attack.enabled）
+var target_stance: StringName = &"nearest"       # 索敌策略：nearest（最近）/ strongest（最强）
+var designated_target: Node2D = null             # 「指定攻击」锁定的目标（死后/跑出射程自动解除）
+var command_set := "combat"                      # 指令集 id（config characters.list[].command_set）
+var _arm_mode: StringName = &""                  # 待点选模式：designate（点敌人）/ patrol_set（点地面）
+var _patrol_points: PackedVector2Array = PackedVector2Array()
+var _patrol_active := false
+var _patrol_index := 0
+var _patrol_wait := 0.0
+
 # --- 当前武器（config: combat.weapons.<id>）---
 # 空 = 不启用武器表，一切走 combat.attack 全局值（改造前的行为）。
 var current_weapon: StringName = &""
@@ -52,6 +71,16 @@ var current_weapon: StringName = &""
 # 空则回落 config 的 player.weapon（命令行 / 无头回归路径没有选人面板，走回落）。
 var character_name := ""
 var initial_weapon := ""
+
+# --- 名册身份 / 等级（main.gd 在 add_child 前设置；config progression 段）---
+# roster_uid：本实例对应 Meta.roster 里的哪个**人**（0 = 无名册身份 ——
+#   命令行、无头回归、直接跑 Main.tscn 这些路径不经过选人面板，也就没有名册身份：
+#   它们不发经验、死亡也不除名，行为与加等级系统之前完全一致）。
+# level：这个**人**的等级，不是兵种的 —— 死亡永久，所以等级必须挂在实例上。
+var roster_uid: int = 0
+var level: int = 0
+# 头顶等级徽章（Scenes/Player.tscn 的 LevelBadge 节点，见 unit_level_badge.gd）
+var _badge: Node = null
 
 
 # 导航数据：由 main.gd 注入
@@ -88,6 +117,7 @@ var state_machine: StateMachine
 @onready var _sprite: Sprite2D = $Body
 @onready var hitbox: Area2D = $Hitbox
 var _path_line: Line2D
+var _patrol_line: Line2D   # 巡逻路线（闭环折线，仅选中时可见）
 
 # 表现层动画状态机（4 向精灵方向切换 + 程序化动画），详见 player_animator.gd
 var _animator: PlayerAnimator
@@ -119,6 +149,8 @@ func current_anim() -> int:
 func _ready() -> void:
 	add_to_group("player")
 	z_index = 1
+	# 自动攻击的出厂开关 = config 全局值；之后由菜单栏的开关单独控制本角色
+	auto_attack_on = bool(Config.get_value("combat.auto_attack.enabled", true))
 	_animator = PlayerAnimator.new(_sprite)
 	# 武器要先解析：武器可以强制指定贴图集（弓必须用弓手素材 —— 拉弓动作只存在于
 	# Archer，拿枪兵素材去射箭是画不出来的）。武器没指定才回落到 player.sprite_set。
@@ -147,8 +179,16 @@ func _ready() -> void:
 	_path_line.z_index = 100
 	_path_line.visible = false
 	add_child(_path_line)
+	# 巡逻路线：世界坐标折线（与本节点同变换，直接给世界坐标即可）
+	_patrol_line = Line2D.new()
+	_patrol_line.width = 2.0
+	_patrol_line.default_color = Color(0.42, 0.86, 1.0, 0.85)
+	_patrol_line.z_index = 100
+	_patrol_line.visible = false
+	add_child(_patrol_line)
 	_init_combat()
 	_setup_rifle()
+	_setup_level_badge()
 	_init_state_machine()
 
 
@@ -179,6 +219,42 @@ func _setup_rifle() -> void:
 	_rifle.offset = Vector2(-22, -15)   # 抓握点 = 机匣中心（画布 72x24）
 	_rifle.scale = Vector2.ONE * float(cfg.get("scale", 1.0))
 	_rifle.z_index = 2                  # 画在角色身体之上
+
+
+## 头顶等级徽章：节点在 Scenes/Player.tscn 里（LevelBadge），这里只把当前等级灌进去。
+## 为什么徽章要独立成节点而不是烘进贴图：等级是**运行时**属性（升级发生在局外结算），
+## 烘进贴图意味着 9 级 × 3 角色 = 27 套帧，且每次调数值都要重出图。
+func _setup_level_badge() -> void:
+	_badge = get_node_or_null("LevelBadge")
+	if _badge == null or not _badge.has_method("refresh"):
+		_badge = null
+		return
+	_badge.call("refresh", level, Meta.tier_id_of_level(level))
+
+
+## 设定这个人的等级（0~progression.max_level）。
+## 跨档位时**换整套贴图**（蓝新兵 → 紫老兵 → 黑精锐 → 金传奇），档位内只换徽章数字。
+## 换贴图要重载帧序列，所以档位没变就绝不重载 —— 否则每次结算都白重建一次。
+func apply_level(lv: int) -> void:
+	var clamped := clampi(lv, 0, Meta.max_level())
+	if clamped == level:
+		_ensure_badge_synced()
+		return
+	var tier_changed := Meta.tier_id_of_level(clamped) != Meta.tier_id_of_level(level)
+	level = clamped
+	_ensure_badge_synced()
+	if tier_changed:
+		_reload_animator()
+		print("[Level] %s 进入 %s 档（Lv%d）→ 贴图集 %s"
+				% [character_name, Meta.tier_name_of_level(level), level,
+					_sprite_set_for_weapon()])
+
+
+func _ensure_badge_synced() -> void:
+	if _badge == null or not is_instance_valid(_badge):
+		_badge = get_node_or_null("LevelBadge")
+	if _badge != null and _badge.has_method("refresh"):
+		_badge.call("refresh", level, Meta.tier_id_of_level(level))
 
 
 func _process(_delta: float) -> void:
@@ -221,8 +297,13 @@ func _init_state_machine() -> void:
 
 func _physics_process(delta: float) -> void:
 	_tick_combat_timers(delta)
+	# 自动战斗：刷新锁定目标（内部节流）。状态机只用结果，不自己遍历场景组。
+	_update_auto_target(delta)
 	# 行为决策交给状态机，本组件只提供能力
 	state_machine.physics_update(delta)
+	# 巡逻排在状态机之后：状态机这一帧把「到达」处理掉（清目标 → 回 idle），
+	# 这里立刻下令走下一个巡逻点，idle 下一帧看到有移动目标就自动转 move。
+	_tick_patrol(delta)
 	if _animator != null:
 		_animator.update(delta, _current_anim(), facing)
 
@@ -234,27 +315,164 @@ func _unhandled_input(event: InputEvent) -> void:
 	# 未选中的角色不受键鼠影响（各自继续执行状态机里的既有行为）。
 	if not selected:
 		return
-	var attack_button := int(Config.get_value("combat.input.attack_mouse_button", 2))
-	var attack_key := int(Config.get_value("combat.input.attack_key", 74))   # J
+	# 攻击已改为全自动（2026-09-17）：不再有手动攻击键/攻击鼠标键，
+	# 只要敌人进入「观察视野 ∩ 攻击距离」就自动起手，这里只留冲刺键。
 	var dodge_key := int(Config.get_value("combat.input.dodge_key", 32))     # Space
-	if event is InputEventMouseButton and event.pressed \
-			and event.button_index == attack_button:
-		push_input(&"attack")
-		return
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.physical_keycode == attack_key:
-			push_input(&"attack")
-			return
 		if event.physical_keycode == dodge_key:
 			push_input(&"dodge")
 			return
+		# ESC：先用来「退出待点选模式」（指定攻击 / 巡逻设点），
+		# 没有待点选状态时才放行给 Main（那边才轮到退出游戏）。
+		if event.is_action("ui_cancel") and _arm_mode != &"":
+			_arm_mode = &""
+			get_viewport().set_input_as_handled()
+			return
+	if event is InputEventMouseButton and event.pressed:
+		# 右键 = 取消当前指令（RTS 惯例）；左键 = 下指令（移动 / 设点 / 点敌人）
+		if event.button_index == MOUSE_BUTTON_RIGHT:
+			cancel_commands()
+			return
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			command_click(get_global_mouse_position())
+			return
 	state_machine.handle_input(event)
-	if not selected:
+
+
+# ------------------------------------------------------------
+# 菜单栏指令（指挥层：菜单栏发指令，本组件执行）
+# ------------------------------------------------------------
+
+## 下一条左键指令。世界点击（地图上）与菜单栏小地图点击都走这里，
+## 所以「点小地图移动」和「在地图上点」行为完全一致，待点选模式也通用。
+func command_click(world_pos: Vector2) -> void:
+	if _dead:
 		return
-	if not (event is InputEventMouseButton and event.pressed \
-			and event.button_index == MOUSE_BUTTON_LEFT):
+	match _arm_mode:
+		&"designate":
+			# 指定攻击：点中敌人即锁定（之后只要它还在「视野 ∩ 射程」内就优先打它）；
+			# 点空处 = 放弃这次指定，回到自动索敌。
+			var t := _enemy_near(world_pos, designate_pick_radius_px())
+			designated_target = t
+			_arm_mode = &""
+			return
+		&"patrol_set":
+			# 巡逻设点：每点一次地面加一个巡逻点（可在小地图上点）
+			_patrol_points.append(world_pos)
+			_patrol_index = 0
+			return
+	set_move_target(world_pos)
+
+
+## 自动攻击开关（菜单栏「自动攻击」按钮）
+func set_auto_attack(value: bool) -> void:
+	auto_attack_on = value
+	if not value:
+		_auto_target = null
+
+
+## 索敌策略：nearest（最近）/ strongest（最强）。见 _pick_by_stance()。
+func set_target_stance(stance: StringName) -> void:
+	target_stance = stance if stance == &"strongest" else &"nearest"
+
+
+## 进入「指定攻击」待点选模式（再点一次同一个按钮可取消）
+func arm_designate() -> bool:
+	_arm_mode = &"" if _arm_mode == &"designate" else &"designate"
+	return _arm_mode == &"designate"
+
+
+## 进入「巡逻设点」模式
+func begin_patrol_setup() -> void:
+	_arm_mode = &"patrol_set"
+	_patrol_active = false
+	_patrol_points = PackedVector2Array()
+	_patrol_index = 0
+
+
+## 按已设的点开始巡逻（无点返回 false，避免空巡逻把角色钉在原地）
+func start_patrol() -> bool:
+	if _patrol_points.is_empty():
+		return false
+	_patrol_active = true
+	_arm_mode = &""
+	_patrol_index = 0
+	_patrol_wait = 0.0
+	return true
+
+
+func stop_patrol() -> void:
+	_patrol_active = false
+	if _arm_mode == &"patrol_set":
+		_arm_mode = &""
+	stop_moving()
+
+
+## 巡逻状态："" 无 / "setting" 设点中 / "active" 巡逻中（菜单栏据此换按钮文字）
+func patrol_state() -> StringName:
+	if _patrol_active:
+		return &"active"
+	if _arm_mode == &"patrol_set":
+		return &"setting"
+	return &""
+
+
+func patrol_point_count() -> int:
+	return _patrol_points.size()
+
+
+func patrol_points() -> PackedVector2Array:
+	return _patrol_points
+
+
+## 待点选模式（"" / designate / patrol_set）；菜单栏用它高亮按钮
+func arm_mode() -> StringName:
+	return _arm_mode
+
+
+## 取消当前指令：解除指定目标、停巡逻、清巡逻点、停下脚步（菜单栏「取消指令」按钮）。
+## 不动「自动攻击」与「索敌策略」—— 那两个是持续偏好，不是一次性指令。
+func cancel_commands() -> void:
+	_arm_mode = &""
+	designated_target = null
+	_patrol_active = false
+	_patrol_points = PackedVector2Array()
+	_patrol_index = 0
+	stop_moving()
+
+
+## 巡逻推进：走完一个点、停顿 patrol_wait_seconds，再走向下一个（循环）。
+## 只在「当前没有移动目标」时下令，所以不会打断玩家手动点的移动、也不会和攻击抢方向。
+## 注意 _patrol_index 是**下令时就自增**的：某一段被攻击打断后不会原地重走同一个点，
+## 而是继续往下走（环形路线，迟早绕回来）。
+func _tick_patrol(delta: float) -> void:
+	if _patrol_active and not _patrol_points.is_empty() and not _dead:
+		if not has_move_target():
+			_patrol_wait -= delta
+			if _patrol_wait <= 0.0:
+				set_move_target(_patrol_points[_patrol_index])
+				_patrol_index = (_patrol_index + 1) % _patrol_points.size()
+				_patrol_wait = float(Config.get_value("menu_bar.patrol_wait_seconds", 0.6))
+	# 巡逻路线可视化：把路线画在屏幕上（选中时可见），否则玩家看不出巡逻在跑
+	_update_patrol_line()
+
+
+## 巡逻路线可视化（复用移动路径那条 Line2D 的兄弟节点；只有选中时才画）
+func _update_patrol_line() -> void:
+	if _patrol_line == null:
 		return
-	set_move_target(get_global_mouse_position())
+	var show := selected and _patrol_points.size() >= 1 and _patrol_active
+	_patrol_line.visible = show
+	if not show:
+		return
+	var pts := PackedVector2Array(_patrol_points)
+	pts.append(_patrol_points[0])   # 闭环
+	_patrol_line.points = pts
+
+
+## 「指定攻击」点选半径（像素）：在菜单栏点敌人时容错用，不是判定射程
+func designate_pick_radius_px() -> float:
+	return float(Config.get_value("menu_bar.designate_pick_radius_px", 96.0))
 
 
 # ------------------------------------------------------------
@@ -314,8 +532,170 @@ func attack_noise() -> float:
 	return float(Config.get_value("noise.sources.attack", 120.0))
 
 
-## 该武器该用哪套贴图集；空字符串 = 跟随 player.sprite_set
+## ------------------------------------------------------------
+## 观察视野 / 攻击距离 —— 自动战斗的两个核心属性（2026-09-17 起）
+##
+## 观察视野 vision_px：**能看见多远**（player.vision_radius_cells × 格宽）。
+##   只有视野内的目标才会被自动索敌选中；视野外的敌人不参与任何攻击判定，
+##   所以"看不见的敌人"永远不会被自动攻击打到。
+## 攻击距离 attack_range_px：**武器打得到多远**——近战取 range_px，
+##   远程取弹道射程 projectile.max_distance_px，瞬狙取射线射程 hitscan.max_distance_px。
+## 有效攻击距离 = min(攻击距离, 观察视野)：
+##   设计上观察视野预期大于攻击距离（先发现、再等它进入射程才开打），
+##   但不管数值怎么配，实际射程一律被观察视野截断 —— 杜绝"打到看不见的目标"。
+## ------------------------------------------------------------
+
+## 观察视野（像素）
+func vision_px() -> float:
+	return float(Config.get_value("player.vision_radius_cells", 10)) * float(_tile_size)
+
+
+## 武器自身的攻击距离（像素）
+func attack_range_px() -> float:
+	var w := weapon_data()
+	match attack_kind():
+		"ranged":
+			var pc = w.get("projectile", null)
+			if pc is Dictionary:
+				return float((pc as Dictionary).get("max_distance_px",
+						attack_param("range_px", 120.0)))
+		"hitscan":
+			var hc = w.get("hitscan", null)
+			if hc is Dictionary:
+				return float((hc as Dictionary).get("max_distance_px",
+						attack_param("range_px", 120.0)))
+	return attack_param("range_px", 120.0)
+
+
+## 有效攻击距离：攻击距离与观察视野取小者
+func effective_attack_range_px() -> float:
+	return minf(attack_range_px(), vision_px())
+
+
+## 自动索敌（节流刷新）：视野内、且进入有效攻击距离的最近敌对目标；没有则 null。
+## 只认 enemies 组 —— 中立生物（animals）不自动打，避免队友见羊就开火。
+## 三层优先级（2026-09-17 加菜单栏指令后）：
+##   1. 自动攻击开关关掉（菜单栏按钮）→ 永不锁定；
+##   2. 有「指定攻击」目标且它仍在有效射程内 → 只打它（focus fire）；
+##   3. 否则按索敌策略（最近 / 最强）在射程内挑一个。
+func auto_target() -> Node2D:
+	return _auto_target
+
+
+func _update_auto_target(delta: float) -> void:
+	if _dead or not auto_attack_on \
+			or not bool(Config.get_value("combat.auto_attack.enabled", true)):
+		_auto_target = null
+		return
+	_scan_timer -= delta
+	# 已锁定的目标仍然"够得着"时不必重扫；一旦死亡/被回收/跑出有效射程就立刻重扫。
+	# 距离必须在这里复核：只判 is_dead 的话，目标跑远了锁定还挂着，
+	# 会表现为"对着空气空挥"（状态机不停进 attack，但永远打不到）。
+	if _scan_timer > 0.0 and _auto_target != null and is_instance_valid(_auto_target) \
+			and not _target_lost(_auto_target) and _within_reach(_auto_target):
+		return
+	_scan_timer = float(Config.get_value("combat.auto_attack.scan_interval_seconds", 0.15))
+	# 指定目标优先（同样受「观察视野 ∩ 攻击距离」约束：跑出射程就解除指定）
+	if designated_target != null:
+		if not _target_lost(designated_target) and _within_reach(designated_target):
+			_auto_target = designated_target
+			return
+		designated_target = null
+	_auto_target = _pick_by_stance()
+
+
+## 目标是否在有效攻击距离内
+func _within_reach(t: Node2D) -> bool:
+	return global_position.distance_to(t.global_position) <= effective_attack_range_px()
+
+
+## 按当前索敌策略挑目标（只考虑射程内的）。
+##   nearest   → 距离最近（早发现早开打，默认）
+##   strongest → 「最强」= 生命上限高 + 打得疼的优先（先拆掉威胁最大的那个）。
+##               评分相同的（比如 4 个劫掠者）退化成「较近者优先」，不会来回跳。
+func _pick_by_stance() -> Node2D:
+	var reach := effective_attack_range_px()
+	var best: Node2D = null
+	var best_score := -INF
+	var best_dist := INF
+	for n in get_tree().get_nodes_in_group(&"enemies"):
+		if not is_instance_valid(n) or not (n is Node2D):
+			continue
+		var tgt := n as Node2D
+		if _target_lost(tgt):
+			continue
+		var d := global_position.distance_to(tgt.global_position)
+		if d > reach:
+			continue
+		var score := -d if target_stance != &"strongest" else _threat_score(tgt)
+		if score > best_score or (is_equal_approx(score, best_score) and d < best_dist):
+			best_score = score
+			best_dist = d
+			best = tgt
+	return best
+
+
+## 「最强」评分：生命上限 + 一半的接触伤害。取不到字段时给个中庸值（假目标/中立单位）。
+static func _threat_score(t: Node) -> float:
+	var mh = t.get("max_hp")
+	var hp = t.get("hp")
+	var dmg = t.get("damage")
+	var s := 20.0
+	if mh != null:
+		s = float(mh)
+	elif hp != null:
+		s = float(hp)
+	if dmg != null:
+		s += float(dmg) * 0.5
+	return s
+
+
+## 距 pos 最近的可打敌人（限定半径）；「指定攻击」点选用。
+func _enemy_near(pos: Vector2, radius: float) -> Node2D:
+	var best: Node2D = null
+	var best_d := radius
+	for n in get_tree().get_nodes_in_group(&"enemies"):
+		if not is_instance_valid(n) or not (n is Node2D):
+			continue
+		var tgt := n as Node2D
+		if _target_lost(tgt):
+			continue
+		var d := pos.distance_to(tgt.global_position)
+		if d <= best_d:
+			best_d = d
+			best = tgt
+	return best
+
+
+## 目标是否已不能打（已死或被回收）。敌人/动物都暴露 is_dead()，没有该方法就当活着。
+static func _target_lost(t: Node) -> bool:
+	if t == null or not is_instance_valid(t):
+		return true
+	if t.has_method("is_dead"):
+		return bool(t.call("is_dead"))
+	return false
+
+
+## 朝当前锁定目标转向（攻击状态进入时调用）；没有目标就保持原朝向，不乱甩枪口。
+func aim_at_auto_target() -> void:
+	var t := _auto_target
+	if t == null or not is_instance_valid(t):
+		return
+	var to := t.global_position - global_position
+	if to.length() > 1.0:
+		facing = to.normalized()
+
+
+## 该武器该用哪套贴图集。优先级（2026-09-17 加等级后）：
+##   1. 等级档位配色 —— progression.sprite_sets.<档位>.<武器>（同一个人升级就换配色）
+##   2. 武器自带的 sprite_set —— 档位表没配到这把武器时用（如已移出名单的强弩）
+##   3. config player.sprite_set —— 武器没指定贴图集时的全局回落
+## 为什么不直接把档位写进武器表：档位是**等级**的函数、武器是**兵种**的函数，
+## 两者正交；写进武器表就得为每把武器复制 4 份、加一档要改所有武器。
 func _sprite_set_for_weapon() -> String:
+	var tiered := Meta.unit_sprite_set(str(current_weapon), level)
+	if tiered != "":
+		return tiered
 	var s := str(weapon_data().get("sprite_set", ""))
 	if s != "":
 		return s
@@ -370,13 +750,21 @@ func _reload_animator() -> void:
 ## 判定框半径跟着武器走，且**必须能重复调用**。
 ## _init_combat() 里的半径只设一次，换武器不重设的话判定框还是旧武器的
 ## —— 远程武器这里给 0（它的判定在弹道上，不在玩家身上）。
+## 近战半径取**有效**攻击距离（被观察视野截断）：框多大就能打到多远，
+## 所以半径必须同样受限，否则会出现"判定框够到、但视野根本看不见"的目标。
 func _apply_hitbox_radius() -> void:
 	if hitbox == null:
 		return
 	var shape := hitbox.get_node("CollisionShape2D").shape as CircleShape2D
 	if shape == null:
 		return
-	shape.radius = maxf(attack_param("range_px", 30.0), 0.0)
+	# 远程/瞬狙仍然给 0：它们的判定在弹道或射线上，玩家身上不该挂判定框。
+	# （不能直接用 effective_attack_range_px()，那会把弓/强弩的射程变成一个
+	#  巨大却无用的 Area2D，语义错了还可能误伤别处的重叠查询。）
+	if attack_kind() != "melee":
+		shape.radius = 0.0
+		return
+	shape.radius = maxf(effective_attack_range_px(), 0.0)
 
 
 func _init_combat() -> void:
@@ -507,6 +895,10 @@ func resolve_attack_hit() -> void:
 		hits += 1
 		var dmg := DamagePipeline.compute(base_damage)
 		area.take_damage(dmg)
+		# 「受到攻击也要动」（用户 2026-09-17）：把攻击者位置告诉它，它自己转调查朝我走来。
+		# 用 has_method 而不是硬调：命中目标可能是动物（另一个脚本），它没有这个方法。
+		if area.has_method("alert_from_attacker"):
+			area.call("alert_from_attacker", global_position)
 		print("[Combat] 命中 %s，造成 %d 伤害" % [area.name, dmg])
 
 
@@ -524,7 +916,10 @@ func fire_projectile() -> bool:
 	var parent := get_parent()
 	if parent == null:
 		return false
-	var cfg: Dictionary = pc
+	# 射程按"有效攻击距离"截断（≤ 观察视野）：箭飞不出视野范围，
+	# 与自动索敌的射程判定用同一个数，避免"锁定得到但箭够不着"或反过来。
+	var cfg: Dictionary = (pc as Dictionary).duplicate()
+	cfg["max_distance_px"] = effective_attack_range_px()
 	var p := PROJECTILE.new()
 	p.name = "Projectile"
 	parent.add_child(p)
@@ -553,7 +948,10 @@ func fire_hitscan() -> int:
 		return 0
 
 	var from := global_position + facing * float(cfg.get("muzzle_offset_px", 34.0))
-	var far := from + facing * float(cfg.get("max_distance_px", 900.0))
+	# 射线长度同样按"有效攻击距离"截断（≤ 观察视野）：
+	# 强弩表上 900px 比 10 格视野（640px）远，实际最远只能打到看得见的地方。
+	var max_dist := minf(float(cfg.get("max_distance_px", 900.0)), effective_attack_range_px())
+	var far := from + facing * max_dist
 	# 墙截断：撞墙的点就是弹道终点（曳光也画到这里，视觉与判定一致）
 	var wall_hit = PROJECTILE.first_wall_point(_walls, _tile_size, from, far)
 	var to: Vector2 = wall_hit if wall_hit != null else far
@@ -568,6 +966,9 @@ func fire_hitscan() -> int:
 	for t in targets:
 		var dmg := DamagePipeline.compute(base_damage)
 		t.take_damage(dmg)
+		# 「受到攻击也要动」：挨了瞬狙的敌人会朝枪口方向来（远处点名不再毫无反应）
+		if t.has_method("alert_from_attacker"):
+			t.call("alert_from_attacker", global_position)
 		print("[Combat] 狙击命中 %s，造成 %d 伤害" % [t.name, dmg])
 
 	_spawn_tracer(from, to, cfg)
@@ -664,6 +1065,12 @@ func on_death() -> void:
 	if _dead:
 		return
 	_dead = true
+	# 死亡永久（用户 2026-09-17 定）：立刻从名册除名 —— 等级与经验随人一起消失。
+	# roster_uid == 0 是「没有名册身份」的临时角色（命令行 / 无头回归 / auto_enter_run），
+	# 它们从来没进过名册，自然也不该被除名（否则会误删同名条目）。
+	if roster_uid > 0:
+		Meta.remove_unit(roster_uid)
+		roster_uid = 0
 	stop_moving()
 	velocity = Vector2.ZERO
 	move_and_slide()

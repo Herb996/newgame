@@ -230,3 +230,22 @@ static func key_name(code: int) -> String:
 		return "未绑定"
 	var s := OS.get_keycode_string(code)
 	return s if s != "" else "键码 %d" % code
+
+
+# ------------------------------------------------------------
+# 局内菜单栏
+# ------------------------------------------------------------
+
+## 局内底部菜单栏的高度（像素）= 视口高 × menu_bar.height_ratio，再按 min/max 夹住。
+## 为什么放这里：菜单栏自己要用它铺底，HUD 与视野提示要用它让位 ——
+## 公式只写一份，避免两处 clamp 各写一遍后漂移（一边 20%、另一边 18% 这种）。
+## 兜底默认值与 config 里保持一致，否则配置键被删掉时两处会算出不同的高度。
+static func menu_bar_height(viewport_h: float) -> float:
+	var h := viewport_h * float(Config.get_value("menu_bar.height_ratio", 0.2))
+	return clampf(h, float(Config.get_value("menu_bar.min_height_px", 160)),
+			float(Config.get_value("menu_bar.max_height_px", 320)))
+
+
+## 菜单栏是否启用（关掉后不铺底，HUD 也不需要让位）
+static func menu_bar_enabled() -> bool:
+	return bool(Config.get_value("menu_bar.enabled", true))

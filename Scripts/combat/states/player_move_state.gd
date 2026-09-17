@@ -22,12 +22,22 @@ func physics_update(delta: float) -> void:
 	_footstep += delta
 	if _footstep >= float(Config.get_value("noise.footstep_interval_seconds", 0.4)):
 		_footstep = 0.0
-		NoiseSystem.emit(actor.global_position,
-				float(Config.get_value("noise.sources.walk", 10.0)))
-	# 攻击 / 冲刺可以打断移动（进入对应状态时会 stop_moving）
-	if actor.consume_input(&"attack"):
+		var pos: Vector2 = actor.global_position
+		# from_player=true → 计入菜单栏「当前/累积噪音」读数（脚步也算暴露度）
+		NoiseSystem.emit(pos, float(Config.get_value("noise.sources.walk", 10.0)), true)
+		# 踩水：站在积水格上时，同一次脚步额外出波纹 + 播水声。
+		# 噪声照常发（踩水不豁免噪音暴露）。这是 0.4s 一次的低频路径，
+		# 直接查组即可、不缓存（缓存反而要处理切图时 WeatherSystem 引用失效）。
+		# is_water_at 内部已判 _active，基地/未激活/无该节点时安全返回 false。
+		var weather := actor.get_tree().get_first_node_in_group("weather_system")
+		if weather != null and weather.is_water_at(pos):
+			weather.on_water_step(pos)
+	# 自动战斗（2026-09-17）：赶路途中敌人进入「视野 ∩ 攻击距离」就地开打，
+	# 打完回到 move 继续赶路（见 PlayerAttackState 的后摇分支）。
+	if actor.auto_target() != null:
 		request_transition(&"attack")
 		return
+	# 冲刺可以打断移动（进入对应状态时会 stop_moving）
 	if actor.can_dodge() and actor.consume_input(&"dodge"):
 		request_transition(&"dodge")
 		return

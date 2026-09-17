@@ -131,6 +131,8 @@ func create_slot(slot: int, slot_name: String = "") -> bool:
 		"last_played_unix": now,
 		"bank": {},
 		"upgrades": {},
+		"base_layout": {},
+		"roster": [],
 	}
 	if not write_slot(slot, payload):
 		return false
@@ -160,8 +162,9 @@ func active_payload() -> Dictionary:
 	return read_slot(active_slot)
 
 
-## Meta.save_game 走这里：把仓库/升级写回当前槽，并刷新时间戳。
-func write_active(bank: Dictionary, upgrades: Dictionary) -> bool:
+## Meta.save_game 走这里：把仓库/升级/**名册**写回当前槽，并刷新时间戳。
+func write_active(bank: Dictionary, upgrades: Dictionary, base_layout: Dictionary = {},
+		roster: Array = []) -> bool:
 	if active_slot <= 0:
 		return false
 	var data := read_slot(active_slot)
@@ -174,6 +177,8 @@ func write_active(bank: Dictionary, upgrades: Dictionary) -> bool:
 		}
 	data["bank"] = bank
 	data["upgrades"] = upgrades
+	data["base_layout"] = base_layout
+	data["roster"] = roster
 	data["last_played_unix"] = int(Time.get_unix_time_from_system())
 	return write_slot(active_slot, data)
 

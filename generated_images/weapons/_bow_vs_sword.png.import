@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b313nit755vdm"
-path="res://.godot/imported/_bow_vs_sword.png-f31210a79ee01caeae9566bca729f97f.ctex"
+path="res://.godot/imported/_bow_vs_sword.png-1ca578982b8e7fd89d2c99f70bcc7d80.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://_bow_vs_sword.png"
-dest_files=["res://.godot/imported/_bow_vs_sword.png-f31210a79ee01caeae9566bca729f97f.ctex"]
+source_file="res://generated_images/weapons/_bow_vs_sword.png"
+dest_files=["res://.godot/imported/_bow_vs_sword.png-1ca578982b8e7fd89d2c99f70bcc7d80.ctex"]
 
 [params]
 

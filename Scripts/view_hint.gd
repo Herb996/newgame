@@ -22,9 +22,15 @@ const FADE_AT := 0.9       # 从第几秒开始淡出
 
 var _label: Label = null
 var _cam: Node = null
+## 局内底部菜单栏占了最下面 1/5 屏（本提示原本贴底 12px，正好会被压住），
+## 高度与菜单栏同源（UiKit.menu_bar_height）。基地模式下菜单栏不显示，
+## 这里照样上移 —— 位置保持一致比"有时高有时低"更好预期。
+var _lift := 0.0
 
 
 func _ready() -> void:
+	_lift = UiKit.menu_bar_height(get_viewport().get_visible_rect().size.y) \
+			if UiKit.menu_bar_enabled() else 0.0
 	var l := Label.new()
 	l.name = "ZoomHint"
 	l.add_theme_font_size_override("font_size", 14)
@@ -33,8 +39,8 @@ func _ready() -> void:
 	# 而矩形宽度为 0 时"撑开"是往锚点外侧长的 —— 文字会被推到屏幕外。
 	l.offset_left = -420.0
 	l.offset_right = -12.0
-	l.offset_top = -56.0
-	l.offset_bottom = -12.0
+	l.offset_top = -56.0 - _lift
+	l.offset_bottom = -12.0 - _lift
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	l.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	l.add_theme_color_override("font_color", Color(0.92, 0.95, 0.99))

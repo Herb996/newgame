@@ -11,10 +11,12 @@ extends Area2D
 ## ============================================================
 
 signal interacted(building_id: String)
+signal reposition_requested(building_id: String)
 
 var building_id := ""
 var display_name := ""
 var hint := ""
+var cell := Vector2i.ZERO          # 占地左上角格（base.buildings[*].cell）
 var _hint_label: Label
 var _e_was_pressed := false  # 边沿检测：按住 E 只触发一次
 
@@ -28,11 +30,28 @@ func _ready() -> void:
 	input_event.connect(_on_area_input)
 
 
-## 鼠标点击建筑 → 触发交互（由 main 路由：仓库/升级/选人面板）
+## 是否有放置模式在跑（跑的时候建筑不响应普通点击/交互，避免误触）
+func _placing() -> bool:
+	return get_tree() != null and get_tree().get_first_node_in_group("placement_active") != null
+
+
+## 按占地左上角格摆位（节点原点 = 占地中心）
+func set_cell(c: Vector2i) -> void:
+	cell = c
+	var tile := float(Config.get_value("map.tile_size", 64))
+	var cells := float(Config.get_value("base.building_cells", 4))
+	position = Vector2(c.x + cells * 0.5, c.y + cells * 0.5) * tile
+
+
+## 鼠标点击建筑：左键=交互，右键=请求重摆。放置模式激活时忽略。
 func _on_area_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
-	if event is InputEventMouseButton and event.pressed \
-			and event.button_index == MOUSE_BUTTON_LEFT:
-		interacted.emit(building_id)
+	if _placing():
+		return
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			interacted.emit(building_id)
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			reposition_requested.emit(building_id)
 
 
 func setup(id: String, b_name: String, hint_text: String, sprite_path: String = "") -> void:
@@ -108,6 +127,9 @@ func _color_for(id: String) -> Color:
 
 
 func _physics_process(_delta: float) -> void:
+	if _placing():
+		_hint_label.visible = false
+		return
 	var player_inside := false
 	for body in get_overlapping_bodies():
 		if body.is_in_group("player"):

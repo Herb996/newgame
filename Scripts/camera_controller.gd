@@ -89,6 +89,24 @@ func setup(map_size: Vector2, player_node: CharacterBody2D) -> void:
 	reset_smoothing()
 
 
+## 把某个世界矩形框进视口（居中 + 缩放到刚好装下，四周留 margin_px 像素边距）。
+## 用于进基地时一眼看全所有建筑。
+func frame_world_rect(rect: Rect2, margin_px: float = 80.0) -> void:
+	_refresh_zoom_limits()
+	var vp := get_viewport_rect().size
+	var rw := maxf(rect.size.x, 1.0)
+	var rh := maxf(rect.size.y, 1.0)
+	var avail_x := maxf(vp.x - margin_px * 2.0, 1.0)
+	var avail_y := maxf(vp.y - margin_px * 2.0, 1.0)
+	var fit := minf(avail_x / rw, avail_y / rh)
+	_zoom_target = clampf(fit, _zoom_lo, _zoom_hi)
+	_zoom_ref = _zoom_target
+	global_position = rect.get_center()
+	_apply_zoom(zoom.x, _zoom_target)
+	_clamp_to_bounds()
+	_zoom_idle = 999.0
+
+
 func _physics_process(delta: float) -> void:
 	if get_tree().paused:
 		return

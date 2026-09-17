@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://Scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://Scripts/run_manager.gd" id="2_run"]
@@ -15,6 +15,8 @@
 [ext_resource type="Script" path="res://Scripts/survival_system.gd" id="12_surv"]
 [ext_resource type="Script" path="res://Scripts/animal_system.gd" id="13_animal"]
 [ext_resource type="Script" path="res://Scripts/view_hint.gd" id="14_hint"]
+[ext_resource type="Script" path="res://Scripts/weather_system.gd" id="16_weather"]
+[ext_resource type="Script" path="res://Scripts/menu_bar.gd" id="17_menubar"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_main")
@@ -42,13 +44,20 @@ script = ExtResource("12_surv")
 [node name="FogSystem" type="Node" parent="."]
 script = ExtResource("6_fog")
 
+[node name="WeatherSystem" type="Node" parent="."]
+script = ExtResource("16_weather")
+
 [node name="BaseSystem" type="Node" parent="."]
 script = ExtResource("8_base")
 
 [node name="HUD" type="CanvasLayer" parent="."]
 script = ExtResource("4_hud")
 
-[node name="Minimap" type="CanvasLayer" parent="."]
+[node name="MenuBar" type="CanvasLayer" parent="."]
+script = ExtResource("17_menubar")
+
+[node name="Minimap" type="CanvasLayer" parent="MenuBar"]
+layer = 3
 script = ExtResource("7_map")
 
 [node name="WarehousePanel" type="CanvasLayer" parent="."]

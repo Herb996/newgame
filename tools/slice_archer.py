@@ -14,24 +14,33 @@
 Archer 是**单向**素材（正视视角、弓箭在画面右侧）-> 左半边由水平镜像派生，
 与 slice_lancer.py 同策略：config 里 default=原图、left/down_left/up_left=镜像。
 
-用法：python tools/slice_archer.py
+用法：python tools/slice_archer.py [Blue|Purple|Black|Yellow]
+
+等级档位配色（2026-09-17 方案三）：除了 Blue，还要给 Purple / Black / Yellow
+各切一份 —— 玩家单位按等级换配色分档（0-2 蓝 / 3-5 紫 / 6-8 黑 / 9 金）。
+四套源图在免费包里是**同一套骨架、只换颜色**（帧数完全一致），所以切片逻辑零改动，
+只换 SRC/DST。箭矢 Arrow.png 只有 Blue 才复制（弹道素材不该跟着换色）。
 """
 from __future__ import annotations
 
 import json
 import os
 import shutil
+import sys
 
 from PIL import Image
 
-SRC = r"D:\SteamPunkExtraction\images\Tiny Swords (Free Pack)\Units\Blue Units\Archer"
-DST = r"D:\SteamPunkExtraction\Assets\Art\Sprites\Units\blue_archer"
+FACTION = sys.argv[1] if len(sys.argv) > 1 else "Blue"
+TAG = FACTION.lower()          # blue / purple / black / yellow
+
+SRC = r"D:\SteamPunkExtraction\images\Tiny Swords (Free Pack)\Units\%s Units\Archer" % FACTION
+DST = r"D:\SteamPunkExtraction\Assets\Art\Sprites\Units\%s_archer" % TAG
 PROJ_DST = r"D:\SteamPunkExtraction\Assets\Art\Sprites\Projectiles"
-CONFIG_SNIPPET = r"C:\Users\Administrator\WorkBuddy\2026-09-15-23-06-42\_archer_frames.json"
-REPORT = r"C:\Users\Administrator\WorkBuddy\2026-09-15-23-06-42\_archer_slice.txt"
+CONFIG_SNIPPET = r"C:\Users\Administrator\WorkBuddy\2026-09-15-23-06-42\_%s_archer_frames.json" % TAG
+REPORT = r"C:\Users\Administrator\WorkBuddy\2026-09-15-23-06-42\_%s_archer_slice.txt" % TAG
 
 FW = FH = 192
-RES_DIR = "res://Assets/Art/Sprites/Units/blue_archer/"
+RES_DIR = "res://Assets/Art/Sprites/Units/%s_archer/" % TAG
 RES_ARROW = "res://Assets/Art/Sprites/Projectiles/arrow.png"
 
 # (源文件, 输出前缀)  -- 输出前缀即 config 里的动作名（run -> walk 由 config 映射）
@@ -81,10 +90,12 @@ def main() -> int:
         bots = [bbox_of(fr)[3] for fr in frames]
         lines.append("%-20s %2d 帧  包围盒下沿 %s" % (prefix, n, sorted(set(bots))))
 
-    # --- 箭矢：独立弹道素材 ---
+    # --- 箭矢：独立弹道素材（只有 Blue 才复制，别让档位配色污染弹道） ---
     arrow_src = os.path.join(SRC, "Arrow.png")
     arrow_line = ""
-    if os.path.exists(arrow_src):
+    if TAG != "blue":
+        arrow_line = "（非 Blue 阵营：跳过 Arrow.png 复制，弹道沿用蓝色箭矢）"
+    elif os.path.exists(arrow_src):
         os.makedirs(PROJ_DST, exist_ok=True)
         a = Image.open(arrow_src).convert("RGBA")
         bb = bbox_of(a)

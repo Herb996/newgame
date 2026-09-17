@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://1c8wjnjjvwco"
-path="res://.godot/imported/_live_collide.png-7cebd196504e469f98a764c9e5ad2e2f.ctex"
+path="res://.godot/imported/_live_collide.png-9018540f59947e95099bec09ceb8860f.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://_live_collide.png"
-dest_files=["res://.godot/imported/_live_collide.png-7cebd196504e469f98a764c9e5ad2e2f.ctex"]
+source_file="res://generated_images/live/_live_collide.png"
+dest_files=["res://.godot/imported/_live_collide.png-9018540f59947e95099bec09ceb8860f.ctex"]
 
 [params]
 

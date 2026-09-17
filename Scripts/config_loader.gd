@@ -54,18 +54,42 @@ func load_config() -> bool:
 ##   Config.get_value("session.time_limit_seconds")        -> 3600
 ##   Config.get_value("meta_progression.survival.max_hp.base") -> 100
 ## 缺失时返回 default 并打警告，方便发现 config 漏项。
+##
+## 三层合并规则（优先级 高→低：_overrides > _user > _data）：
+##   - 取值路径落到**标量/数组**：取最高优先层的那份（数组整体替换，不逐元素合）。
+##   - 取值路径落到**字典**：三层做**深合并**（高层覆盖低层同名键，低层补齐缺失键）。
+##     这是 2026-09-17 修的一个严重 bug 的根因 —— 之前某个高层只要“有这条路径”就整棵
+##     返回，于是 settings.json 里部分覆盖的 combat.weapons{sword/bow 只写了 damage}
+##     会把出厂值里 bow 的 sprite_set/kind/projectile 乃至整个 sniper 武器全部顶掉，
+##     导致“选弓手进图却是枪兵近战”。深合并后用户只调自己改的值，其余沿用出厂值。
 func get_value(path: String, default = null):
-	var hit := _probe(_overrides, path)
-	if hit[0]:
-		return hit[1]
-	hit = _probe(_user, path)
-	if hit[0]:
-		return hit[1]
-	hit = _probe(_data, path)
-	if hit[0]:
-		return hit[1]
-	push_warning("[Config] 缺少配置项 %s，使用默认值：%s" % [path, str(default)])
-	return default
+	var ov := _probe(_overrides, path)
+	var us := _probe(_user, path)
+	var ba := _probe(_data, path)
+	var present: Array = []
+	if ba[0]:
+		present.append(ba[1])
+	if us[0]:
+		present.append(us[1])
+	if ov[0]:
+		present.append(ov[1])
+	if present.is_empty():
+		push_warning("[Config] 缺少配置项 %s，使用默认值：%s" % [path, str(default)])
+		return default
+	if present.size() == 1:
+		return present[0]
+	# 多层都有值：全是字典才深合并；否则标量/数组取最高优先层（present 末尾 = override）
+	var all_dict := true
+	for c in present:
+		if not (c is Dictionary):
+			all_dict = false
+			break
+	if all_dict:
+		var merged := {}
+		for c in present:   # 顺序已是 base → user → override，深合并即 override 胜出
+			_deep_merge(merged, c)
+		return merged
+	return present[present.size() - 1]
 
 
 ## 只取出厂值（忽略用户设置与运行时覆盖）。设置面板里「恢复默认」要拿它。
@@ -163,6 +187,18 @@ func _probe(root: Dictionary, path: String) -> Array:
 		else:
 			return [false, null]
 	return [true, node]
+
+
+## 深合并：把 from 的键值并入 into（from 同名键胜出；双方都是字典则递归）。
+## 仅用于在 get_value 里把 _overrides / _user / _data 三层字典按路径合成“生效值”，
+## 避免高层部分子树把低层整棵顶掉（见 get_value 头注释的 2026-09-17 修复说明）。
+func _deep_merge(into: Dictionary, from: Dictionary) -> void:
+	for k in from:
+		var v = from[k]
+		if v is Dictionary and into.has(k) and (into[k] is Dictionary):
+			_deep_merge(into[k], v)
+		else:
+			into[k] = v
 
 
 func _set_path(root: Dictionary, path: String, value: Variant) -> void:

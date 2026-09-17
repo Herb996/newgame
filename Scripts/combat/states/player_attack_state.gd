@@ -12,7 +12,7 @@ extends State
 ## （actor.attack_param），判定帧往哪走按 actor.attack_kind() 分岔：
 ##   melee   → begin_attack_hit() + 逐帧 resolve_attack_hit()（原行为，一字未改）
 ##   ranged  → fire_projectile() 发射一次，不碰 Hitbox（箭会飞）
-##   hitscan → fire_hitscan() 瞬间结算 + 曳光（狙击枪：判定与出枪同帧）
+##   hitscan → fire_hitscan() 瞬间结算 + 曳光（强弩：判定与出箭同帧）
 ## 武器没写某一项时 attack_param 会自动回落到 combat.attack，所以不配武器表 = 老行为。
 ## ============================================================
 
@@ -28,15 +28,15 @@ func _init(p_actor: Node = null) -> void:
 
 func enter(_msg: Dictionary = {}) -> void:
 	actor.stop_moving()
-	actor.aim_at_mouse()          # 朝鼠标方向挥击 / 射击
+	# 自动战斗：朝当前锁定目标起手（无目标则保持原朝向，不再看鼠标）
+	actor.aim_at_auto_target()
 	_phase = Phase.WINDUP
 	_timer = 0.0
 
 
 func exit() -> void:
 	actor.end_attack_hit()        # 兜底：任何原因离开都关闭判定框（远程下本就是关的）
-	# 丢弃缓冲攻击输入：攻击离散、不连招（已移除连招派生链）
-	actor.consume_input(&"attack")
+	# 手动攻击输入已移除（2026-09-17 全自动战斗），无需再丢弃缓冲输入
 
 
 func physics_update(delta: float) -> void:
@@ -66,8 +66,9 @@ func physics_update(delta: float) -> void:
 				else:
 					actor.begin_attack_hit()
 				# 出招发声：惊动附近敌人（DESIGN.md 第二部分 噪音机制）
-				# 取武器自己的噪音值 —— 弓比剑安静、狙击枪震天响，潜行时的可利用差异
-				NoiseSystem.emit(actor.global_position, actor.attack_noise())
+				# 取武器自己的噪音值 —— 弓比剑安静、强弩震天响，潜行时的可利用差异
+				# from_player=true：这是小队自己弄出的动静，计入菜单栏的噪音读数
+				NoiseSystem.emit(actor.global_position, actor.attack_noise(), true)
 		Phase.ACTIVE:
 			if not hit_once:
 				actor.resolve_attack_hit()   # 判定帧内每帧结算（内部按目标去重）
@@ -77,7 +78,8 @@ func physics_update(delta: float) -> void:
 				if not hit_once:
 					actor.end_attack_hit()
 		Phase.RECOVERY:
-			# 本作非动作游戏：攻击为离散动作，后摇结束直接回 Idle；
-			# 缓冲里的攻击输入在 exit() 丢弃，避免刚结束又立刻起一击（已移除连招派生链）
+			# 本作非动作游戏：攻击为离散动作，后摇结束回 Idle（或继续走原来那条路）。
+			# 自动战斗下打完会立刻再锁敌、再次起手 —— 连打节奏由武器时长决定，
+			# 不需要额外冷却。若玩家还有移动指令，回 move 让角色继续赶路。
 			if _timer >= recovery:
-				request_transition(&"idle")
+				request_transition(&"move" if actor.has_move_target() else &"idle")

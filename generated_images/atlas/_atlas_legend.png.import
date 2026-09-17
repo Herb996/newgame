@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bb7ijyv7h5p2g"
-path="res://.godot/imported/_atlas_legend.png-0e0434ff0170a6c29ee36be8e1af7a40.ctex"
+path="res://.godot/imported/_atlas_legend.png-309975d73a552877568ea84cce8c18ba.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://_atlas_legend.png"
-dest_files=["res://.godot/imported/_atlas_legend.png-0e0434ff0170a6c29ee36be8e1af7a40.ctex"]
+source_file="res://generated_images/atlas/_atlas_legend.png"
+dest_files=["res://.godot/imported/_atlas_legend.png-309975d73a552877568ea84cce8c18ba.ctex"]
 
 [params]
 

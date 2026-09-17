@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c1roy8antg0tb"
-path="res://.godot/imported/_bow_proof.png-96235d6eb24bcbc81dfbc2b4c3fb0a1d.ctex"
+path="res://.godot/imported/_bow_proof.png-3963b26a78d0d859f3f7d4b9f0d2c8fb.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://_bow_proof.png"
-dest_files=["res://.godot/imported/_bow_proof.png-96235d6eb24bcbc81dfbc2b4c3fb0a1d.ctex"]
+source_file="res://generated_images/weapons/_bow_proof.png"
+dest_files=["res://.godot/imported/_bow_proof.png-3963b26a78d0d859f3f7d4b9f0d2c8fb.ctex"]
 
 [params]
 

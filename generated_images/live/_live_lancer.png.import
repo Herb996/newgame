@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bjbhlmdleqbki"
-path="res://.godot/imported/_live_lancer.png-785161a0fbea2054550512dad5e017fa.ctex"
+path="res://.godot/imported/_live_lancer.png-fee8f138dfeb4fac0078beb9881ff7a7.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://_live_lancer.png"
-dest_files=["res://.godot/imported/_live_lancer.png-785161a0fbea2054550512dad5e017fa.ctex"]
+source_file="res://generated_images/live/_live_lancer.png"
+dest_files=["res://.godot/imported/_live_lancer.png-fee8f138dfeb4fac0078beb9881ff7a7.ctex"]
 
 [params]
 

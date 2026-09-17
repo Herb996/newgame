@@ -34,6 +34,10 @@ var damage := 20
 var hit_radius := 16.0
 var walls: Array = []
 var tile_size: int = 16
+## 出膛点。命中时用它当「攻击者位置」告诉挨打的敌人往哪边走
+## （见 enemy.gd::alert_from_attacker）——**不能**用命中点，那就在敌人脚下。
+## 由 setup() 从当时的 global_position 抓取，所以调用方必须先摆位再 setup。
+var origin := Vector2.ZERO
 
 var _travelled := 0.0
 var _done := false
@@ -44,6 +48,7 @@ var _sprite: Sprite2D = null
 func setup(cfg: Dictionary, p_dir: Vector2, p_damage: int,
 		p_walls: Array, p_tile_size: int) -> void:
 	dir = p_dir.normalized() if p_dir.length() > 0.0001 else Vector2.RIGHT
+	origin = global_position          # 先摆位再 setup（见 origin 的说明）
 	damage = p_damage
 	walls = p_walls
 	tile_size = maxi(p_tile_size, 1)
@@ -85,6 +90,10 @@ func _physics_process(delta: float) -> void:
 	# 命中优先于撞墙：贴脸射击时两者可能同时成立，打中比消失更符合直觉
 	if target != null:
 		target.take_damage(damage)
+		# 「受到攻击也要动」：告诉它这一箭是从哪飞来的（出膛点，不是命中点 ——
+		# 命中点就在它脚下，拿它当声源等于没让它动）。见 enemy.gd::alert_from_attacker。
+		if origin != Vector2.ZERO and target.has_method("alert_from_attacker"):
+			target.call("alert_from_attacker", origin)
 		_finish()
 		return
 	if blocked:

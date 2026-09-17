@@ -12,6 +12,7 @@ extends Node
 
 const PLAYER_SCENE := preload("res://Scenes/Player.tscn")
 const CAMERA_SCRIPT := preload("res://Scripts/camera_controller.gd")
+const PLACEMENT_SCRIPT := preload("res://Scripts/placement_mode.gd")
 const SOAK_PROBE := preload("res://Scripts/soak_probe.gd")
 
 enum Mode { BASE, RUN }
@@ -46,20 +47,30 @@ var _last_map: Dictionary = {}     # 最近一次生成的地图结果（供 Soa
 @onready var loot_system: Node = $LootSystem
 @onready var animal_system: Node = $AnimalSystem
 @onready var fog_system: Node = $FogSystem
-@onready var minimap: CanvasLayer = $Minimap
+@onready var menu_bar: CanvasLayer = $MenuBar
 @onready var hud: CanvasLayer = $HUD
 @onready var base_system: Node = $BaseSystem
 @onready var warehouse_panel: CanvasLayer = $WarehousePanel
 @onready var statue_panel: CanvasLayer = $StatuePanel
 @onready var character_panel: CanvasLayer = $CharacterPanel
+@onready var weather_system: Node = $WeatherSystem
 
 ## 本次会话里大门选中的角色 id 列表（可多选，构成进局小队）。
 ## 只存会话内存不落盘；空数组 = 未选过（命令行/回归路径按 characters.default 单人进局）。
-var _selected_character_ids: Array = []
+## 本局出击名单。2026-09-17 起存的是**名册单位实例**而不是兵种 id：
+##   [{"uid": 3, "id": "spearman", "name": "枪手", "level": 2}, ...]
+## 因为等级挂在「人」身上、死亡永久，光记兵种 id 是无法还原"这一局带的是谁"的。
+## 空数组 = 没选过（命令行 / 无头回归 / auto_enter_run），走 characters.default 单人 0 级。
+var _selected_units: Array = []
+
+## 基地建筑重摆：当前 PlacementMode 节点 + 正在重摆的建筑 id（"" = 无）
+var _placement: Node = null
+var _placing_id := ""
 
 
 func _ready() -> void:
 	base_system.building_interacted.connect(_on_building_interacted)
+	base_system.reposition_requested.connect(_on_reposition_requested)
 	character_panel.launch_requested.connect(_on_launch)
 	if Config.get_value("debug.smoke_test", false):
 		_smoke_test()
@@ -320,12 +331,30 @@ func _process(delta: float) -> void:
 		_capture_left -= delta
 		if _capture_left < 0.0:
 			_capture_now()
-	if Input.is_action_just_pressed("ui_cancel"):
-		get_tree().quit()
 	# 局结束后按 R 回基地（局内运行中无效）
 	if Input.is_physical_key_pressed(KEY_R) and mode == Mode.RUN \
 			and run.state == run.State.ENDED:
 		_enter_base()
+
+
+## ESC 退出游戏——但只在没有任何覆盖层（面板 / 放置模式）打开时。
+## 有面板时交给面板自己的 _unhandled_input 处理 ESC 关闭，避免"面板关闭的同一帧
+## 又触发退出"（输入事件先于 _process 处理，面板 unpause 后 _process 会误判 just_pressed）。
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and not _overlay_open():
+		get_tree().quit()
+
+
+func _overlay_open() -> bool:
+	if _placement != null:
+		return true
+	if warehouse_panel != null and warehouse_panel.visible:
+		return true
+	if statue_panel != null and statue_panel.visible:
+		return true
+	if character_panel != null and character_panel.visible:
+		return true
+	return false
 
 
 # ------------------------------------------------------------
@@ -343,8 +372,13 @@ func _clear_game_root() -> void:
 ## 相机 WASD/方向键/边缘滚屏自由平移（不绑玩家）。
 func _enter_base() -> void:
 	mode = Mode.BASE
+	_end_placement()
 	hud.visible = false
+	# 菜单栏（含小地图槽）只在局内：基地里它是空的（没有单位可指挥、没有地图）
+	menu_bar.set_active(false)
 	fog_system.deactivate()
+	_sync_minimap_fog()   # 此时返回 null：摘掉上一局的遮罩引用，不留隔局数据
+	weather_system.deactivate()
 	get_tree().paused = false
 	warehouse_panel.close()
 	statue_panel.close()
@@ -360,12 +394,19 @@ func _enter_base() -> void:
 	game_root.add_child(cam)
 	cam.make_current()
 	cam.setup(Vector2i(base_size * tile_size, base_size * tile_size), null)
+	# 进基地默认拉到最远视角（框住整片基地 → 落到最远档并居中），一眼看全所有建筑
+	if bool(Config.get_value("base.fit_camera_on_enter", true)):
+		var whole := Rect2(0, 0, float(base_size) * tile_size, float(base_size) * tile_size)
+		cam.frame_world_rect(whole, 0.0)
 
 
 ## 进入一局
 func _enter_run() -> void:
 	mode = Mode.RUN
 	hud.visible = true
+	menu_bar.set_active(true)
+	# 菜单栏的噪音读数是「本局」的：开局清零，否则上一局的暴露度会带进来
+	NoiseSystem.reset()
 	get_tree().paused = false
 	_clear_game_root()
 	run.start_run()
@@ -394,6 +435,13 @@ func _enter_run() -> void:
 		var player: CharacterBody2D = PLAYER_SCENE.instantiate()
 		player.character_name = str(c.get("name", c.get("id", "")))
 		player.initial_weapon = str(c.get("weapon", ""))
+		# 指令集 id：菜单栏据此决定「这个单位显示哪几个指令按钮」
+		# （config characters.list[].command_set → menu_bar.command_sets）
+		player.command_set = str(c.get("command_set", ""))
+		# 名册身份 + 等级：**必须在 add_child 之前**设好 —— player._ready() 里就
+		# 按 level 决定穿哪套档位贴图、头顶画几级，晚一步会先套蓝甲再被换掉（闪一帧）。
+		player.roster_uid = int(c.get("uid", 0))
+		player.level = clampi(int(c.get("level", 0)), 0, Meta.max_level())
 		# 多人时在出生点横向排开（各偏 0.8 格），避免挤在同一格互相顶
 		player.position = result.spawn \
 				+ Vector2((float(i) - float(squad.size() - 1) * 0.5) * tile_size * 0.8, 0.0)
@@ -428,7 +476,27 @@ func _enter_run() -> void:
 	fog_system.setup(game_root, result)
 	if _no_fog:
 		fog_system.disable()
-	minimap.setup(result)
+	# 雨天放在雾之后：雨滴 z=6 要盖住雾层（z=5），否则未揭开区看不到雨。
+	weather_system.setup(game_root, result)
+	# 菜单栏：小地图槽接上地图数据（常驻 + 资源点烘焙）+ 指令面板按小队就位
+	menu_bar.setup(result)
+	# 小地图迷雾必须在 menu_bar.setup **之后**（它重建地形底图）且 **之后** 判 _no_fog
+	# （关雾时 fog_system 已 deactivate，这里自然拿到 null）。
+	_sync_minimap_fog()
+
+
+## 小地图迷雾：把本局的探索遮罩挂给小地图（**同一张纹理**，非拷贝）。
+## 小地图据此把未探索区涂黑，与主地图共享同一份探索记忆 —— 迷雾那边揭一格，
+## 小地图同一格立刻透出来，中间没有任何同步代码（见 fog_system 头部说明）。
+##
+## 拿不到（返回 null）的三种情况，行为都应是「不叠雾」：
+##   基地（雾 deactivate）、--no-fog 出图（雾 disable）、Main3D 线（它不调这个函数）。
+func _sync_minimap_fog() -> void:
+	var mm := menu_bar.get_node_or_null("Minimap")
+	if mm == null:
+		return
+	var tex: ImageTexture = fog_system.minimap_fog_texture()
+	mm.call("set_fog_texture", tex)
 
 
 ## 建筑交互路由（base_system 转发；基地无角色后，触发方式 = 鼠标左键点建筑）
@@ -437,7 +505,7 @@ func _on_building_interacted(building_id: String) -> void:
 		"gate":
 			# 出发前先选人（可多选组成小队）：面板「出击」→ _on_launch 才进局；
 			# E/ESC 取消则留在基地。交互立刻复位，取消后可再点一次重开面板。
-			character_panel.open(_selected_character_ids)
+			character_panel.open(_selected_units)
 			base_system.reset_interaction(building_id)
 		"warehouse":
 			warehouse_panel.open()
@@ -450,37 +518,109 @@ func _on_building_interacted(building_id: String) -> void:
 			base_system.reset_interaction(building_id)
 
 
+## 右键建筑 → 启动「重摆」模式（复用 PlacementMode：绿格 + 幽灵 + 点格落位）
+func _on_reposition_requested(building_id: String) -> void:
+	if _placement != null:
+		return   # 已在重摆中，忽略
+	var opts: Dictionary = base_system.begin_reposition(building_id)
+	if opts.is_empty():
+		return
+	_placing_id = building_id
+	_placement = PLACEMENT_SCRIPT.new()
+	_placement.name = "PlacementMode"
+	game_root.add_child(_placement)
+	_placement.placed.connect(_on_placement_placed)
+	_placement.cancelled.connect(_on_placement_cancelled)
+	var base_sz := int(Config.get_value("base.map_size", 64))
+	_placement.begin(
+			Vector2i(base_sz, base_sz),
+			int(Config.get_value("map.tile_size", 64)),
+			opts["footprint"], opts["anchors"], opts["texture"])
+	print("[Base] 重摆模式：%s（合法锚点 %d 个）" % [building_id, (opts["anchors"] as Array).size()])
+
+
+func _on_placement_placed(anchor: Vector2i) -> void:
+	base_system.apply_reposition(_placing_id, anchor)
+	_end_placement()
+
+
+func _on_placement_cancelled() -> void:
+	base_system.cancel_reposition(_placing_id)
+	_end_placement()
+
+
+func _end_placement() -> void:
+	if _placement != null and is_instance_valid(_placement):
+		_placement.end()
+		_placement.queue_free()
+	_placement = null
+	_placing_id = ""
+
+
 ## 大门面板「出击」回调：记住本局小队 → 进局。
-## 武器/贴图集由每个玩家实例的 initial_weapon 注入（player._resolve_initial_weapon），
-## 不再走 Config override —— 基地已无角色，无需全局换装。
+## 传进来的条目来自名册（uid/id/name/level），但也兼容只有 id/name 的老式调用
+## —— 探针（probe_squad / probe_menu_bar / …）都是那么调的，别让它们为了
+## 一个等级字段全体返工。缺 uid 的条目 = 无名册身份、0 级。
 func _on_launch(characters: Array) -> void:
-	_selected_character_ids.clear()
+	_selected_units.clear()
 	var names: Array = []
 	for c in characters:
-		_selected_character_ids.append(str(c.get("id", "")))
-		names.append(str(c.get("name", "")))
+		if not (c is Dictionary):
+			continue
+		_selected_units.append({
+			"uid": int((c as Dictionary).get("uid", 0)),
+			"id": str((c as Dictionary).get("id", "")),
+			"name": str((c as Dictionary).get("name", "")),
+			"level": int((c as Dictionary).get("level", 0)),
+		})
+		names.append(str((c as Dictionary).get("name", (c as Dictionary).get("id", ""))))
 	print("[Main] 出击小队：%s" % "、".join(names))
 	_enter_run()
 
 
-## 大门选角结果 → 角色配置列表。
-## 没选过（命令行 / 无头回归 / auto_enter_run）时回落 characters.default 单人，
+## 出击名单 → 角色配置列表（兵种原型 + 本人 uid/等级 合并后的扁平字典）。
+## 没选过（命令行 / 无头回归 / auto_enter_run）时回落 characters.default 单人 0 级，
 ## 保证这些路径的行为与改版前一致。
 func _squad_characters() -> Array:
-	var ids: Array = _selected_character_ids
-	if ids.is_empty():
-		var def := str(Config.get_value("characters.default", ""))
-		if def != "":
-			ids = [def]
 	var out: Array = []
+	for u in _selected_units:
+		var arch := _archetype_of(str(u.get("id", "")))
+		if arch.is_empty():
+			continue      # 原型已被删（存档里留了旧 id）：跳过，别生成幽灵单位
+		var merged := arch.duplicate()
+		merged["uid"] = int(u.get("uid", 0))
+		merged["level"] = clampi(int(u.get("level", 0)), 0, Meta.max_level())
+		# 名字用名册里的：同兵种第 2 个人叫「枪手2」，面板上要能分辨谁是谁
+		if str(u.get("name", "")) != "":
+			merged["name"] = str(u.get("name"))
+		out.append(merged)
+	if not out.is_empty():
+		return out
+	var def := str(Config.get_value("characters.default", ""))
+	if def != "":
+		var fallback := _archetype_of(def)
+		if not fallback.is_empty():
+			var d := fallback.duplicate()
+			d["uid"] = 0
+			d["level"] = 0
+			return [d]
+	var list: Array = Config.get_value("characters.list", [])
+	if not list.is_empty():
+		var l0: Dictionary = (list[0] as Dictionary).duplicate()
+		l0["uid"] = 0
+		l0["level"] = 0
+		return [l0]      # 存档里留了已删除的角色 id 时兜底
+	return []
+
+
+## 按 id 查 characters.list 里的兵种原型（决定武器 / 指令集 / 描述）
+func _archetype_of(id: String) -> Dictionary:
+	if id == "":
+		return {}
 	for entry in Config.get_value("characters.list", []):
-		if entry is Dictionary and ids.has(str(entry.get("id", ""))):
-			out.append(entry)
-	if out.is_empty():
-		var list: Array = Config.get_value("characters.list", [])
-		if not list.is_empty():
-			out.append(list[0])   # 存档里留了已删除的角色 id 时兜底
-	return out
+		if entry is Dictionary and str(entry.get("id", "")) == id:
+			return entry
+	return {}
 
 
 # ------------------------------------------------------------

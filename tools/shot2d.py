@@ -20,7 +20,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GODOT = os.environ.get(
     "GODOT_BIN", r"C:/Users/Administrator/Downloads/Godot_v4.7.2-stable_win64_console.exe")
-LOG_DIR = os.environ.get("WB_LOG_DIR", ROOT)
+LOG_DIR = os.environ.get("WB_LOG_DIR", os.path.join(ROOT, "tools"))
 
 
 def main() -> int:

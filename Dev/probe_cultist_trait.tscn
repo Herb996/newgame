@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Dev/probe_cultist_trait.gd" id="1_probe"]
+
+[node name="ProbeCultistTrait" type="Node"]
+script = ExtResource("1_probe")
