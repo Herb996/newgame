@@ -159,6 +159,21 @@ func on_water_step(world_pos: Vector2) -> void:
 		p.play()
 
 
+## 干地脚步（雨天）：出小一圈的湿痕波纹，让整片地面看着"被雨淋湿"。
+## 不播踩水音、不产生暴露噪音变化（噪音由调用方照常发）。
+func on_dry_step(world_pos: Vector2) -> void:
+	if not _active:
+		return
+	var r := _get_free_ripple()
+	if r != null:
+		var c := Color.from_string(str(Config.get_value("weather.ripple.color", "#bfe3ff")), Color(0.75, 0.89, 1.0))
+		c.a = float(Config.get_value("weather.ripple.dry_alpha", 0.35))
+		r.spawn(world_pos,
+				float(Config.get_value("weather.ripple.dry_radius_px", 22.0)),
+				float(Config.get_value("weather.ripple.dry_duration_s", 0.4)),
+				c)
+
+
 # ============================================================
 # 积水网格：噪声水洼 ∪ DECOR_WATER 浅滩 → _water_cells + shader mask
 # ============================================================

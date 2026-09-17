@@ -21,6 +21,7 @@ var ring_color := Color(0.75, 0.89, 1.0, 0.8)
 
 var _t := 0.0
 var _active := false
+var _seed := 0   # spawn 时定下：碎弧的随机分布在存活期内固定，避免每帧闪烁
 
 
 ## 从池里取出并复位。返回 false = 参数非法（调用方据此跳过本次波纹）。
@@ -30,6 +31,7 @@ func spawn(pos: Vector2, p_radius: float, p_duration: float, p_color: Color) -> 
 	duration = maxf(p_duration, 0.05)
 	ring_color = p_color
 	_t = 0.0
+	_seed = randi()
 	_active = true
 	visible = true
 	queue_redraw()
@@ -55,20 +57,55 @@ func is_free() -> bool:
 	return not _active
 
 
+## 椭圆碎弧波纹：y 轴压扁成椭圆（贴地感），整圈拆成随机短弧——
+## 有虚有实（透明度/线宽逐段抖动）、段间留缝，形成"碎碎的"水面反馈。
 func _draw() -> void:
 	var k := clampf(_t / duration, 0.0, 1.0)
 	var fade := 1.0 - k
+	var squash := float(Config.get_value("weather.ripple.ellipse_squash", 0.45))
 
 	# 主圈：从 25% 半径扩到满，线宽随扩张变细（水波外圈能量衰减）
-	var r1 := radius * (0.25 + 0.75 * k)
-	var c1 := ring_color
-	c1.a = ring_color.a * fade
-	draw_arc(Vector2.ZERO, r1, 0.0, TAU, maxi(int(r1 * 0.6), 16), c1, maxf(1.0, 2.6 * fade), true)
+	_draw_frag_ring(radius * (0.25 + 0.75 * k), ring_color.a * fade,
+			maxf(1.0, 2.6 * fade), squash, _seed)
 
 	# 次圈：起步晚 30%、最大半径只有主圈的 62%，形成拖尾
 	var k2 := clampf((_t - duration * 0.3) / (duration * 0.7), 0.0, 1.0)
 	if k2 > 0.0:
-		var r2 := radius * 0.62 * (0.2 + 0.8 * k2)
-		var c2 := ring_color
-		c2.a = ring_color.a * (1.0 - k2) * 0.55
-		draw_arc(Vector2.ZERO, r2, 0.0, TAU, maxi(int(r2 * 0.6), 12), c2, maxf(0.8, 1.8 * (1.0 - k2)), true)
+		_draw_frag_ring(radius * 0.62 * (0.2 + 0.8 * k2), ring_color.a * (1.0 - k2) * 0.55,
+				maxf(0.8, 1.8 * (1.0 - k2)), squash, _seed + 7)
+
+
+## 把一圈拆成若干短弧段（段长/缝隙/透明度/线宽都随机），按椭圆压扁后画折线。
+func _draw_frag_ring(r: float, alpha: float, width: float, squash: float, seed: int) -> void:
+	if r < 2.0 or alpha <= 0.01:
+		return
+	var seg_r: Array = Config.get_value("weather.ripple.frag_seg_rad", [0.25, 0.8])
+	var gap_r: Array = Config.get_value("weather.ripple.frag_gap_rad", [0.1, 0.45])
+	var jitter := float(Config.get_value("weather.ripple.frag_alpha_jitter", 0.5))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var a := rng.randf_range(0.0, TAU)   # 起始角随机：每圈碎缝位置不同
+	var guard := 0
+	while guard < 48:
+		guard += 1
+		var seg := rng.randf_range(float(seg_r[0]), float(seg_r[1]))
+		var gap := rng.randf_range(float(gap_r[0]), float(gap_r[1]))
+		var a_j := alpha * (1.0 - jitter * rng.randf())          # 有虚有实
+		var w_j := width * rng.randf_range(0.7, 1.3)             # 粗细不一
+		_draw_arc_ellipse(r, a, a + seg, a_j, w_j, squash)
+		a += seg + gap
+		if a >= TAU + seg_r[0]:
+			break
+
+
+## 椭圆弧：沿角度采样折线，y 乘 squash 压扁。
+func _draw_arc_ellipse(r: float, a0: float, a1: float, alpha: float, width: float, squash: float) -> void:
+	var n := maxi(int(r * (a1 - a0) * 0.4), 4)
+	var pts := PackedVector2Array()
+	pts.resize(n + 1)
+	for i in range(n + 1):
+		var a := lerpf(a0, a1, float(i) / float(n))
+		pts[i] = Vector2(cos(a) * r, sin(a) * r * squash)
+	var c := ring_color
+	c.a = alpha
+	draw_polyline(pts, c, width, true)

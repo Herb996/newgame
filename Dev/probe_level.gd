@@ -94,8 +94,8 @@ func _a_config() -> void:
 			"击杀经验 = 0（关掉的）")
 	_check(bool(Config.get_value("progression.badge.enabled", false)),
 			"徽章默认开启（progression.badge.enabled）")
-	_check(float(Config.get_value("progression.badge.offset_y", 0.0)) == -46.0,
-			"徽章高度 offset_y = -46")
+	_check(float(Config.get_value("progression.badge.orb.center_offset_y", 0.0)) == -34.0,
+			"光点轨道中心 center_offset_y = -34（**身体中部**；-56 是头顶，用户要「绕四周飞」）")
 	var cols := {}
 	for tid in ["blue", "purple", "black", "gold"]:
 		var hex := str(Config.get_value("progression.badge.colors.%s" % tid, ""))

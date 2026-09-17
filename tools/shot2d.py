@@ -33,6 +33,8 @@ def main() -> int:
                     help="关掉迷雾再截：看清地图本体（默认开雾，地面会被黑雾压暗）")
     ap.add_argument("--weapon", default="",
                     help="强制玩家武器（sword / bow），走 main.gd 的 --weapon 通道，不改 config")
+    ap.add_argument("--walk-test", action="store_true",
+                    help="截图前让角色走起来（拍走路波纹用）")
     args = ap.parse_args()
 
     out = args.out if os.path.isabs(args.out) else os.path.join(ROOT, args.out)
@@ -46,6 +48,8 @@ def main() -> int:
            "--seed", str(args.seed)]
     if args.no_fog:
         cmd.append("--no-fog")
+    if args.walk_test:
+        cmd.append("--walk-test")
     if args.weapon:
         cmd += ["--weapon", args.weapon]
     print("[shot2d] %s" % " ".join(cmd))

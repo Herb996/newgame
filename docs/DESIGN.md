@@ -340,7 +340,7 @@
 | resource_find_chance 资源发现率 | acquisition | 0.5 | +0.03 | 5 | 石 25 + 金 1 | ⚠ **未接线** |
 | rare_resource_chance 稀有资源率 | acquisition | 0.05 | +0.01 | 5 | 油 30 + 金 2 | ⚠ **未接线** |
 
-- **角色等级 / 名册（`progression` 段，2026-09-17）**：`max_level 9`、`xp.curve {base 100, growth 1.3}`、`per_extraction 100`、`per_kill 0`、`tiers` 边界 `2/5/8/9`、`roster.max_size 8`、`roster.recruit_free true`、`badge {offset_y -46, radius 9, font_size 11}`。语义、档位配色映射与踩坑见 **§5.10**。
+- **角色等级 / 名册（`progression` 段，2026-09-17）**：`max_level 9`、`xp.curve {base 100, growth 1.3}`、`per_extraction 100`、`per_kill 0`、`tiers` 边界 `2/5/8/9`、`roster.max_size 8`、`roster.recruit_free true`。等级视觉 = **绕角色飞的一缕淡光**（2026-09-18 三版迭代）：`orb {radius_px 11 屏幕像素, screen_fixed, center_offset_y -34, orbit_radius_px [24,36], orbit_y_scale 0.85, spin_speed 1.2, speed_sway 0.5 + speed_sway_hz 0.13, speed_sway2 0.2 + speed_sway_hz2 0.31, wobble_px 3}`、`orb.glow {tint_white 0.55, max_alpha 0.9, core_whiten 0.5, falloff 1.7, layers [[1.3,0.14],[0.95,0.24],[0.62,0.44],[0.34,1.0]], pulse_seconds [3.4,2.1], pulse_power 1.15, min_scale 0.72}`、`flash {interval [5,9], first_delay 1.5, scale 2.0, rise/hold/fade 0.15/0.7/0.35, text_size 14, text_outline_color #2B2A3A}`、`far_fade {0.95 → 0.70}`、`colors` 四档主色已提亮。语义、档位配色映射与踩坑见 **§5.10**。
 
 ### 4.7 相机 / 显示 / 音频
 - 相机：`pan_speed 1600`、`return_key F(70)`；`zoom 0.35–3.0`（`step 0.12 / smooth 14 / at_cursor true / invert false / fit_bounds true / hud true`）；`edge_pan enabled margin 24 / speed×1.0 / ignore_ui true`。
@@ -607,15 +607,33 @@
 
 **视觉 = 方案三（用户 2026-09-17 选定）：配色管档位、数字管精确等级。**
 
-| 档位 id | 等级 | 档位名 | 配色（素材包阵营）| 徽章圈色 |
+| 档位 id | 等级 | 档位名 | 配色（素材包阵营）| 光点基色 |
 |---|---|---|---|---|
-| `blue` | 0–2 | 新兵 | Blue | `#378ADD` |
-| `purple` | 3–5 | 老兵 | Purple | `#7F77DD` |
-| `black` | 6–8 | 精锐 | Black | `#5F5E5A` |
-| `gold` | 9 | 传奇 | **Yellow** | `#EF9F27` |
+| `blue` | 0–2 | 新兵 | Blue | `#4FA8F0` |
+| `purple` | 3–5 | 老兵 | Purple | `#A98CFF` |
+| `black` | 6–8 | 精锐 | Black | `#C9D2E0`（银灰）|
+| `gold` | 9 | 传奇 | **Yellow** | `#FFC53D` |
+
+> 基色 2026-09-18 **整体提亮**（旧值 `#378ADD`/`#7F77DD`/`#5F5E5A`/`#EF9F27`）：压到屏幕上显脏，精锐档那颗灰黑更是"太深"的最大来源。精锐改**银灰** —— 与 6–8 级角色的 Black 阵营甲同属黑白灰一族（银就是黑甲的提亮版），档位语义不丢。出击面板色块读同一份配置，跟着一起变。
+> 注意这里只是**基色**：光点实际绘制时会朝白 lerp `glow.tint_white`(0.55)，所以**看到的比这些色值淡得多**（蓝档饱和度 0.67 → 0.29），档位区分度也相应变弱 —— 这是"颜色尽量淡"的代价，刻意的：谁是我方靠选中框/小地图点（恒阵营蓝），档位靠身上甲色。
 
 - 配色映射在 `progression.sprite_sets.<档位>.<武器>` → 精灵集名；`player._sprite_set_for_weapon()` 顺序：**档位配色 → 武器自带 `sprite_set` → `player.sprite_set`**。加档位只改 config，不动武器表（档位是等级的、武器是兵种的，两者正交）。
-- **头顶数字徽章**（`unit_level_badge.gd`，挂在 `Scenes/Player.tscn` 的 `LevelBadge` 节点）：UI 层 `_draw` 自绘，**不烘进贴图**（9 级 × 3 角色 = 27 套帧，且改数值要重出图）。档位变了才换整套贴图（`apply_level()` 里判 `tier_changed`），档内只换数字。
+- **等级淡光**（`unit_level_badge.gd`，挂在 `Scenes/Player.tscn` 的 `LevelBadge` 节点）：UI 层 `_draw` 自绘、**不烘进贴图**（9 级 × 3 角色 = 27 套帧，且改数值要重出图）。档位变了才换整套贴图（`apply_level()` 里判 `tier_changed`），档内只换数字。
+- **三次改版，每次都是用户判「丑」，病根逐次挖深**：
+  1. 「半透明黑圈 + 白数字」→ 违和。三个根因：数字用 `ThemeDB.fallback_font`（矢量抗锯齿字）压在 Tiny Swords 像素小人头上，两种画风硬拼；世界空间固定尺寸，缩到 0.35 倍糊成一点、拉到 3 倍变成压在头顶的大黑圈；「半透明黑底 + 白字」是 UI 提示牌的语言，挂在角色身上像别了个工牌。
+  2. 「卡通糖果球」（细描边定形 + 上部球冠亮面 + 底部薄影 + 高光点，`_cap_polygon()` 画球冠）→ **仍然丑：画成了实体**。越是「画得完整」越像一颗真球挂在人身上；首版那圈暗边大环只是把「深色从面收成线」，换汤不换药。
+  3. **本版：删掉一切轮廓。** 光不该有边界 —— 现在是几层**同心软边光斑**从内到外化开（外大而极淡当光晕、内小而亮当光核），颜色朝白推淡。它不再是一个「东西」，而是角色身边忽明忽暗飘着的一缕光。**每层是运行时生成的径向渐变贴图**（`_ensure_glow_tex()`，48×48、static 全场共用一张），不是 `draw_circle` 的实心圆 —— 实心圆叠起来放大能数出一圈圈同心环，像个靶子（实拍抓出来的）。
+- **四条行为约定**（用户原话：时隐时现 / 时快时慢 / 颜色尽量淡 / 在角色四周飞）：
+  - **时隐时现** —— `pulse_visibility()` 把两条**不同周期**（`pulse_seconds` 3.4 / 2.1，不整除）的正弦叠加，明暗节奏因此不规律（不是呼吸灯那种匀速明灭）。clamp 到 [0,1] 后**两端都有平台**：真的会完全隐没（探针测到 0.000）、也真的会完全显现（1.000）。`pulse_power 1.15 > 1` 让暗的时间不短于亮的；`min_scale 0.72` 让暗时收缩，有「凑近 / 退远」的体积感。
+  - **时快时慢** —— `orbit_angle()` 的角速度 ω(t) = `spin_speed` + 两条正弦的导数，实测 ω ∈ [0.42, 2.00]，**差 4.7 倍**。⚠ **硬约束：两条 sway 项之和（amp × 2π × hz）必须 < spin_speed**（当前 0.80 < 1.20），否则 ω 变负 → 光点原地掉头，看着像故障不像飘。探针 K 段用数值微分守这条，并校验配置层面的数学前提。
+  - **颜色尽量淡** —— `glow_color()` 把档位基色朝白 lerp `tint_white`(0.55)，再乘 `max_alpha 0.9`（<1 才有「虚」的质感）。
+  - **绕着角色四周飞** —— `center_offset_y` 落在**身体中部**（-34，旧值 -56 是头顶），`orbit_y_scale 0.85` 让纵向跨度够大：实测光点会掠过头顶（-68.8）到脚边（+0.8），纵向走位跨度约 50 px。
+- **「飞舞」是有界的伪随机**：角度自转 + 轨道半径缓慢呼吸 + 正弦抖动，光点永远落在 `orbit_radius_px` 上限 + `wobble_px` 之内（探针 C 段 600 点采样断言）。真随机（每帧 `randf`）会抖成筛子、还会飘走或被角色挡住。
+- **屏幕恒定尺寸 + 缩远淡出**：`orb.screen_fixed` → 绘制尺寸乘 `1/zoom`，任何视野下一样大（`drawn_radius_world() × zoom ≡ radius_px`，探针 F 段）。`far_fade` 在 zoom 0.95 → 0.70 线性淡出：看全图时不出光点，省得远景糊成一片。
+  > ⚠ 世界半径兜底上限 `_radius_max_world = max(radius_px, orbit_r_hi)`，**别收到 `orbit_r_lo × 0.5` 那种量级** —— 那样 zoom 0.8 这种正常视野就会撞上限，把「屏幕恒定尺寸」这条更重要的观感特性打掉（探针 F 段抓到过）。极端视野本来就有 far_fade 兜着。
+- **数字不常驻 → 想知道就点一下**：平时不显示数字，每隔 `flash.interval`（5~9s 随机）闪一次；闪的那 1.2s 里光点胀大 2.0 倍、光心亮出卡通数字（深色描边 + 白填充）。`player._set_selected(true)` 调 `notify_selected()` 让光点立刻闪一次（`flash.on_select`）；升级也闪（`flash.on_level_up`，等级没变不闪）。**flash 期间可见度被强制拉满** —— 否则光点正好处在「隐」的时刻，闪了也白闪。
+- **选中标记改用暖色**（`player.selected_color`：`#4fc3f7` → `#FFC14D`）：等级光点是蓝白系，两个蓝色悬浮物挤在一起会分不清哪个是「选中」哪个是「等级」（连拍实拍时看出来的）。
+- 探针钩子 `zoom_override`（headless 常没有 Camera2D，读不到倍率）、`drawn_radius_world()`、`view_alpha()`、`glow_texture()` 专供 `probe_level_orb` 断言，正常游戏流程不碰。
 - **恒定蓝色锚点**：体色一旦承载等级，「谁是我方」就不能靠体色判断了 —— 选中框 / 小地图点 / 面板色块沿用阵营蓝。
 
 **经验**：`progression.xp`，升到下一级需 `round(base × growth^当前等级)`，现 `base 100 / growth 1.3` → 升级线 100/130/169/220/286/371/483/627/816，**累计约 3200 ⇒ 单局撤离 100，约 32 局满级**（"难但有尽头"）。`per_kill = 0`（关掉的）。
@@ -629,7 +647,11 @@
 3. **`player.level` 必须在 `add_child` 之前设**：`player._ready()` 里就按 level 选贴图集，晚一步会先套蓝甲再被换掉（闪一帧）。
 4. 探针里量"身上贴的是哪套帧"要用 **`Body.texture.resource_path`**，不要用纹理对象 id：换帧要等 animator 下一次 `update()` 才落到 Sprite2D（同帧取到旧图），而同档位播放中帧号本来就在变（对象 id 天然会变）。
 
-**验证**：`Dev/probe_level.tscn`（145 项：配置真值 / 档位映射 / 武器×档位映射 / 四档每帧都存在 / 名册数据层 / 经验曲线与升级 / 撤离发经验 / player 换档贴图与徽章 / 死亡除名 / 出击面板）。探针会改 `Meta.roster` 并触发存档写入，所以**开跑先备份 `user://save.json`、收尾原样还原**。
+**验证**：`Dev/probe_level.tscn`（146 项：配置真值 / 档位映射 / 武器×档位映射 / 四档每帧都存在 / 名册数据层 / 经验曲线与升级 / 撤离发经验 / player 换档贴图与等级显示 / 死亡除名 / 出击面板）；等级淡光另有 **`Dev/probe_level_orb.tscn`（104 项：光点配置真值 / 节点接线 / 轨道有界 600 点采样 / 闪烁状态机三段 / 自动闪烁节奏落在 interval 内 / 屏幕恒定尺寸与缩远淡出 / 点选与升级联动 / enabled 开关停 process / **I 淡光长相**（旧的 `orb.look` 必须已从配置移除、柔光层 ratio 递减 + alpha 递增、贴图已生成、四档色淡化后饱和度降）/ **J 时隐时现**（明灭采到底 min≈0 且 max≈1、中间态占比够高、flash 强制拉满）/ **K 时快时慢**（ω 数值微分恒正 + max/min > 1.5 + 配置层面「sway 和 < spin」的数学前提）/ **L 绕着四周飞**（中心不在头顶、纵向跨度够大、不钻地）** —— 它全程**手动步进 `_process(delta)`**（先 `set_process(false)`），因为 headless 的真实帧率不确定，等真实帧数验不了"闪 1.2 秒"这类时间语义。两个探针都会改 `Meta.roster` / 触发存档写入，所以**开跑先备份 `user://save.json`、收尾原样还原**。
+**视觉改动必须开窗实拍 + 放大看**（`--headless` 是 dummy 渲染驱动，viewport 贴图永远空白、截出来纯黑）：
+- `Dev/shot_orb_showcase.tscn` —— 四档并排：上面放大看构造，下面**真实大小**下同一档位画三个**不同明灭时刻**的光点、围着一个角色剪影（正常开一局只可能看到 0 级那点蓝光，想验四档得打满 9 级）。⚠ `_phase` 是随机的 → 可见度跟着随机，所以展示场景会**显式钉住 `_phase / _t`**（`_t_for_visibility()` 反查一个能得到目标可见度的时刻），否则排版不可复现。
+- `Dev/shot_orb_motion.tscn` —— **局内连拍** 12 帧（间隔 0.45s ≈ 5.4s，正好一圈）拼成网格，验证「绕飞 + 明灭」。⚠ **不能靠 shot2d.py 连跑几次拼图**：`_phase = randf()` 每次启动都不同，跨进程拼出来的「轨迹」是假的 —— 必须在同一进程里沿同一条时间线连拍。它每帧还会打印 `zoom / view_alpha / vis / cur_a / t / offset / r_world`，这类「局内看不见它」的问题只有把这些摊开才能定位。
+- 单帧真实局内仍走 `tools/shot2d.py`。
 
 ### 5.9 已定义未接线 / 失效清单（当前真实状态）
 | 对象 | 状态 | 说明 |

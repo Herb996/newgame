@@ -213,7 +213,7 @@
         "vision_radius_cells": 10,
         "select_radius_px": 64.0,
         "path_arrive_threshold_px": 24.0,
-        "selected_color": "#4fc3f7",
+        "selected_color": "#FFC14D",
         "sprite_set": "sprites_lancer",
         "weapon": "sword",
         "sprite_scale": 0.6,
@@ -305,16 +305,58 @@
             }
         },
         "badge": {
-            "_comment": "头顶等级徽章：UI 层 _draw 自绘（**不烘进贴图** —— 9 级 x 3 角色 = 27 套帧，且改数值要重出图）。数字 0~9 + 圈，圈色随档位。",
+            "_comment": "等级显示 = 一个绕角色漂移的小光球（2026-09-18 取代旧的「圈 + 数字」—— 黑底白字压在像素小人头上像工牌，用户评价太违和）。平时只有球（颜色随档位），每隔几秒闪一次；闪的那 1 秒球胀大、球心亮出卡通数字。UI 层 _draw 自绘，不烘进贴图（9 级 x 3 角色 = 27 套帧）。",
             "enabled": true,
-            "offset_y": -46.0,
-            "radius": 9.0,
-            "font_size": 11,
+            "orb": {
+                "_comment": "缕绕角色飞的**淡光**（2026-09-18 三次改版）。前两版都被判丑，根因同一个：把它**画成了实体**——先是「暗色棋子」，后是「卡通糖果球」（细描边定形 + 球冠亮面 + 底部薄影），越画得完整越像一颗真球挂在人身上。光不该有边界。现在删掉一切轮廓，只留几层同心柔光从内到外化开（`glow.layers`），颜色朝白推淡，整体压在半透明。四条行为（用户原话：时隐时现 / 时快时慢 / 颜色尽量淡 / 在角色四周飞）分别在 pulse / speed_sway / glow / center_offset_y+orbit_y_scale 四组参数里。radius_px 是**屏幕像素**（screen_fixed 按 1/zoom 换算）→ 拉远拉近一样大一样清楚。",
+                "center_offset_y": -34.0,
+                "radius_px": 11.0,
+                "screen_fixed": true,
+                "orbit_radius_px": [24.0, 36.0],
+                "orbit_y_scale": 0.85,
+                "spin_speed": 1.2,
+                "speed_sway": 0.5,
+                "speed_sway_hz": 0.13,
+                "speed_sway2": 0.2,
+                "speed_sway_hz2": 0.31,
+                "wobble_px": 3.0,
+                "_speed_comment": "「时快时慢」：ω(t) = spin_speed + speed_sway·2π·speed_sway_hz·cos(2π·hz·t) + speed_sway2·2π·speed_sway_hz2·cos(2π·hz2·t)。⚠ **两条 sway 项之和必须 < spin_speed**，否则 ω 会变负——光点原地掉头，看着像 bug 不像飘。当前 0.41 + 0.39 = 0.80 < 1.20 ✓（ω ∈ [0.40, 2.00]，快慢差 5 倍）。两条频率取不整除（0.13 / 0.31）→ 快慢节奏本身也不规律。",
+                "glow": {
+                    "_comment": "淡光的画法。layers = 「从外到内」的同心光斑层，每层 [半径比例, 不透明度比例]：外层大而极淡（当光晕）、内层小而亮（当光核），**没有任何描边**。不变量：ratio 递减、alpha 递增（探针守这条，写反了会变成一圈实心靶子）。ratio 允许 > 1（光晕比光核大）。内层颜色自动朝白推 (1-ratio)×core_whiten → 光核偏白、光晕偏档位色。⚠ 每层是**软边光斑**（运行时生成的径向渐变贴图，见 Scripts/unit_level_badge.gd 的 `_ensure_glow_tex`），不是实心圆 —— 实心圆叠起来能数出一圈圈同心环，放大看就是个靶子（首版实拍验证后改掉的）。falloff 是这张贴图的三次方级以下的衰减指数：越大 → 中心越集中、边缘散得越快（1.5 左右最像光，>4 会缩成一粒硬点）。pulse_seconds = 「时隐时现」的两条周期（两周期不整除 → 明暗节奏不规律，不是呼吸灯）；clamp 后两端都有平台，即**真的会完全隐没、也真的会完全显现**。pulse_power > 1 → 暗的时间更长、亮的时刻更短促。max_alpha 是整体不透明度天花板（<1 才有「虚」的质感）。min_scale = 最暗时缩到多小（亮时饱满、暗时收缩，像凑近又退远）。",
+                    "tint_white": 0.55,
+                    "max_alpha": 0.9,
+                    "core_whiten": 0.5,
+                    "falloff": 1.7,
+                    "layers": [[1.3, 0.14], [0.95, 0.24], [0.62, 0.44], [0.34, 1.0]],
+                    "pulse_seconds": [3.4, 2.1],
+                    "pulse_power": 1.15,
+                    "min_scale": 0.72
+                }
+            },
+            "flash": {
+                "_comment": "「闪一下报等级」的节奏：间隔 interval 秒随机闪一次（first_delay = 进场后第一次，别让玩家等太久才明白这光点干嘛的）。rise 胀大 / hold 保持 / fade 淡出。闪的时候**可见度被强制拉满**（orb.glow 的时隐时现会被顶掉）—— 否则光点正好处在「隐」的时刻，闪了也白闪。on_select = 点选该角色立刻闪一次（想知道就能知道）—— 这是「不常驻数字」的补偿手段。scale 比球时代大（2.0）：底球半径小了，不多胀一点数字搁不下。",
+                "interval": [5.0, 9.0],
+                "first_delay": 1.5,
+                "scale": 2.0,
+                "rise": 0.15,
+                "hold": 0.7,
+                "fade": 0.35,
+                "text_size": 14,
+                "text_outline_color": "#2B2A3A",
+                "on_select": true,
+                "on_level_up": true
+            },
+            "far_fade": {
+                "_comment": "视野拉远（zoom 变小）时淡出，避免看全图时一堆光球糊成一片。start_zoom 开始淡、end_zoom 完全隐藏。",
+                "start_zoom": 0.95,
+                "end_zoom": 0.7
+            },
             "colors": {
-                "blue": "#378ADD",
-                "purple": "#7F77DD",
-                "black": "#5F5E5A",
-                "gold": "#EF9F27"
+                "_comment": "档位球色（2026-09-18 整体提亮）。旧值 blue #378ADD / purple #7F77DD / black #5F5E5A / gold #EF9F27 明度都偏低，压到 18px 屏幕上显脏；精锐档那颗 #5F5E5A 更是「太深」的最大来源。精锐改**银灰** —— 与 6–8 级角色的 Black 阵营甲同属黑白灰一族（银就是黑甲的提亮版），档位语义不丢。出击面板色块读的是同一份配置，会一起变。",
+                "blue": "#4FA8F0",
+                "purple": "#A98CFF",
+                "black": "#C9D2E0",
+                "gold": "#FFC53D"
             }
         },
         "roster": {
@@ -3047,12 +3089,13 @@
             "scale": 0.5
         },
         "reflection": {
-            "_comment": "积水倒影：SubViewport 垂直镜像渲染（Camera2D zoom.y 取负）+ MultiMesh2D 批量装饰物 + 天空渐变底。alpha=反射整体不透明度；wobble_*=噪波扰动倒影 UV（晃动强度）；sky_*=天空渐变上下色；exclude_path_fragments=剔除路径含该片段的装饰（如贴地裂缝，不产生倒影）。",
+            "_comment": "积水倒影：SubViewport 垂直镜像渲染（Camera2D zoom.y 取负）+ MultiMesh2D 批量装饰物 + 天空渐变底。alpha=反射整体不透明度；wobble_*=噪波扰动倒影 UV（晃动强度）；dispersion=色散采样最大 UV 偏移（红通道 +off、绿蓝 −off）；sky_*=天空渐变上下色；exclude_path_fragments=剔除路径含该片段的装饰（双保险，主过滤靠 map_generator 打的 refl meta）。",
             "enabled": true,
             "alpha": 0.55,
             "wobble_scale": 0.12,
             "wobble_speed": 0.8,
             "wobble_strength": 0.012,
+            "dispersion": 0.015,
             "sky_top_color": "#3c4c60",
             "sky_bottom_color": "#6d8ba6",
             "exclude_path_fragments": ["crack"]
@@ -3085,7 +3128,7 @@
             "smooth_iterations": 2,
             "clear_spawn_radius_cells": 4,
             "color": "#3f6f8f",
-            "alpha": 0.42,
+            "alpha": 0.62,
             "noise_scale": 0.1,
             "scroll_cells_per_s": [0.5, 0.9],
             "wobble": 0.65,
@@ -3102,7 +3145,14 @@
             "alpha": 0.8,
             "base_channel": 0.85,
             "disp_channel": 0.5,
-            "glow": 0.35
+            "glow": 0.35,
+            "dry_radius_px": 30.0,
+            "dry_duration_s": 0.6,
+            "dry_alpha": 0.55,
+            "ellipse_squash": 0.45,
+            "frag_seg_rad": [0.25, 0.8],
+            "frag_gap_rad": [0.1, 0.45],
+            "frag_alpha_jitter": 0.5
         },
         "step": {
             "_comment": "脚步音：players 个 AudioStreamPlayer2D 轮转避免重叠被吞；max_distance 之外不响（世界像素）。volume_db=湿脚步（踩水）音量；dry_volume_db=干地脚步音量。",

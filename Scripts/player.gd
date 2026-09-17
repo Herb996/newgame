@@ -169,7 +169,9 @@ func _ready() -> void:
 	speed = float(Config.get_value("player.speed", 160.0))
 	var select_radius := float(Config.get_value("player.select_radius_px", 16.0))
 	(_select_area.get_node("CollisionShape2D").shape as CircleShape2D).radius = select_radius
-	var sel_color := Color(str(Config.get_value("player.selected_color", "#4fc3f7")))
+	# 选中标记用**暖色**：头顶那颗等级光点是蓝白系，两个蓝色悬浮物挤在一起
+	# 会分不清哪个是「选中」哪个是「等级」（实拍连拍验出来的，见 unit_level_badge.gd）。
+	var sel_color := Color(str(Config.get_value("player.selected_color", "#FFC14D")))
 	_select_icon.icon_color = sel_color
 	_select_icon.visible = false
 	_select_area.input_event.connect(_on_select_area_input)
@@ -1309,6 +1311,10 @@ func _set_selected(value: bool) -> void:
 	selected = value
 	_select_icon.visible = value
 	if value:
+		# 点选 = 让头顶光球立刻闪一次报出等级。这是"平时不常驻数字"的补偿手段：
+		# 想知道某人是几级，点一下就闪给你看（见 unit_level_badge.gd）。
+		if _badge != null and is_instance_valid(_badge) and _badge.has_method("notify_selected"):
+			_badge.call("notify_selected")
 		# 小队互斥：同一时刻只有一名角色被选中，后点的顶掉先前的
 		for p in get_tree().get_nodes_in_group("player"):
 			if p != self and p.has_method("deselect"):

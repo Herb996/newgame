@@ -28,6 +28,7 @@ var _dump_atlas := ""              # --dump-atlas，把运行时图集另存 PNG
 var _dump_biome := ""              # --dump-biome，把群系 id 画成色块图（看群系分布）
 var _dump_zoom := 1                # --zoom N，上面两张诊断图的放大倍数（小图看不清时用）
 var _no_macro := false             # --no-macro，关掉宏观明暗层（二分"叠加层 vs 地形"用）
+var _walk_test := false            # --walk-test，截图前让角色走起来（拍走路波纹用）
 var _soak_seconds := 0.0           # --soak N，跑 N 秒行为验证（移动不卡住/死亡消失）后退出
 var _soak_kill_ratio := 0.3        # --soak-kill-ratio F，探针在中途击杀多大比例的单位
 var _soak_trace := false           # --soak-trace，探针逐次采样打印玩家状态（排查用）
@@ -131,6 +132,8 @@ func _handle_cli() -> bool:
 			"--no-macro":
 				_no_macro = true
 				MapGenerator.disable_macro = true
+			"--walk-test":
+				_walk_test = true
 			"--dump-atlas":
 				i += 1
 				_dump_atlas = argv[i] if i < argv.size() else ""
@@ -181,6 +184,11 @@ func _handle_cli() -> bool:
 		_capture_left = _capture_delay
 		_enter_base()
 		_enter_run()
+		if _walk_test:
+			var wd := WalkDriver.new()
+			wd.name = "WalkDriver"
+			add_child(wd)
+			wd.start(_last_map)
 		return true
 	# 只给了 --no-fog（没给出图路径）时走到这里：返回 false，让 _ready 继续走
 	# 正常的"进基地 → 进局"流程，_enter_run 里会按 _no_fog 关掉迷雾。
@@ -676,3 +684,43 @@ func _smoke_test() -> void:
 	run.start_run()
 	run.time_remaining = 0.01
 	print("[自检] 4. 已启动超时测试局，等待下一帧触发…")
+
+
+## ============================================================
+## WalkDriver — --walk-test 截图辅助：让角色持续走动（拍走路波纹用）
+## 玩家到达目标或卡住就再发一个新目标，距离 5~10 格。
+## ============================================================
+class WalkDriver extends Node:
+	var _player: Node2D = null
+	var _cells: Array = []
+	var _tile := 64.0
+
+	func start(map_data: Dictionary) -> void:
+		_tile = float(map_data.get("tile_size", 64))
+		_player = get_tree().get_first_node_in_group("player")
+		var reachable: Array = map_data.get("reachable", [])
+		var walls: Array = map_data.get("walls", [])
+		for y in range(reachable.size()):
+			var rrow: Array = reachable[y]
+			var wrow: Array = walls[y]
+			for x in range(rrow.size()):
+				if bool(rrow[x]) and not bool(wrow[x]):
+					_cells.append(Vector2i(x, y))
+		print("[WalkTest] 角色走动测试开始：跳点格 %d 个" % _cells.size())
+
+	func _process(_delta: float) -> void:
+		if _player == null or not is_instance_valid(_player):
+			return
+		if _player.has_method("has_move_target") and not _player.has_move_target():
+			_order()
+
+	func _order() -> void:
+		if _cells.is_empty():
+			return
+		for _i in range(24):
+			var c: Vector2i = _cells[randi() % _cells.size()]
+			var p := Vector2(c) * _tile + Vector2(_tile * 0.5, _tile * 0.5)
+			if p.distance_to(_player.global_position) > _tile * 4.0 \
+					and p.distance_to(_player.global_position) < _tile * 10.0:
+				_player.call("set_move_target", p)
+				return

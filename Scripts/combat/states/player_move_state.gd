@@ -30,8 +30,11 @@ func physics_update(delta: float) -> void:
 		# 直接查组即可、不缓存（缓存反而要处理切图时 WeatherSystem 引用失效）。
 		# is_water_at 内部已判 _active，基地/未激活/无该节点时安全返回 false。
 		var weather := actor.get_tree().get_first_node_in_group("weather_system")
-		if weather != null and weather.is_water_at(pos):
-			weather.on_water_step(pos)
+		if weather != null:
+			if weather.is_water_at(pos):
+				weather.on_water_step(pos)
+			else:
+				weather.on_dry_step(pos)   # 雨天干地也出小湿痕波纹
 	# 自动战斗（2026-09-17）：赶路途中敌人进入「视野 ∩ 攻击距离」就地开打，
 	# 打完回到 move 继续赶路（见 PlayerAttackState 的后摇分支）。
 	if actor.auto_target() != null:

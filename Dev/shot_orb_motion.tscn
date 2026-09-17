@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Dev/shot_orb_motion.gd" id="1_motion"]
+
+[node name="ShotOrbMotion" type="Node"]
+script = ExtResource("1_motion")

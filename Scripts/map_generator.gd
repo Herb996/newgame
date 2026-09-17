@@ -640,6 +640,8 @@ static func generate() -> Dictionary:
 					# 立体：脚底对齐格心（图片底边落在格心下方 2px，"站在"这一格）
 					s.offset = Vector2(-tex_size.x * 0.5, 2.0 - tex_size.y)
 				s.z_index = 0   # 与地形同层：玩家（z=1）始终在前景，未探索区被雾盖住
+				if not is_flat:
+					s.set_meta("refl", true)   # 水面倒影源（树/石/灌木/碎石）：weather 侧按此 meta 过滤
 				decor_root.add_child(s)
 				counts[kk] = int(counts[kk]) + 1
 
@@ -676,6 +678,7 @@ static func generate() -> Dictionary:
 		os.position = opos
 		os.offset = Vector2(-otex.get_width() * 0.5, 2.0 - otex.get_height())
 		os.z_index = 0
+		os.set_meta("refl", true)   # 矿脉也进水面倒影
 		decor_root.add_child(os)
 		vd["sprite"] = os
 
