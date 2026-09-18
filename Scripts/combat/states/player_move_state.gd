@@ -24,7 +24,7 @@ func physics_update(delta: float) -> void:
 		_footstep = 0.0
 		var pos: Vector2 = actor.global_position
 		# from_player=true → 计入菜单栏「当前/累积噪音」读数（脚步也算暴露度）
-		NoiseSystem.emit(pos, float(Config.get_value("noise.sources.walk", 10.0)), true)
+		NoiseSystem.emit(pos, float(Config.get_value("noise.sources.walk", 10.0)), true, actor)
 		# 踩水：站在积水格上时，同一次脚步额外出波纹 + 播水声。
 		# 噪声照常发（踩水不豁免噪音暴露）。这是 0.4s 一次的低频路径，
 		# 直接查组即可、不缓存（缓存反而要处理切图时 WeatherSystem 引用失效）。

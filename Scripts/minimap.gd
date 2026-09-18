@@ -4,8 +4,9 @@ extends CanvasLayer
 ##
 ## 【embed 模式】局内菜单栏左侧的常驻槽（2026-09-17 起的主用法）：
 ##   menu_bar.gd 调 set_embed_mode(true) + set_slot_rect(rect) 把面板钉进栏内左槽，
-##   开局就有、全程可见；**点它 = 给选中单位下一道指令**（世界坐标换算好后
-##   由 menu_bar 转给角色，所以「点小地图」与「点地图」完全同义，巡逻设点也通用）。
+##   开局就有、全程可见；**点它 = 把大世界镜头平移到对应的世界坐标**（RTS 式导航，
+##   换算好世界坐标后经 map_clicked 交给 menu_bar，由它移镜头）。给单位下令/指定攻击/
+##   巡逻设点改走「点大世界地图」（player.gd 世界左键 → command_click）。
 ##
 ## 【legacy 模式】独立弹出（3D 线 Scenes/Main3D.tscn 仍在用）：
 ##   撤离点开启 / 关闭前预警时弹出 duration_seconds，见 show_for()。

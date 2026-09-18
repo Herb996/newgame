@@ -24,6 +24,9 @@ extends Node2D
 ##      选中框 / 小地图点（恒阵营蓝），档位靠身上甲色，光点只管「这人在哪」。
 ##   ④ **绕着角色四周飞** —— `center_offset_y` 落在**身体中部**（不再是头顶 -56），
 ##      `orbit_y_scale` 接近 1 让纵向跨度够大：光点会掠过头顶、腰侧、腿边。
+##   ⑤ **越吵飞得越急**（2026-09-18 追加）：`noise_speed()` 读**所属角色**的自身噪音
+##      （noise.self，菜单右下第 1 行），把**整条时间轴**乘一个 1~3 倍的系数 ——
+##      移动、明灭、报数的频率一起变快，且相位连续看不出是被调快了。
 ##
 ## 保留的旧机制（都有探针守着，别顺手删）：
 ##   `screen_fixed` 屏幕恒定尺寸（1/zoom）、`far_fade` 视野拉远淡出、
@@ -77,6 +80,12 @@ var _on_level_up: bool = true
 var _fade_start_zoom: float = 0.95
 var _fade_end_zoom: float = 0.7
 var _radius_max_world: float = 10.0   # 兜底：极端视野下的**世界**半径上限
+# --- 跟着自身噪音提速（progression.badge.noise_link，2026-09-18）---
+var _link_on: bool = true
+var _link_ref: float = 240.0
+var _link_max: float = 3.0
+var _link_curve: float = 1.4
+var _link_boost_flash: bool = true
 
 # --- 运行时 ---
 var _t: float = 0.0                   # 相位（累计秒）
@@ -93,6 +102,9 @@ static var _glow_tex_falloff: float = -1.0
 ## 探针钩子：>0 时替代真实相机 zoom（headless 里往往没有 Camera2D，读不到倍率，
 ## 而「屏幕恒定尺寸 / 缩远淡出」全靠 zoom）。设了记得还原成 0.0。
 var zoom_override: float = 0.0
+## 探针钩子：>= 0 时替代「所属角色的自身噪音」（headless 里没法真让角色攻一次击
+## 来攒够一段噪音，注入一个读数就能验「噪音越大越快」这条联动）。默认 -1 = 读真的。
+var noise_override: float = -1.0
 
 
 func _ready() -> void:
@@ -154,6 +166,15 @@ func _apply_cfg() -> void:
 	_on_level_up = bool(Config.get_value("progression.badge.flash.on_level_up", true))
 	_fade_start_zoom = float(Config.get_value("progression.badge.far_fade.start_zoom", 0.95))
 	_fade_end_zoom = float(Config.get_value("progression.badge.far_fade.end_zoom", 0.7))
+	_link_on = bool(Config.get_value("progression.badge.noise_link.enabled", true))
+	_link_ref = maxf(1.0, float(Config.get_value(
+			"progression.badge.noise_link.reference", 240.0)))
+	_link_max = maxf(1.0, float(Config.get_value(
+			"progression.badge.noise_link.max_speed_multiplier", 3.0)))
+	_link_curve = maxf(0.05, float(Config.get_value(
+			"progression.badge.noise_link.curve", 1.4)))
+	_link_boost_flash = bool(Config.get_value(
+			"progression.badge.noise_link.boost_flash", true))
 	# 世界半径上限（最后一道保险）：极端视野下别让光点长得比轨道还大、糊满角色。
 	# ⚠ 别收到 `_orbit_r_lo * 0.5` 这种量级 —— 那样在 zoom 0.8 这种**正常视野**就会撞上限，
 	# 把「屏幕恒定尺寸」这条更重要的观感特性打掉（探针 F 段抓到过一次）。
@@ -265,18 +286,51 @@ func _flash_amount() -> float:
 
 
 func _process(delta: float) -> void:
-	_t += delta
+	var sp := noise_speed()
+	# 【整条时间轴 × sp】而不是分别给每条曲线各自乘频率。
+	# orbit_angle / pulse_visibility / wobble 全读同一个 `_t`，所以 `-=加速` 是**相位连续**
+	# 的：不会有哪一帧突然跳到新相位。分别乘则三者会互相错位、表现为光点「抖一下」。
+	_t += delta * sp
 	_update_view()
 	if _flash_t >= 0.0:
+		# ⚠ 单次时长**不跟着加速**：那 1.2 秒是为了让球心的数字能被读出来，
+		# 压到 0.4 秒就是「一闪而过」，等于没报。加速只体现在**多久闪一次**上。
 		_flash_t += delta
 		if _flash_t >= _flash_total():
 			_flash_t = -1.0
 			_schedule_next()
 	else:
-		_next_flash -= delta
+		_next_flash -= delta * (sp if _link_boost_flash else 1.0)
 		if _next_flash <= 0.0:
 			flash()
 	queue_redraw()
+
+
+# ------------------------------------------------------------
+# 跟着自身噪音提速（noise.self → 移动越快 / 闪得越勤）
+# ------------------------------------------------------------
+
+## 自己这个角色的**自身噪音**（noise.self）。光点在 `Scenes/Player.tscn` 里是 Player 的
+## 直接子节点，取 `get_parent()` 最直接；组筛查只是给手工搭出来的 Dev 场景（展示场景里
+## 光球挂在裸 Node2D 下）一条回落，不会误抓到别人。
+func owner_self_noise() -> float:
+	if noise_override >= 0.0:
+		return noise_override           # 探针钩子：headless 里没法真去攻一次击
+	var p := get_parent()
+	if p == null:
+		return 0.0
+	var raw = p.get("self_noise")
+	return float(raw) if raw != null else 0.0
+
+
+## 时间轴倍速 1~max倍（value 1.0 = 完全安静，无心 reactors）。
+## `curve > 1` → 小噪音（脚步 22）几乎不提速，只有真吵起来（120+）才明显；
+## 写成线性（curve = 1）的话，光点会被呼吸般的脚步声拽得一跳一跳，很烦躁。
+func noise_speed() -> float:
+	if not _link_on:
+		return 1.0
+	var n := clampf(owner_self_noise() / _link_ref, 0.0, 1.0)
+	return 1.0 + (_link_max - 1.0) * pow(n, _link_curve)
 
 
 ## 取相机 zoom 算「屏幕恒定尺寸」和「缩远淡出」。无头 / 没相机时按 1.0 处理。

@@ -24,9 +24,9 @@ func enter(_msg: Dictionary = {}) -> void:
 	if bool(Config.get_value("combat.dodge.invincible", true)):
 		actor.set_invincible(true)
 	# 冲刺发声：比走路更响（DESIGN.md 第二部分 噪音机制）
-	# from_player=true → 计入菜单栏「当前/累积噪音」读数
+	# from_player=true + actor → 这次动静记在**这个角色**的自身噪音上
 	NoiseSystem.emit(actor.global_position,
-			float(Config.get_value("noise.sources.dodge", 28.0)), true)
+			float(Config.get_value("noise.sources.dodge", 28.0)), true, actor)
 
 
 func exit() -> void:

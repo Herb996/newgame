@@ -79,9 +79,20 @@ var initial_weapon := ""
 # level：这个**人**的等级，不是兵种的 —— 死亡永久，所以等级必须挂在实例上。
 var roster_uid: int = 0
 var level: int = 0
+# 升级特性层数表：{"attack": 2, "hp": 1, ...}（main.gd 在 add_child 前注入，
+# 来自 Meta.traits_of(roster_uid)）。临时角色（命令行/无头回归）为空 → 一切加成归零。
+var traits: Dictionary = {}
 # 头顶等级徽章（Scenes/Player.tscn 的 LevelBadge 节点，见 unit_level_badge.gd）
 var _badge: Node = null
 
+
+# --- 自身噪音（noise.self；2026-09-18 起两路噪音互相喂养，这是「每人一份」那一路）---
+# 出声时由 NoiseSystem.add_player_noise 灌进来（**已乘过世界噪音的增益**）；
+# 每帧由 NoiseSystem._process 统一做两件事：线性快衰减、按比例喂给世界噪音。
+# 为什么不在本文件里自己衰减：那样这条路就要同时依赖各自的 delta 与团队的 world 值，
+# 一旦有人 pending 移除（死锁/换图）就会各走一半。集中在一处衰减，才好保持一致。
+# 头顶光球（unit_level_badge.gd）读它来决定飘动与明灭的快慢 —— 越吵飞得越急。
+var self_noise: float = 0.0
 
 # 导航数据：由 main.gd 注入
 var _walls: Array = []
@@ -166,7 +177,7 @@ func _ready() -> void:
 		sprite_cfg = Config.get_value("sprites", {})
 	_animator.load_from_config(sprite_cfg, _view_cfg_for(sprite_cfg))
 	facing = Vector2(0, 1)   # 出生默认朝下方（标准俯视）
-	speed = float(Config.get_value("player.speed", 160.0))
+	speed = float(Config.get_value("player.speed", 160.0)) + trait_flat("move_speed")
 	var select_radius := float(Config.get_value("player.select_radius_px", 16.0))
 	(_select_area.get_node("CollisionShape2D").shape as CircleShape2D).radius = select_radius
 	# 选中标记用**暖色**：头顶那颗等级光点是蓝白系，两个蓝色悬浮物挤在一起
@@ -259,6 +270,19 @@ func _ensure_badge_synced() -> void:
 		_badge.call("refresh", level, Meta.tier_id_of_level(level))
 
 
+## 发声记账。`amount` 是**已经乘过世界噪音增益**的量（增益的算法只在
+## NoiseSystem.self_gain_from_world 写了这一份），这里不再二次加工 ——
+## 否则「这里再按世界噪音放大一次」会让调参完全失控（指数上的指数）。
+func add_self_noise(amount: float) -> void:
+	var smax := maxf(1.0, float(Config.get_value("noise.self.max", 300.0)))
+	self_noise = clampf(self_noise + maxf(0.0, amount), 0.0, smax)
+
+
+## 开局清零（NoiseSystem.reset 会遍历 player 组调它）
+func clear_self_noise() -> void:
+	self_noise = 0.0
+
+
 func _process(_delta: float) -> void:
 	if _rifle != null and is_instance_valid(_rifle):
 		_rifle.rotation = facing.angle()
@@ -331,12 +355,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 	if event is InputEventMouseButton and event.pressed:
-		# 右键 = 取消当前指令（RTS 惯例）；左键 = 下指令（移动 / 设点 / 点敌人）
+		# 右键 = 取消当前指令（RTS 惯例）。左键「选择 / 框选 / 空地下令」已交给
+		# SelectionController：它区分点击 vs 拖拽，并把指令同时下达给所有选中单位。
 		if event.button_index == MOUSE_BUTTON_RIGHT:
 			cancel_commands()
-			return
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			command_click(get_global_mouse_position())
 			return
 	state_machine.handle_input(event)
 
@@ -519,11 +541,16 @@ func attack_kind() -> String:
 
 ## 按武器覆盖 combat.attack 的同名键；武器没写该键就回落到全局值。
 ## 这条回退链是「不填 weapons 也完全保持旧行为」的保证。
+## 攻击频率特性：三段时序（前摇/判定/后摇）统一除以 (1+累计%)，越多越快。
 func attack_param(key: String, fallback: float) -> float:
 	var w := weapon_data()
-	if w.has(key):
-		return float(w[key])
-	return float(Config.get_value("combat.attack." + key, fallback))
+	var v: float = float(w[key]) if w.has(key) \
+			else float(Config.get_value("combat.attack." + key, fallback))
+	if key == "windup_seconds" or key == "active_seconds" or key == "recovery_seconds":
+		var scale := _trait_cadence_scale()
+		if scale > 1.0:
+			v /= scale
+	return v
 
 
 ## 当前武器的挥击噪音；武器没写就回落到 noise.sources.attack
@@ -532,6 +559,35 @@ func attack_noise() -> float:
 	if w.has("noise"):
 		return float(w["noise"])
 	return float(Config.get_value("noise.sources.attack", 120.0))
+
+
+## ------------------------------------------------------------
+## 升级特性加成（config progression.traits；层数 × per_stack）
+##
+## traits 由 main.gd 注入（Meta.traits_of），临时角色为空 → 所有加成 0。
+## per_stack 全是整数「单位」：flat 类（攻击/防御/气血/移速/视野/攻击距离/投射体速度）
+## 直接当点数相加；pct 类（攻击频率）的 per_stack 是「每层百分点」，走
+## attack_param 的时序除法（见 _trait_cadence_scale）。
+## ------------------------------------------------------------
+
+## 某特性定义（id → 配置项），从 Meta 的表读
+func _trait_def(id: String) -> Dictionary:
+	return Meta.trait_defs().get(id, {})
+
+
+## 某特性的数值 = 层数 × per_stack（flat 是点数，pct 是百分点）
+func trait_flat(id: String) -> float:
+	return float(traits.get(id, 0)) * float(_trait_def(id).get("per_stack", 0.0))
+
+
+## 攻击频率的时序缩放：累计 +X% → 前摇/判定/后摇除以 (1 + X/100)，越多越快
+func _trait_cadence_scale() -> float:
+	return 1.0 + trait_flat("attack_speed") / 100.0
+
+
+## 攻击伤害叠加特性后的最终基础伤害（近战/弹道/瞬狙三条路径共用）
+func trait_damage(base: float) -> float:
+	return base + trait_flat("attack")
 
 
 ## ------------------------------------------------------------
@@ -547,12 +603,13 @@ func attack_noise() -> float:
 ##   但不管数值怎么配，实际射程一律被观察视野截断 —— 杜绝"打到看不见的目标"。
 ## ------------------------------------------------------------
 
-## 观察视野（像素）
+## 观察视野（像素）；含视野特性加成
 func vision_px() -> float:
-	return float(Config.get_value("player.vision_radius_cells", 10)) * float(_tile_size)
+	return float(Config.get_value("player.vision_radius_cells", 10)) * float(_tile_size) \
+			+ trait_flat("vision")
 
 
-## 武器自身的攻击距离（像素）
+## 武器自身的攻击距离（像素）；含攻击距离特性加成
 func attack_range_px() -> float:
 	var w := weapon_data()
 	match attack_kind():
@@ -560,13 +617,13 @@ func attack_range_px() -> float:
 			var pc = w.get("projectile", null)
 			if pc is Dictionary:
 				return float((pc as Dictionary).get("max_distance_px",
-						attack_param("range_px", 120.0)))
+						attack_param("range_px", 120.0))) + trait_flat("attack_range")
 		"hitscan":
 			var hc = w.get("hitscan", null)
 			if hc is Dictionary:
 				return float((hc as Dictionary).get("max_distance_px",
-						attack_param("range_px", 120.0)))
-	return attack_param("range_px", 120.0)
+						attack_param("range_px", 120.0))) + trait_flat("attack_range")
+	return attack_param("range_px", 120.0) + trait_flat("attack_range")
 
 
 ## 有效攻击距离：攻击距离与观察视野取小者
@@ -776,8 +833,10 @@ func _init_combat() -> void:
 	var meta_hp := int(Meta.get_stat("survival.max_hp"))
 	if meta_hp > 0:
 		max_hp = meta_hp
+	# 气血特性：在养成之后再加一层固定值（层数 × per_stack）
+	max_hp += int(trait_flat("hp"))
 	hp = max_hp
-	print("[Combat] 本局生命上限 %d（含局外养成）" % max_hp)
+	print("[Combat] 本局生命上限 %d（含局外养成/升级特性）" % max_hp)
 	_run = get_tree().get_first_node_in_group("run_manager")
 	if hitbox != null:
 		hitbox.monitoring = false   # 只在判定帧窗口开启
@@ -878,7 +937,7 @@ func resolve_attack_hit() -> void:
 	if hitbox == null or attack_kind() != "melee":
 		return
 	var max_targets := int(attack_param("max_targets", 3.0))
-	var base_damage := attack_param("damage", 25.0)
+	var base_damage := trait_damage(attack_param("damage", 25.0))
 	var half_arc := deg_to_rad(attack_param("arc_degrees", 200.0)) * 0.5
 	var hits := 0
 	for area in hitbox.get_overlapping_areas():
@@ -922,11 +981,13 @@ func fire_projectile() -> bool:
 	# 与自动索敌的射程判定用同一个数，避免"锁定得到但箭够不着"或反过来。
 	var cfg: Dictionary = (pc as Dictionary).duplicate()
 	cfg["max_distance_px"] = effective_attack_range_px()
+	# 投射体速度特性：直接叠在弹速上（箭/子弹飞得更快，射程已按有效攻击距离截断）
+	cfg["speed"] = float(cfg.get("speed", 900.0)) + trait_flat("projectile_speed")
 	var p := PROJECTILE.new()
 	p.name = "Projectile"
 	parent.add_child(p)
 	p.global_position = global_position + facing * float(cfg.get("muzzle_offset_px", 22.0))
-	p.setup(cfg, facing, int(attack_param("damage", 20.0)), _walls, _tile_size)
+	p.setup(cfg, facing, int(trait_damage(attack_param("damage", 20.0))), _walls, _tile_size)
 	return true
 
 
@@ -964,7 +1025,7 @@ func fire_hitscan() -> int:
 	if pierce < targets.size():
 		targets = targets.slice(0, pierce)
 
-	var base_damage := attack_param("damage", 25.0)
+	var base_damage := trait_damage(attack_param("damage", 25.0))
 	for t in targets:
 		var dmg := DamagePipeline.compute(base_damage)
 		t.take_damage(dmg)
@@ -1028,13 +1089,17 @@ static func _is_damageable(node: Node) -> bool:
 func take_damage(amount: int, source_pos: Vector2 = Vector2.ZERO) -> bool:
 	if _dead or is_invincible():
 		return false
-	hp = maxi(hp - amount, 0)
+	# 防御特性：入伤先扣固定减免，扣到 0 就是完全挡下（不掉血、不进硬直）
+	var mitigated := maxi(amount - int(trait_flat("defense")), 0)
+	if mitigated <= 0:
+		return false
+	hp = maxi(hp - mitigated, 0)
 	_invincible_timer = float(Config.get_value("combat.player.invincible_after_hit_seconds", 0.4))
 	var knockback := Vector2.ZERO
 	if source_pos != Vector2.ZERO:
 		knockback = (global_position - source_pos).normalized() \
 				* float(Config.get_value("combat.player.knockback_speed", 140.0))
-	print("[Combat] 玩家受到 %d 伤害，剩余 HP %d/%d" % [amount, hp, max_hp])
+	print("[Combat] 玩家受到 %d 伤害（减免 %d），剩余 HP %d/%d" % [mitigated, amount - mitigated, hp, max_hp])
 	if hp <= 0:
 		state_machine.force_transition(&"dead")
 		return true
@@ -1304,31 +1369,34 @@ func _unstick_radius() -> int:
 func _on_select_area_input(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
 	if event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
-		_set_selected(true)   # 点角色 = 选中指挥它（RTS 惯例，不再做"点一下取消"）
+		select()   # 点角色 = 排他单选并指挥它（RTS 惯例，不做"点一下取消"）
 
 
 func _set_selected(value: bool) -> void:
+	# 纯标志位 + 视觉：不再 stop_moving、也不做互斥。
+	# 「同一时刻选中谁」由 select()/SelectionController 统一编排。
+	# 旧版这里 deselect 会 stop_moving()，导致「点选别的角色 → 当前角色停下」，
+	# 正是要修的 bug：取消选中只是摘掉光环，绝不该打断该单位正在执行的移动/攻击。
 	selected = value
 	_select_icon.visible = value
-	if value:
-		# 点选 = 让头顶光球立刻闪一次报出等级。这是"平时不常驻数字"的补偿手段：
-		# 想知道某人是几级，点一下就闪给你看（见 unit_level_badge.gd）。
-		if _badge != null and is_instance_valid(_badge) and _badge.has_method("notify_selected"):
-			_badge.call("notify_selected")
-		# 小队互斥：同一时刻只有一名角色被选中，后点的顶掉先前的
-		for p in get_tree().get_nodes_in_group("player"):
-			if p != self and p.has_method("deselect"):
-				p.deselect()
-	else:
-		stop_moving()
+	if value and _badge != null and is_instance_valid(_badge) and _badge.has_method("notify_selected"):
+		_badge.call("notify_selected")
 	_path_line.visible = value and not _cached_path.is_empty()
 
 
-## 供 main / 死亡移交控制权时选中本角色
+## 排他单选：点角色 / 死亡移交控制权 / 开局默认选中都走这里 —— 清掉其他只留自己。
 func select() -> void:
+	for p in get_tree().get_nodes_in_group("player"):
+		if p != self and p.has_method("deselect"):
+			p.deselect()
 	_set_selected(true)
 
 
-## 取消选中（小队互斥由 _set_selected(true) 触发）
+## 框选入口：把自己并入当前选择集，不清除别人（多选用）。
+func select_keep_others() -> void:
+	_set_selected(true)
+
+
+## 取消选中（只动自己；是否连带清其它单位由调用方决定）
 func deselect() -> void:
 	_set_selected(false)

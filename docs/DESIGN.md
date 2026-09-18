@@ -49,13 +49,14 @@
 | enemy pawn/archer/monk | 192² | ~135 | −38~−40 | 6 | 1.0 |
 | sheep | 128² | 84 | −20 | 4 | 1.0 |
 
-> 玩家三兵种（warrior/archer/lancer）`scale` 统一为 **0.6**、`pixel_unit` 统一 **10**：Tiny Swords 各兵种身体原生像素一致，只有枪兵画布更大（320，容长枪），故战士/弓兵若按 1.0 会明显比枪手大一圈；对齐到 0.6 后小队三个角色体型一致（脚底仍由 `offset_y` 公式自动锚定，不随 scale 漂）。
+> 玩家四兵种（warrior/archer/lancer/monk）`scale` 统一为 **0.6**、`pixel_unit` 统一 **10**：Tiny Swords 各兵种身体原生像素一致，只有枪兵画布更大（320，容长枪），故战士/弓兵若按 1.0 会明显比枪手大一圈；对齐到 0.6 后小队角色体型一致（脚底仍由 `offset_y` 公式自动锚定，不随 scale 漂）。
 
 - 方向覆盖：**仅 Lancer 有真 8 向**（Attack/Defence 五向 + 左右镜像）；Warrior/Archer/Pawn 单向 + 水平镜像；Archer 有完整 Shoot 动作（免费包唯一自带拉弓帧）。
 
 ### 1.2 玩家与单位的真实贴图集（config 驱动）
-- 玩家可选出击 **3 名**角色（config `characters.list`）：**枪手**=长枪（`spear` → `sprites_lancer` 8 向枪兵）、**弓兵**=弓（`bow` → `sprites_archer` 弓兵）、**剑士**=剑（`sword` → `sprites_ts` 战士）。各武器已锁定自己的贴图集，未指定才回落 `player.sprite_set`。
+- 玩家可选出击 **4 名**角色（config `characters.list`）：**枪手**=长枪（`spear` → `sprites_lancer` 8 向枪兵）、**弓兵**=弓（`bow` → `sprites_archer` 弓兵）、**剑士**=剑（`sword` → `sprites_ts` 战士）、**僧侣**=法杖（`staff` → `sprites_monk` 僧侣，2026-09-18 加入）。各武器已锁定自己的贴图集，未指定才回落 `player.sprite_set`。
   > **强弩（`sniper`）已于 2026-09-17 从出击名单移除**（用户原话：「强弩准备废弃了，风格不统一，太丑了」）—— 它用的是即梦 AI 立绘 `blue_crossbowman/`，与另外三人（Tiny Swords 原生素材）画风割裂。**武器配置块、精灵集、贴图、探针、`fire_hitscan()` 代码全部保留**，`characters.list` 里插回一条即可复活；敌人没有任何一种用这套贴图，故移除不影响敌人。
+  > **僧侣（`monk`）2026-09-18 加入**：Tiny Swords Monk，五档配色齐全（Blue/Purple/Black/Yellow → 玩家档位，Red 已是敌人邪术师）。**官方没画 Attack 帧**（只有 Idle 6 / Run 4 / Heal 11 / Heal_Effect 11），沿用敌人 cultist 的先例 —— **Heal 帧就是攻击动作**（切出 `attack1_*` 与 `heal_*` 同像素两份命名，heal_fx_* 特效层不进动作序列）。本轮边界=「只加外观、能选能打」：新增 `combat.weapons.staff` **复用现成 melee 判定**（一行 combat 代码没改），数值定位=低伤(18)低噪(60，全场最安静)中距(140)近战；治疗机制是后续独立任务。**不在 `roster.starting` 出厂名册里**，走出击面板「补招新兵」获取（补招按钮遍历 characters.list 自动生成）。验收：`Dev/shot_monk_inrun.tscn` 开窗实拍（四人列队 / 四档配色 / Heal 施法当攻击动作），逐帧 `exists()` 断言 120 项全过。
 - **每个角色有 4 套档位配色**（2026-09-17 加等级系统）：同一套 Tiny Swords 骨架、只换颜色，帧数完全一致。放在 `Units/{blue,purple,black,yellow}_{lancer,archer,warrior}/`，由 `tools/slice_{lancer,archer,warrior}.py <Faction>` 生成（`Faction` = `Blue`/`Purple`/`Black`/`Yellow`，对应素材包 `images/Tiny Swords (Free Pack)/Units/<Faction> Units/`）。档位 → 配色的映射在 `progression.tiers` + `progression.sprite_sets`，见 §5.10。**红色永远留给敌人**，玩家档位不许占用红色系。
 - 现存贴图集（`Assets/Art/Sprites/`）：`PlayerTS/warrior_*`（192²，72 帧，历史/备用）、`Player/*`（48²，旧）、`PlayerHD/*`（512²，HD 备用）、`Units/blue_warrior|blue_lancer|blue_archer`（TS 单位）。
 - 敌人/中立（`Units/`）：`red_pawn`(idle8·run6·attack4) / `red_archer`(idle6·run4·**attack8**) / `red_monk`(idle6·run4·attack11) / `yellow_pawn`(idle8·run6·attack4) / `sheep`(idle6·run4·graze12)。
@@ -124,13 +125,21 @@
 - 槽内除 `bank` / `upgrades` / `base_layout` 外还有 **`roster`（名册）**：跨局持久的单位实例列表 `[{uid,id,name,level,xp}]`。等级挂在**具体的人**身上而不是兵种上 —— 因为死亡永久（见 §5.10）。
 
 ### 2.4 主基地（Base，`base_system.gd`，含于 `Main.tscn`）
-- 64×64 **整片草地**（`base.map_size`；已去掉外圈挡边墙，四周边框与内部统一，基地无角色不需挡边）；建筑 **4×4 格**（`base.building_cells`）。三栋建筑（`base.buildings`）：
+- 64×64 **整片草地**（`base.map_size`；已去掉外圈挡边墙，四周边框与内部统一，基地无角色不需挡边）；建筑 **4×4 格**（`base.building_cells`）。**8 栋建筑**（2026-09-18 全量换上 Tiny Swords Blue Buildings 素材 `blue_*.png`，功能只做原有的 3 个，其余纯展示待接功能）：
 
 | 建筑 | 默认 cell | sprite | 左键交互 |
 |---|---|---|---|
-| warehouse 仓库 | [24,30] | `house_large.png` | 打开仓库面板（只读展示 `Meta.bank`：种类数 / 仓库格数 / 叠加上限）|
-| statue 雕像 | [36,30] | `monastery.png` | 打开升级面板（`meta_progression` 生存/搜刮两组升级，即时生效并存档）|
-| gate 出发大门 | [30,42] | `castle.png` | 打开选人面板 →「出击」进局 |
+| warehouse 仓库 | [24,30] | `blue_house1.png` | 打开仓库面板（只读展示 `Meta.bank`：种类数 / 仓库格数 / 叠加上限）|
+| statue 修道院 | [36,30] | `blue_monastery.png` | 打开升级面板（`meta_progression` 生存/搜刮两组升级，即时生效并存档）|
+| gate 出发大门 | [30,42] | `blue_castle.png` | 打开选人面板 →「出击」进局 |
+| archery 箭术场 | [22,22] | `blue_archery.png` | 无（纯展示，点击 push_warning）|
+| barracks 兵营 | [38,22] | `blue_barracks.png` | 无 |
+| tower 瞭望塔 | [46,30] | `blue_tower.png` | 无 |
+| house2 民居 | [20,38] | `blue_house2.png` | 无 |
+| house3 民居 | [40,38] | `blue_house3.png` | 无 |
+
+- **建筑渲染全自动**：`building.gd` 按贴图尺寸等比缩放进 4×4 格框（屋顶可向上探出 1.4 倍）、脚底对齐占地底边，缺图保底一块 id 配色方块不消失。新素材不覆盖旧图（`blue_` 前缀），旧 `castle/monastery/house_*` 仍被 3D 层 / 兜底引用。**新建筑 id 不在存档 `Meta.base_layout` 里 → 直接用配置 cell**；重摆过位置的旧建筑仍按存档摆放。
+- **实拍坑**：出厂 config `debug.auto_enter_run = true`（headless 回归用），开窗实拍基地必须先 `Config.set_override("debug.auto_enter_run", false)` 再 instantiate Main —— 否则进基地立刻被拉进局、`game_root` 被清空（建筑 0 栋、满屏黑局内）。验证场景 `Dev/shot_base_buildings.tscn`（顺带打印 8 栋运行时清单 + 贴图路径）。
 
 - **交互 = 鼠标左键点建筑本体**（基地无玩家角色；`building.gd` Area2D `input_event`）。面板打开时 `get_tree().paused=true`；`E` 或 `ESC` 关闭。
 - **右键建筑 = 重摆位置**：进入 `placement_mode.gd`（可复用组件）→ 铺瓦片网格、把该建筑 footprint 能放的左上角锚点覆盖区标**绿**、半透明幽灵跟随光标 → 左键点绿格落位、ESC/右键取消。落位后 `base_system.apply_reposition` → `Meta.set_building_cell` 写进**当前存档槽**（`base_layout`，每存档一套布局，覆盖 config 默认；合法锚点须留 1 格外圈墙且不与其它建筑重叠）。此组件后续进图放东西可复用。
@@ -166,7 +175,7 @@
 | 相机回玩家 | `F` | `camera.return_key=70` | 相机 `_ready`（下局）|
 | 交互建筑 | 物理 `E`（**硬编码**，不可重映射）| — | 即时 |
 | 缩放 | 滚轮 / 触控板捏合，以光标为锚 0.35×–3.0× | `camera.zoom_*` | 相机 `_ready` |
-| 边缘滚屏 | 鼠标贴窗口边（需窗口有焦点，`ignore_ui`）| `camera.edge_pan_*` | 相机 `_ready` |
+| 边缘滚屏 | 鼠标贴窗口边（需窗口有焦点，`ignore_ui`；常驻底部菜单栏不挡）| `camera.edge_pan_*` | 相机 `_ready` |
 | 局结束返回 | `R`（仅结算面板）| — | 即时 |
 | 退出 | `ESC`（仅无面板/放置时）| `ui_cancel` | 即时 |
 
@@ -178,7 +187,7 @@
 - **资源点 / 掉落物**：走近 `loot.pickup_radius_px=80` 自动拾取入背包；背包（新种类）满则失败并 `pickup_retry_seconds=0.5` 后重试。
 - **撤离点**：站入 `extraction.trigger_radius=96` 保持 `session.extraction_hold_seconds=3` → 撤离；离开或点关闭则进度清零。
 - **敌人**：身体接触造成伤害（`enemy.contact_cooldown_seconds=1.0`）。
-- **菜单栏**：整条栏是 `mouse_filter=STOP` 的 Control —— 压在它上面的鼠标事件不会穿到世界（不会误下移动令），按钮/小地图各自接自己的点击。代价：**贴底那条边的边缘滚屏在栏区域内失效**（`camera.edge_pan_ignore_ui` 看到「鼠标下有 STOP 控件」就不滚），左右上三边与 WASD 平移照常。不想要这个代价就把 `menu_bar.height_ratio` 调小或关掉菜单栏。
+- **菜单栏**：整条栏是 `mouse_filter=STOP` 的 Control —— 压在它上面的鼠标事件不会穿到世界（不会误下移动令），按钮/小地图各自接自己的点击。底部边缘滚屏：`camera_controller.edge_pan_active()` 已把常驻菜单栏（group `menu_bar`）从"悬停 UI 即停止滚屏"的规则里**豁免**，所以贴底边的向下滚屏照常可用（只有真正贴到最底 `edge_pan_margin` 才触发方向，栏中部按钮在其之上不会误滚）；仓库/雕像等**模态面板**仍会挡住滚屏。
 
 ### 3.3 设置面板（8 页，表驱动，`settings_panel.gd`）
 - 页签：**画面 / 性能 / 音频 / 玩法 / 资源 / 操作 / 语言 / 调试**。
@@ -210,7 +219,7 @@
   - 面板首行是单位名 + 武器 + `HP / 观察视野 / 武器射程 / 有效射程 / 武器噪音`；第三行是当前指令状态（`自动索敌中 → 劫掠者` / `指定攻击 → 重甲 (HP 3000/3000)` / `巡逻设点中：2 个点` …）。
   - 目标选取优先级：`指定目标（仍在射程内）` → `按索敌策略挑`；两者都受「观察视野 ∩ 有效攻击距离」约束（§5.8）。
   - 巡逻路线用 `Line2D` 闭环画在世界里（仅选中时可见）；`_patrol_index` **下令时就自增**，某段被攻击打断不会原地重走同一个点。
-- **右槽 · 噪音显示**：`当前噪音`（条 + 数值 + 档位名/配色）、`累积噪音`（本局暴露度，条按 `accumulated_reference` 归一）、标题右上角 `被惊动 N`（警觉度 ≥ `thresholds.investigate` 的敌人数，0.25s 刷新一次）。数据源见 §5.2。
+- **右槽 · 噪音显示**（2026-09-18 改）：**第 1 行 `自身`**＝角色自身噪音（每人一份，显示全队最大值，条按 `self.max 300` 归一）+ 档位名/配色；**第 2 行 `世界`**＝世界累计噪音（全局一份，条按 `world.reference 2000` 归一）；标题右上角 `被惊动 N`（警觉度 ≥ `thresholds.investigate` 的敌人数，0.25s 刷新一次）。两路互相喂养（自身喂高世界、世界让自身涨得更快），详见 **§5.2.1**；数据源见 §5.2。
 
 
 ---
@@ -296,10 +305,11 @@
 | `thresholds.suspicious / investigate / combat` | 15 / 30 / 70 |
 | `sources` | walk 22 / dodge 40 / attack 120 / shout 160 / **hurt 100**（挨打时该敌人自己涨的警觉度，2026-09-17 新增，见 §5.1）/ ~~sniper_shot 240（死配置）~~ |
 | `ring` | duration 0.7s，color #ffd54f，alpha 0.35，min_intensity 35，min_interval 0.15 |
-| `display.decay_per_second` | 90（**菜单栏当前噪音条**的衰减率；与上面 `noise.decay_per_second=10` 那个「敌人警觉度衰减」是两回事，名字撞车） |
-| `display.accumulated_reference` | 2000（累积噪音条满值，仅用于归一显示） |
+| `self.decay_per_second` / `self.max` | 90 / 300 —— **角色自身噪音**（每人一份）：线性快衰减，硬上限 |
+| `world.decay_ratio_per_second` / `reference` / `max` | 0.06 / 2000 / 4000 —— **世界累计噪音**（全局一份）：比例慢衰减（时间常数 ≈17s） |
+| `link.self_to_world_per_second` / `world_to_self_gain` | 360 / 1.2 —— 自身满格时每秒喂给世界的点数；世界到参考值时发声的额外增幅。两者构成正反馈，靠上面两组 cap 兜底，**详见 §5.2.1** |
 | `display.alert_watch_interval_seconds` | 0.25（「被惊动 N」计数刷新周期） |
-| `display.levels` | 安静 min0 `#7bc86c` / 轻响 min45 `#d8c34a` / 吵闹 min120 `#e08a3c` / 震耳 min200 `#d8452f`（按当前噪音值取最大 min ≤ 值的档） |
+| `display.levels` | 安静 min0 `#7bc86c` / 轻响 min45 `#d8c34a` / 吵闹 min120 `#e08a3c` / 震耳 min200 `#d8452f`（按**自身噪音**取最大 min ≤ 值的档，给菜单第 1 行用） |
 | `enemy_traits.noise_amplify` | `enabled` true、`max_multiplier` 3.0（**不在 `noise` 段**：它是邪术师特性「爆裂鼓手」的全局封顶，见 §5.5）|
 | `enemy_traits.phantom` | `enabled` true、`max_live_phantoms` 16、`max_phantoms_per_owner` 8（**也不在 `noise` 段**：弓手特性「幻影分身」的全局开关 + 全场幻影硬兜底 + 单只本体上限，见 §5.5）|
 
@@ -340,7 +350,7 @@
 | resource_find_chance 资源发现率 | acquisition | 0.5 | +0.03 | 5 | 石 25 + 金 1 | ⚠ **未接线** |
 | rare_resource_chance 稀有资源率 | acquisition | 0.05 | +0.01 | 5 | 油 30 + 金 2 | ⚠ **未接线** |
 
-- **角色等级 / 名册（`progression` 段，2026-09-17）**：`max_level 9`、`xp.curve {base 100, growth 1.3}`、`per_extraction 100`、`per_kill 0`、`tiers` 边界 `2/5/8/9`、`roster.max_size 8`、`roster.recruit_free true`。等级视觉 = **绕角色飞的一缕淡光**（2026-09-18 三版迭代）：`orb {radius_px 11 屏幕像素, screen_fixed, center_offset_y -34, orbit_radius_px [24,36], orbit_y_scale 0.85, spin_speed 1.2, speed_sway 0.5 + speed_sway_hz 0.13, speed_sway2 0.2 + speed_sway_hz2 0.31, wobble_px 3}`、`orb.glow {tint_white 0.55, max_alpha 0.9, core_whiten 0.5, falloff 1.7, layers [[1.3,0.14],[0.95,0.24],[0.62,0.44],[0.34,1.0]], pulse_seconds [3.4,2.1], pulse_power 1.15, min_scale 0.72}`、`flash {interval [5,9], first_delay 1.5, scale 2.0, rise/hold/fade 0.15/0.7/0.35, text_size 14, text_outline_color #2B2A3A}`、`far_fade {0.95 → 0.70}`、`colors` 四档主色已提亮。语义、档位配色映射与踩坑见 **§5.10**。
+- **角色等级 / 名册（`progression` 段，2026-09-17）**：`max_level 9`、`xp.curve {base 100, growth 1.3}`、`per_extraction 100`、`per_kill 0`、`tiers` 边界 `2/5/8/9`、`roster.max_size 8`、`roster.recruit_free true`。等级视觉 = **绕角色飞的一缕淡光**（2026-09-18 三版迭代）：`orb {radius_px 11 屏幕像素, screen_fixed, center_offset_y -34, orbit_radius_px [24,36], orbit_y_scale 0.85, spin_speed 1.2, speed_sway 0.5 + speed_sway_hz 0.13, speed_sway2 0.2 + speed_sway_hz2 0.31, wobble_px 3}`、`orb.glow {tint_white 0.55, max_alpha 0.9, core_whiten 0.5, falloff 1.7, layers [[1.3,0.14],[0.95,0.24],[0.62,0.44],[0.34,1.0]], pulse_seconds [3.4,2.1], pulse_power 1.15, min_scale 0.72}`、`flash {interval [5,9], first_delay 1.5, scale 2.0, rise/hold/fade 0.15/0.7/0.35, text_size 14, text_outline_color #2B2A3A}`、`far_fade {0.95 → 0.70}`、`noise_link {reference 240, max_speed_multiplier 3.0, curve 1.4, boost_flash true}`（光球跟着**角色自身噪音**提速，见 §5.2.1）、`colors` 四档主色已提亮。语义、档位配色映射与踩坑见 **§5.10**。
 
 ### 4.7 相机 / 显示 / 音频
 - 相机：`pan_speed 1600`、`return_key F(70)`；`zoom 0.35–3.0`（`step 0.12 / smooth 14 / at_cursor true / invert false / fit_bounds true / hud true`）；`edge_pan enabled margin 24 / speed×1.0 / ignore_ui true`。
@@ -367,7 +377,7 @@
 | `minimap.show_resources` | true | 是否把资源点烘焙进小地图底图 |
 | `minimap.resource_colors` | wood/stone/iron/gold/oil/food 各一色 | 资源点配色 |
 
-- 单位与指令集的绑定在 `characters.list[].command_set`（当前 3 名角色全是 `combat`，强弩 2026-09-17 已移出名单）。加新单位类型（工程/采集）＝ config 加指令集 + `_button_defs()` 补按钮，布局代码不动。
+- 单位与指令集的绑定在 `characters.list[].command_set`（当前 4 名角色全是 `combat`，强弩 2026-09-17 已移出名单）。加新单位类型（工程/采集）＝ config 加指令集 + `_button_defs()` 补按钮，布局代码不动。
 
 ---
 
@@ -389,10 +399,7 @@
 - `hear_noise`：`noise_alertness += received`（上限 `max_alertness 150`），记声源位驱动 §5.1 FSM。`decay_per_second(10)` 由**每敌人** `_physics_process` 每帧扣。
 - 源触发点：`walk 22`＝`player_move_state`（每 `footstep_interval 0.4` 一次）；`dodge 40`＝`player_dodge_state`；`attack 120`＝近战出招（先取武器 `noise`：剑120/弓70/狙240，无武器回落）；`shout 160`＝**敌人进入 chase 时广播**（惊动附近，非玩家）；`sniper_shot 240`＝**死配置**（狙击走武器 noise 240）。
 - ring 半径 = `hear_radius × (1 − min_notice/intensity)`，扩散+淡出描边圆。
-- **菜单栏两路读数（纯展示，不参与 AI 判定）**：`emit()` 第三参 `from_player`：只有玩家小队自己的走步/闪避/出招（含武器 noise）计入，**敌人的 `shout` 不计**（否则被围时读数会莫名飙高）。
-  - `current_noise`：每次 `+= intensity × 1`，每帧按 `display.decay_per_second(90)` 衰减；档位由 `display.levels` 取。↔ 这是「此刻有多吵」。
-  - `accumulated_noise`：本局累计暴露度，**不衰减**，条按 `display.accumulated_reference(2000)` 归一；`main._enter_run()` 里 `NoiseSystem.reset()` 清零。↔ 这是「这一局总共吵了多少」。
-  - `peak_noise`：本局峰值。`alerted_enemy_count()`：`noise_alertness ≥ thresholds.investigate(30)` 的敌人数，菜单栏每 0.25s 取一次。
+- **菜单栏右下那两条噪音（2026-09-18 重做成互相喂养的两路，详见 §5.2.1）**：第 1 行＝**角色自身噪音**（每人一份，显示全队最大值），第 2 行＝**世界累计噪音**（全局一份）。旧的「当前 / 累积」已废弃 —— 累积原来是只增不减的总账，看不出「这一局到底紧张到什么程度」。
 - **爆裂鼓手放大（2026-09-17，邪术师特性 `burst_drum`）**：`emit()` 在 `from_player=true` 分支里、**记读数与派发之前**乘一次倍率 `player_noise_multiplier(source_pos)`，于是**读数、光圈大小、敌人实际听到的强度全是放大后的值**（一条链路，没有第二个真相）。
   - 倍率 = `clamp(1 + Σ 各放大器增幅, 1, enemy_traits.noise_amplify.max_multiplier 3.0)`；单个放大器增幅 = `per_enemy × (1 − d/radius_px)`（按**发声点**距离线性衰减，超出 `radius_px 480` 不贡献）。
   - 放大器 = 场上带该特性的活敌人，挂在 `noise_amplifiers` 组里 —— **组为空时直接返回 1.0，不做任何遍历**（没有邪术师的老局面零开销）。
@@ -400,6 +407,32 @@
 - **耳朵倍率（2026-09-17，按听者）**：派发循环里按**每只敌人**把等效听力半径乘上 `enemy.gd::noise_sensitivity()`（劫掠者 1.8，就是用户要的「劫掠者对声音更敏感」）⇒ 表现为**听得更远 + 同距离听到的强度更高**（`radius = hear_radius × sens`，`att = 1 − d/radius`，超出普通半径的远处也还够得着）。普通兵种 `sens = 1.0`，与旧公式**逐位一致**（旧式子就是 `radius = hear_radius`）。
   - 与「爆裂鼓手」的区别：那个改的是 `intensity`（声源更响、全局、只在 `from_player`）；这个改的是 `radius`（耳朵更灵、按兵种、对所有声源都生效）。两者互不干扰。
   - 光圈（ring）半径仍按**基础** `hear_radius` 画 —— 它表示「这声响能传多远」，不随听者变。
+
+### 5.2.1 两路噪音：自身 ⇄ 世界（2026-09-18 用户定）
+
+**一句话**：每个角色的吵闹会抬高整张地图的紧张度，而紧张的水位反过来让下一声更难压下去。
+
+| | 自身噪音 `self_noise` | 世界噪音 `world_noise` |
+|---|---|---|
+| 归属 | **每个角色一份**（`player.self_noise`） | **全局一份** |
+| 读法 | 我此刻有多吵 | 这局暴露了多少（地图的紧张水位） |
+| 菜单 | 第 1 行，取**全队最大值** | 第 2 行 |
+| 增长 | 发声事件 +（`intensity × gain`） | 每帧由所有人的自身噪音灌入 |
+| 衰减 | **线性** `−90/秒` | **比例** `× (1 − 0.06·dt)` |
+| 上限 | `noise.self.max 300` | `noise.world.max 4000` |
+
+- **两条 feeding**：
+  - ① 自身 → 世界：`_process` 里每个角色 `world += 360 × (self / 300) × dt`，**不从自身扣**（是累加不是转账 —— 发声的人自己也还是那么吵）。
+  - ② 世界 → 自身：`self_gain_from_world() = 1 + 1.2 × clamp(world / 2000, 0, 1)`，新发声据此放大。世界到参考值时，同样一剑从 +120 变成 **+264**。
+- **为什么世界用比例衰减、自身用线性**：线性的稳态不存在 —— 「输入率 > 衰减」就一路涨到爆表，「输入率 < 衰减」就一路归零，读数是**开关**不是水位；比例衰减才有平衡点，且退场时先快后拖（时间常数 1/0.06 ≈ 17 秒），正好是「慢慢降下去」的手感。自身要的是「说完就没事了」，用线性才能在小动静上真的归零（脚步 22 → 0.25 秒清空）。
+- **⚠ 这是正反馈**：两边都有 hard cap → **结构上不会发散**（探针 F 段每 0.05 秒发一拳连打 30 秒验证：自身停在 295.5、世界停在 4000，无 NaN/Inf）。但把 `link.world_to_self_gain` 调大，会让「吵起来就再也压不下去」—— 这是手感问题，不是崩溃问题，调之前请先跑 F 段。
+- **⚠ 发声必须带 `source_unit`**：`emit(pos, x, true, actor)`。忘了传 actor 的话这一声会掉进「没归属」那份 `_ambient_self`：菜单照样有读数、但每个角色的光球都没反应 —— 运行时看不出来，所以 `probe_noise_link` K 段在源码层守着三个调用点。
+- **等级光球跟着走**（用户原话「光球根据第一个来」）：`unit_level_badge.noise_speed()` 读**自己那个角色**的自身噪音，`_t += delta × speed` —— 给**整条时间轴**乘一个倍数，而不是分别改每条曲线的频率：后者会让摆动 / 明灭 / 抖动各自的相位错位，加速那一下光点会「抖」；乘同一个 `_t` 则相位连续，看不出是被调快了，只会觉得它更躁动。
+  - 用途和实际 feel：`reference 240`（强弩一发即顶格）、`max_speed_multiplier 3.0`、`curve 1.4` ⇒ 脚步 22 只到 1.05 倍（几乎无感，否则会被呼吸般的脚步声拽得一跳一跳）、剑击 120 → 1.76 倍、持续激战 → 3 倍。
+  - **单次闪烁时长不跟着缩**：那 1.2 秒是为了让球心的数字能被读出来，压到 0.4 秒就是「一闪而过」，等于没报。加速只体现在**多久闪一次**（`_next_flash -= delta × speed`）。
+  - 3 倍速下 ω 仍恒 > 0（`speed_sway` 之和 < `spin_speed` 这条约束是等比缩放不变的），所以光点不会原地掉头。
+
+**验证**：`Dev/probe_noise_link.tscn`（60 项）—— 配置真值与「自身更快」的速率差 / 自身噪音挂在个人身上（两人互不影响）/ 两条衰减速率对比 / 自身喂世界且自身照常衰减 / 世界抬增益且超参考值封顶 / **正反馈有界（数值曝打）** / 光球倍速单调且只读自己那份 / 顶格速度下 ω 恒正 / 菜单两行的量程与数值链路 / reset 清干净 / 三个发声点都传了 actor。
 
 ### 5.3 撤离机制（`extraction_system.gd` / `extraction_point.gd`）
 - 30min 随机刷 3 点（限可达格 + `min_dist` 约束）；洗牌预定关闭顺序；45/55 各关 1；最后 1 点保持到超时。轮到点若有人站圈内则改关下一个（全有人本轮作废）。

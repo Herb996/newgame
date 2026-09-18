@@ -160,9 +160,10 @@ func _add_unit_row(u: Dictionary, want: Dictionary) -> void:
 
 	var arch := _archetype(arch_id)
 	var info := Label.new()
-	info.text = "%s · Lv%d %s\n%s\n%s" % [
+	info.text = "%s · Lv%d %s\n%s\n%s\n%s" % [
 		str(u.get("name", arch_id)), level, Meta.tier_name_of_level(level),
-		str(arch.get("desc", "")), _xp_line(level, float(u.get("xp", 0.0)))]
+		str(arch.get("desc", "")), _xp_line(level, float(u.get("xp", 0.0))),
+		_traits_line(u)]
 	info.add_theme_font_size_override("font_size", 15)
 	info.custom_minimum_size = Vector2(560, 0)
 	row.add_child(info)
@@ -170,6 +171,23 @@ func _add_unit_row(u: Dictionary, want: Dictionary) -> void:
 	_content.add_child(row)
 	_checks.append({"uid": uid, "id": arch_id, "name": str(u.get("name", arch_id)),
 			"level": level, "checkbox": check})
+
+
+## 特性层数一览（升级随机攒的）：按 config progression.traits.list 的固定顺序列，
+## 只显示层数 > 0 的；一个都没有时给一句提示，免得空着像坏了。
+func _traits_line(u: Dictionary) -> String:
+	var tr = u.get("traits", {})
+	if not (tr is Dictionary) or (tr as Dictionary).is_empty():
+		return "特性：尚无（每升 1 级随机获得一个）"
+	var parts: Array = []
+	for id in Meta.trait_ids():
+		var s := int((tr as Dictionary).get(id, 0))
+		if s > 0:
+			var d: Dictionary = Meta.trait_defs().get(id, {})
+			parts.append("%s×%d" % [str(d.get("name", id)), s])
+	if parts.is_empty():
+		return "特性：尚无（每升 1 级随机获得一个）"
+	return "特性：" + " · ".join(parts)
 
 
 func _xp_line(level: int, xp: float) -> String:

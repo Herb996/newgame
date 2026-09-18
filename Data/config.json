@@ -1,4 +1,4 @@
-{
+﻿{
     "map": {
         "width": 128,
         "height": 128,
@@ -244,6 +244,13 @@
                 "desc": "近战 · 扇形 200° 最多 3 目标 · 伤害 25 · 噪音大",
                 "weapon": "sword",
                 "command_set": "combat"
+            },
+            {
+                "id": "monk",
+                "name": "僧侣",
+                "desc": "近战 · 法杖横扫 射程 140px · 伤害 18 · 噪音最小",
+                "weapon": "staff",
+                "command_set": "combat"
             }
         ]
     },
@@ -282,26 +289,30 @@
             }
         ],
         "sprite_sets": {
-            "_comment": "档位配色 → 精灵集（按武器查）。gold 档用素材包的 Yellow（金甲）。**红色永远留给敌人**，玩家档位不许占用红色系。",
+            "_comment": "档位配色 → 精灵集（按武器查）。gold 档用素材包的 Yellow（金甲）。**红色永远留给敌人**，玩家档位不许占用红色系。新增武器时必须**四档都补一行** —— 漏一档会让该档位的角色查不到映射、回落到 default 外观（表现为「升到某个等级换了个兵种」）。staff（僧侣）2026-09-18 加入。",
             "blue": {
                 "spear": "sprites_lancer",
                 "bow": "sprites_archer",
-                "sword": "sprites_ts"
+                "sword": "sprites_ts",
+                "staff": "sprites_monk"
             },
             "purple": {
                 "spear": "sprites_lancer_purple",
                 "bow": "sprites_archer_purple",
-                "sword": "sprites_ts_purple"
+                "sword": "sprites_ts_purple",
+                "staff": "sprites_monk_purple"
             },
             "black": {
                 "spear": "sprites_lancer_black",
                 "bow": "sprites_archer_black",
-                "sword": "sprites_ts_black"
+                "sword": "sprites_ts_black",
+                "staff": "sprites_monk_black"
             },
             "gold": {
                 "spear": "sprites_lancer_gold",
                 "bow": "sprites_archer_gold",
-                "sword": "sprites_ts_gold"
+                "sword": "sprites_ts_gold",
+                "staff": "sprites_monk_gold"
             }
         },
         "badge": {
@@ -351,6 +362,14 @@
                 "start_zoom": 0.95,
                 "end_zoom": 0.7
             },
+            "noise_link": {
+                "_comment": "光球跟着**角色自身噪音**（noise.self —— 菜单右下第 1 行，**不是**世界噪音）变快：越吵 = 绕得越快、明灭越急、报等级的闪也越频繁（2026-09-18 用户定）。做法是给整条时间轴乘一个倍数（`_t += delta × speed`），而不是分别去改每条曲线各自的频率 —— 后者会让摆动相位 / 明灭相位 / 抖动各走各的，加速那一瞬光点会「抖一下」；乘同一个 `_t` 则所有东西同步加速且**相位连续**，看不出是被调快了，只会觉得它更躁动。reference = 自身噪音到多少算 100%（按这个取值：脚步 22 → 一档都不到，剑击 120 → 约 1.7 倍，强弩 240 → 顶格）。curve > 1 → 安静时几乎不变、吵起来才明显提速（否则光点会被呼吸般的脚步声带着一跳一跳）。boost_flash = 自动闪烁的倒计时也乘同一倍数。⚠ `speed_sway` 那条「两条 sway 之和 < spin_speed」的约束是按 1 倍速写的，但整体等比放大不会让 ω 越过零点，所以加速后依然不会掉头 —— 探针 K 段在 3 倍速下也验了一遍。",
+                "enabled": true,
+                "reference": 240.0,
+                "max_speed_multiplier": 3.0,
+                "curve": 1.4,
+                "boost_flash": true
+            },
             "colors": {
                 "_comment": "档位球色（2026-09-18 整体提亮）。旧值 blue #378ADD / purple #7F77DD / black #5F5E5A / gold #EF9F27 明度都偏低，压到 18px 屏幕上显脏；精锐档那颗 #5F5E5A 更是「太深」的最大来源。精锐改**银灰** —— 与 6–8 级角色的 Black 阵营甲同属黑白灰一族（银就是黑甲的提亮版），档位语义不丢。出击面板色块读的是同一份配置，会一起变。",
                 "blue": "#4FA8F0",
@@ -368,6 +387,19 @@
             ],
             "recruit_free": true,
             "max_size": 8
+        },
+        "traits": {
+            "_comment": "升级特性（2026-09-18 用户定）：每次升级**随机获得一个特性 +1 层**，收益按层累计（id 即属性键，层数 × per_stack）。等级越高攒的层越多 = 收益越大。**per_stack 一律是整数「单位」**（速度 +5、攻击 +7、攻击距离 +4 这种），不写小数。unit=flat 是把 per_stack 当点数直接相加（移速 px/s、气血点、视野/攻击距离/弹速 px）；unit=pct 用在攻击频率上，per_stack = 每层加的**整数百分点**（5 = 每层 +5%），前摇/判定/后摇 除以 (1 + 层数×5/100)，层越多打得越快。defense 是**入伤减免的点数**（take_damage 里先扣再算，扣到 0 就不掉血）。8 条一视同仁被抽中（均匀随机、无权重）。",
+            "list": [
+                {"id": "attack", "name": "攻击", "unit": "flat", "per_stack": 7},
+                {"id": "defense", "name": "防御", "unit": "flat", "per_stack": 5},
+                {"id": "hp", "name": "气血", "unit": "flat", "per_stack": 5},
+                {"id": "move_speed", "name": "移速", "unit": "flat", "per_stack": 5},
+                {"id": "vision", "name": "视野距离", "unit": "flat", "per_stack": 5},
+                {"id": "attack_range", "name": "攻击距离", "unit": "flat", "per_stack": 4},
+                {"id": "attack_speed", "name": "攻击频率", "unit": "pct", "per_stack": 5},
+                {"id": "projectile_speed", "name": "投射体速度", "unit": "flat", "per_stack": 5}
+            ]
         }
     }
 ,
@@ -571,10 +603,24 @@
         "ring_alpha": 0.35,
         "ring_min_intensity": 35,
         "ring_min_interval_seconds": 0.15,
-        "display": {
-            "_comment": "局内菜单栏右侧「噪音」表的两路读数。当前噪音 = 小队最近一次发声的强度，按 decay_per_second 掉下去（读作『我现在有多吵』）；累积噪音 = 本局小队发出过的噪音总量（读作『我暴露了多少』），条形按 accumulated_reference 归一（参考：一次剑击 120、强弩一发 240，2000 ≈ 十来次挥击）。**只统计小队自己发出的声音**，敌人呼喊不计入 —— 否则会被误读成『是我在吵』。levels 决定档位名与配色（从高往低匹配 min）。",
+        "self": {
+            "_comment": "**角色自身噪音**（菜单右下第 1 行，等级光球读的就是它）。**每个角色一份**，存在 player.self_noise 里；菜单栏显示全队**最大值**（『我此刻有多吵』= 最吵的那个人）。线性衰减（每秒固定掉这么多点），所以小动静（脚步 22）几秒就归零、大动静（强弩 240）要三秒左右 —— 「自身噪音降得快」。入门落差：attack 120 ≈ 1.3 秒衰减完。max 是硬上限，同时也是自身噪音参与 link 换算的分母。",
             "decay_per_second": 90,
-            "accumulated_reference": 2000,
+            "max": 300
+        },
+        "world": {
+            "_comment": "**世界累计噪音**（菜单右下第 2 行，全局一份）。读法：把地图想象成一个紧张度水位 —— 谁在闹都会涨，不闹了才慢慢退。用**比例**衰减（每秒掉自身 ×ratio）而不是固定点数：固定点数会让系统变成『低于阈值就归零、高于就爆表』的开关，比例衰减则天然有稳态、且退场时先是快、尾巴拖得长（时间常数 1/ratio ≈ 17 秒）＝「世界噪音降得慢」。reference 是菜单条形归一参考（一次剑击 120、强弩一发 240；2000 ≈ 十来次挥击的持续暴露量），max 是硬上限。",
+            "decay_ratio_per_second": 0.06,
+            "max": 4000,
+            "reference": 2000
+        },
+        "link": {
+            "_comment": "两条噪音的**互相喂养**（用户原话：『自身噪音会累加世界噪音，世界噪音增加，也会让自身噪音加的更快』）。self_to_world_per_second = 自身噪音**满格**时每秒往世界噪音里灌的点数（按比例：实际灌入 = 360 × self/self.max）；world_to_self_gain = 世界噪音**达到 reference** 时，新发声额外增长的倍率加成（0 → 无耦合，1.2 → 最吵时同样的动作涨 2.2 倍）。⚠ 这是**正反馈**：两者都有 hard cap（self.max / world.max），所以不会发散，但把 gain 调大会让局面一旦吵起来就再也压不下去（谁 explain 都想走的那种联动），调前先想清楚。",
+            "self_to_world_per_second": 360,
+            "world_to_self_gain": 1.2
+        },
+        "display": {
+            "_comment": "菜单右下的读数接线：第 1 行 = 自身噪音（全队最大值，见 noise.self），第 2 行 = 世界噪音（见 noise.world）。**只统计小队自己发出的声音**（emit 的 from_player）—— 敌人呼喊不计入，否则会被误读成『是我在吵』。levels 决定第 1 行的档位名与配色（从高往低匹配 min）。",
             "alert_watch_interval_seconds": 0.25,
             "levels": [
                 {"name": "安静", "min": 0, "color": "#7bc86c"},
@@ -612,6 +658,20 @@
                 "active_seconds": 0.08,
                 "recovery_seconds": 0.25,
                 "noise": 110
+            },
+            "staff": {
+                "_comment": "法杖（2026-09-18 随「僧侣」加入）。**kind 复用现成的 melee**（扇形 Hitbox），一行 combat 代码都不改 —— 这轮的边界就是「只加外观、能选能打」，治疗机制留作后续任务。数值定位刻意做成**低伤低噪的中距近战**：伤害 18（低于剑 25 / 枪 26）、射程 140（夹在剑 120 与枪 180 之间）、扇形 140° 打 2 个，噪音 60 是四把武器里最小的（比弓的 70 还安静）—— 施法声本就不该像刀剑碰撞那么响，也给日后「奶妈不该引怪」留出空间。三段时间（0.2/0.1/0.35 = 0.65s）刻意放慢，去贴 Heal 动画那 11 帧的施法韵律（14fps ≈ 0.79s，动画略长于判定，末帧停留等待 recovery）。",
+                "name": "法杖",
+                "kind": "melee",
+                "sprite_set": "sprites_monk",
+                "damage": 18,
+                "range_px": 140.0,
+                "arc_degrees": 140,
+                "max_targets": 2,
+                "windup_seconds": 0.2,
+                "active_seconds": 0.1,
+                "recovery_seconds": 0.35,
+                "noise": 60
             },
             "bow": {
                 "name": "弓",
@@ -750,6 +810,7 @@
         ],
         "buildings": [
             {
+                "_comment": "基地建筑表（2026-09-18 全量换上 Tiny Swords Blue Buildings 素材，8 栋齐）。**建筑渲染全自动**：Building.gd 按贴图尺寸等比缩放到 4×4 格框（屋顶可向上探出 1.4 倍）、脚底对齐占地底边，贴图缺失时保底一块 id 配色方块不消失。cell = 占地**左上角**格、占 4×4；玩家重摆过的位置存在 Meta.base_layout 优先于这里的 cell（新增 id 不在存档里 → 直接用配置值）。hint 为空 = 纯装饰（点击只 push_warning 不会崩，main 的 match 有 default 分支）。",
                 "id": "warehouse",
                 "name": "仓库",
                 "cell": [
@@ -758,18 +819,18 @@
                 ],
                 "hint": "按 E 查看仓库",
                 "h3d": 2.6,
-                "sprite": "res://Assets/Art/Sprites/Buildings/house_large.png"
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_house1.png"
             },
             {
                 "id": "statue",
-                "name": "雕像",
+                "name": "修道院",
                 "cell": [
                     36,
                     30
                 ],
                 "hint": "按 E 进行升级",
                 "h3d": 3.4,
-                "sprite": "res://Assets/Art/Sprites/Buildings/monastery.png"
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_monastery.png"
             },
             {
                 "id": "gate",
@@ -780,7 +841,62 @@
                 ],
                 "hint": "按 E 选择角色出发",
                 "h3d": 2.2,
-                "sprite": "res://Assets/Art/Sprites/Buildings/castle.png"
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_castle.png"
+            },
+            {
+                "id": "archery",
+                "name": "箭术场",
+                "cell": [
+                    22,
+                    22
+                ],
+                "hint": "",
+                "h3d": 2.6,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_archery.png"
+            },
+            {
+                "id": "barracks",
+                "name": "兵营",
+                "cell": [
+                    38,
+                    22
+                ],
+                "hint": "",
+                "h3d": 2.6,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_barracks.png"
+            },
+            {
+                "id": "tower",
+                "name": "瞭望塔",
+                "cell": [
+                    46,
+                    30
+                ],
+                "hint": "",
+                "h3d": 3.2,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_tower.png"
+            },
+            {
+                "id": "house2",
+                "name": "民居",
+                "cell": [
+                    20,
+                    38
+                ],
+                "hint": "",
+                "h3d": 2.0,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_house2.png"
+            },
+            {
+                "id": "house3",
+                "name": "民居",
+                "cell": [
+                    40,
+                    38
+                ],
+                "hint": "",
+                "h3d": 2.0,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_house3.png"
             }
         ]
     },
@@ -2728,6 +2844,190 @@
         "dodge": [],
         "dead": []
     },
+    "sprites_monk": {
+        "_comment": "Tiny Swords Monk（僧侣，Blue 阵营）。2026-09-18 加入出击名单。\n            **Monk 是免费包里唯一没有 Attack 帧的单位** —— 官方只给了 Idle 6 帧 / Run 4 帧 / Heal 11 帧 / Heal_Effect 11 帧，\n            所以这套素材的「攻击动作」就是 Heal（施法）。先例早就存在：敌人邪术师 cultist 用的\n            `red_monk/attack1_00..10` 正是同一批 Heal 帧（见 enemy_types.cultist.attack），本段沿用这一约定 ——\n            材料-Heal 与 attack1 是**同一批像素的两份命名**（attack 用 attack1_*；将来做治疗时 heal_* 归治疗语义），\n            由 tools/slice_monk.py 一次切出。\n            Heal_Effect（`heal_fx_*`）是**纯特效层**，画在受术者身上而不是施法者身上，故不进任何动作序列。\n            单向素材（正视视角），四向共用同一套帧 → 数组形式（同 sprites_ts / sprites_pawn 的扁平写法）。\n            不透明包围盒下沿实测 134（比 Warrior/Archer 的 136 高 2px），故 sprite_offset_y = -(134 - 96) = -38；\n            sprite_scale 0.6 / sprite_pixel_unit 10 与另外三个角色一致，保证小队体型统一。\n            dodge / hit / dead 官方无帧 → 留空，走 player_animator 的程序化抖动/冲刺拉伸/死亡倾倒。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -38.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 10,
+            "attack": 14,
+            "dodge": 12,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/blue_monk/idle_00.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/idle_01.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/idle_02.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/idle_03.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/idle_04.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/idle_05.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/blue_monk/run_00.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/run_01.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/run_02.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/run_03.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_00.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_01.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_02.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_03.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_04.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_05.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_06.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_07.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_08.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_09.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_10.png"
+        ],
+        "dodge": [],
+        "hit": [],
+        "dead": []
+    },
+    "sprites_monk_purple": {
+        "_comment": "Tiny Swords Monk（僧侣，Purple 阵营）。2026-09-18 加入出击名单。\n            **Monk 是免费包里唯一没有 Attack 帧的单位** —— 官方只给了 Idle 6 帧 / Run 4 帧 / Heal 11 帧 / Heal_Effect 11 帧，\n            所以这套素材的「攻击动作」就是 Heal（施法）。先例早就存在：敌人邪术师 cultist 用的\n            `red_monk/attack1_00..10` 正是同一批 Heal 帧（见 enemy_types.cultist.attack），本段沿用这一约定 ——\n            材料-Heal 与 attack1 是**同一批像素的两份命名**（attack 用 attack1_*；将来做治疗时 heal_* 归治疗语义），\n            由 tools/slice_monk.py 一次切出。\n            Heal_Effect（`heal_fx_*`）是**纯特效层**，画在受术者身上而不是施法者身上，故不进任何动作序列。\n            单向素材（正视视角），四向共用同一套帧 → 数组形式（同 sprites_ts / sprites_pawn 的扁平写法）。\n            不透明包围盒下沿实测 134（比 Warrior/Archer 的 136 高 2px），故 sprite_offset_y = -(134 - 96) = -38；\n            sprite_scale 0.6 / sprite_pixel_unit 10 与另外三个角色一致，保证小队体型统一。\n            dodge / hit / dead 官方无帧 → 留空，走 player_animator 的程序化抖动/冲刺拉伸/死亡倾倒。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -38.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 10,
+            "attack": 14,
+            "dodge": 12,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/purple_monk/idle_00.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/idle_01.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/idle_02.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/idle_03.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/idle_04.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/idle_05.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/purple_monk/run_00.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/run_01.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/run_02.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/run_03.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_00.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_01.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_02.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_03.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_04.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_05.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_06.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_07.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_08.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_09.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_10.png"
+        ],
+        "dodge": [],
+        "hit": [],
+        "dead": []
+    },
+    "sprites_monk_black": {
+        "_comment": "Tiny Swords Monk（僧侣，Black 阵营）。2026-09-18 加入出击名单。\n            **Monk 是免费包里唯一没有 Attack 帧的单位** —— 官方只给了 Idle 6 帧 / Run 4 帧 / Heal 11 帧 / Heal_Effect 11 帧，\n            所以这套素材的「攻击动作」就是 Heal（施法）。先例早就存在：敌人邪术师 cultist 用的\n            `red_monk/attack1_00..10` 正是同一批 Heal 帧（见 enemy_types.cultist.attack），本段沿用这一约定 ——\n            材料-Heal 与 attack1 是**同一批像素的两份命名**（attack 用 attack1_*；将来做治疗时 heal_* 归治疗语义），\n            由 tools/slice_monk.py 一次切出。\n            Heal_Effect（`heal_fx_*`）是**纯特效层**，画在受术者身上而不是施法者身上，故不进任何动作序列。\n            单向素材（正视视角），四向共用同一套帧 → 数组形式（同 sprites_ts / sprites_pawn 的扁平写法）。\n            不透明包围盒下沿实测 134（比 Warrior/Archer 的 136 高 2px），故 sprite_offset_y = -(134 - 96) = -38；\n            sprite_scale 0.6 / sprite_pixel_unit 10 与另外三个角色一致，保证小队体型统一。\n            dodge / hit / dead 官方无帧 → 留空，走 player_animator 的程序化抖动/冲刺拉伸/死亡倾倒。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -38.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 10,
+            "attack": 14,
+            "dodge": 12,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/black_monk/idle_00.png",
+            "res://Assets/Art/Sprites/Units/black_monk/idle_01.png",
+            "res://Assets/Art/Sprites/Units/black_monk/idle_02.png",
+            "res://Assets/Art/Sprites/Units/black_monk/idle_03.png",
+            "res://Assets/Art/Sprites/Units/black_monk/idle_04.png",
+            "res://Assets/Art/Sprites/Units/black_monk/idle_05.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/black_monk/run_00.png",
+            "res://Assets/Art/Sprites/Units/black_monk/run_01.png",
+            "res://Assets/Art/Sprites/Units/black_monk/run_02.png",
+            "res://Assets/Art/Sprites/Units/black_monk/run_03.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_00.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_01.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_02.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_03.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_04.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_05.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_06.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_07.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_08.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_09.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_10.png"
+        ],
+        "dodge": [],
+        "hit": [],
+        "dead": []
+    },
+    "sprites_monk_gold": {
+        "_comment": "Tiny Swords Monk（僧侣，Yellow 阵营）。2026-09-18 加入出击名单。\n            **Monk 是免费包里唯一没有 Attack 帧的单位** —— 官方只给了 Idle 6 帧 / Run 4 帧 / Heal 11 帧 / Heal_Effect 11 帧，\n            所以这套素材的「攻击动作」就是 Heal（施法）。先例早就存在：敌人邪术师 cultist 用的\n            `red_monk/attack1_00..10` 正是同一批 Heal 帧（见 enemy_types.cultist.attack），本段沿用这一约定 ——\n            材料-Heal 与 attack1 是**同一批像素的两份命名**（attack 用 attack1_*；将来做治疗时 heal_* 归治疗语义），\n            由 tools/slice_monk.py 一次切出。\n            Heal_Effect（`heal_fx_*`）是**纯特效层**，画在受术者身上而不是施法者身上，故不进任何动作序列。\n            单向素材（正视视角），四向共用同一套帧 → 数组形式（同 sprites_ts / sprites_pawn 的扁平写法）。\n            不透明包围盒下沿实测 134（比 Warrior/Archer 的 136 高 2px），故 sprite_offset_y = -(134 - 96) = -38；\n            sprite_scale 0.6 / sprite_pixel_unit 10 与另外三个角色一致，保证小队体型统一。\n            dodge / hit / dead 官方无帧 → 留空，走 player_animator 的程序化抖动/冲刺拉伸/死亡倾倒。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -38.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 10,
+            "attack": 14,
+            "dodge": 12,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/yellow_monk/idle_00.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/idle_01.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/idle_02.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/idle_03.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/idle_04.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/idle_05.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/yellow_monk/run_00.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/run_01.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/run_02.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/run_03.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_00.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_01.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_02.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_03.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_04.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_05.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_06.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_07.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_08.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_09.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_10.png"
+        ],
+        "dodge": [],
+        "hit": [],
+        "dead": []
+    },
     "enemy_types": {
         "_comment": "Tiny Swords 免费包没有「怪物」，但有 5 个阵营 × 4 个兵种的完整单位。这里挑 4 个敌方阵营单位当敌人：强度递进，贴图/动画各不相同。官方包**没有受击/死亡动画**，受击靠染色、死亡靠淡出（见 enemy.gd）。",
         "scale": 1.0,
@@ -3089,9 +3389,9 @@
             "scale": 0.5
         },
         "reflection": {
-            "_comment": "积水倒影：SubViewport 垂直镜像渲染（Camera2D zoom.y 取负）+ MultiMesh2D 批量装饰物 + 天空渐变底。alpha=反射整体不透明度；wobble_*=噪波扰动倒影 UV（晃动强度）；dispersion=色散采样最大 UV 偏移（红通道 +off、绿蓝 −off）；sky_*=天空渐变上下色；exclude_path_fragments=剔除路径含该片段的装饰（双保险，主过滤靠 map_generator 打的 refl meta）。",
+            "_comment": "积水倒影：MultiMesh2D 实例在 CPU 侧绕各自底边垂直镜像（真倒挂，水在哪倒影在哪）+ SubViewport 正立渲染 + 天空渐变底，puddle shader 按 SCREEN_UV 直接采样。alpha=反射整体不透明度；wobble_*=噪波扰动倒影 UV（晃动强度）；dispersion=色散采样最大 UV 偏移（红通道 +off、绿蓝 −off）；sky_*=天空渐变上下色；exclude_path_fragments=剔除路径含该片段的装饰（双保险，主过滤靠 map_generator 打的 refl meta）。",
             "enabled": true,
-            "alpha": 0.55,
+            "alpha": 0.85,
             "wobble_scale": 0.12,
             "wobble_speed": 0.8,
             "wobble_strength": 0.012,
@@ -3124,6 +3424,7 @@
         "puddle": {
             "_comment": "积水=噪声水洼 ∪ DECOR_WATER 浅滩（当前浅滩恒 0 格，见 map_generator）。floor_ratio=水洼占地板格比例（分位数阈值保证命中目标）；smooth_iterations=多数投票轮数，让水洼成团而非椒盐；clear_spawn_radius_cells=出生点周围强制无水。color/alpha=水体本身；noise_scale=边缘噪声频率（格坐标）；scroll=滚动速度（格/秒，做边缘流动）；wobble=噪声啃噬边缘幅度；edge_soft=虚化带宽。shimmer 已废弃（第二阶段由 refraction/reflection 替代）；reflection_blend=倒影/折射合成结果与水色混合比例（1=全倒影，0=纯水色）。",
             "floor_ratio": 0.18,
+            "allowed_biomes": [0, 2],
             "noise_frequency": 0.045,
             "smooth_iterations": 2,
             "clear_spawn_radius_cells": 4,
@@ -3162,7 +3463,7 @@
             "dry_volume_db": -14.0
         },
         "audio": {
-            "_comment": "程序合成占位音（项目无音频素材）。rain_loop_seconds 越长 gust 起伏越自然；sample_rate 单声道即可；low/high_pass 塑形雨声频谱（去隆隆/去尖啸）；gust_depth=响度起伏深度；drip_count=循环内混入的嘀嗒瞬态个数；step_duration_s=踩水音长度。",
+            "_comment": "程序合成占位音（项目无音频素材）。rain_loop_seconds 越长 gust 起伏越自然；sample_rate 单声道即可；low/high_pass 塑形雨声频谱（去隆隆/去尖啸）；gust_depth=响度起伏深度；drip_count=循环内混入的嘀嗒瞬态个数；step_duration_s=踩水音长度；step_dry_*=干脚步（900Hz 低通噪声脆响）长度与滤波截止。",
             "rain_loop_seconds": 4.0,
             "sample_rate": 22050,
             "rain_volume_db": -16.0,
@@ -3171,7 +3472,9 @@
             "gust_depth": 0.35,
             "drip_count": 6,
             "step_duration_s": 0.18,
-            "step_dry_duration_s": 0.1
+            "step_dry_duration_s": 0.1,
+            "step_dry_lowpass_hz": 900.0
         }
     }
 }
+

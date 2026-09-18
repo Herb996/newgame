@@ -107,6 +107,15 @@ func frame_world_rect(rect: Rect2, margin_px: float = 80.0) -> void:
 	_zoom_idle = 999.0
 
 
+## 把镜头中心平移到某个世界坐标（小地图点击导航用），保持当前缩放不变。
+## 越过地图边缘会被 _clamp_to_bounds 收住；相机开了位置平滑，这里立刻落位，
+## 免得上层（探针/手感）等到镜头慢慢滑过去。
+func focus_world_pos(world_pos: Vector2) -> void:
+	global_position = world_pos
+	_clamp_to_bounds()
+	reset_smoothing()
+
+
 func _physics_process(delta: float) -> void:
 	if get_tree().paused:
 		return
@@ -140,12 +149,12 @@ func _physics_process(delta: float) -> void:
 # 边缘滚屏：鼠标贴到窗口边 → 画面往该方向滚（RTS 手感）
 # ------------------------------------------------------------
 
-## 三条件全满足才允许滚：开关打开 + 窗口有焦点 + （可选）鼠标下没有可交互控件。
-## 都是"玩家其实没在操作游戏窗口"的情况，缺一个就会误滚：
-##   · 没焦点（alt-tab 切走）：鼠标坐标还停在窗口内最后的位置，会一直滚下去；
-##   · 鼠标下有 STOP 的控件（开着仓库/雕像面板、压在按钮上）：
-##     玩家是在点按钮，不该顺手把画面带走。
-## 注意 minimap 面板与 HUD 文字都是 MOUSE_FILTER_IGNORE，不挡这条路径。
+## 允许滚屏的条件：开关开 + 窗口有焦点 + （可选）鼠标下没有"会抢输入的模态 UI"。
+##   · 没焦点（alt-tab 切走）：鼠标停在窗口内最后位置会一直滚，故要求有焦点；
+##   · 鼠标下有 STOP 的模态控件（仓库/雕像面板、弹窗按钮）：玩家在下指令，不该顺手带走画面。
+## 底部特例：常驻底部菜单栏占屏高 1/5，鼠标贴底必然压在栏上——只要鼠标进到最底 margin
+##   就**无条件允许向下滚**（位置兜底，不依赖 hovered 控件的父链判断），保证"推到最底边就往下滚"。
+##   左右上三边仍尊重 ignore_ui（且 _is_menu_bar_control 让菜单栏在非底部区域也不误挡）。
 func edge_pan_active() -> bool:
 	if not edge_pan_enabled:
 		return false
@@ -154,9 +163,30 @@ func edge_pan_active() -> bool:
 		return false
 	if not _ignore_focus_gate and not win.has_focus():
 		return false
-	if edge_pan_ignore_ui and get_viewport().gui_get_hovered_control() != null:
-		return false
+	if edge_pan_ignore_ui:
+		var mp := get_viewport().get_mouse_position()
+		var vp := get_viewport_rect().size
+		var margin := clampf(edge_pan_margin, 1.0, minf(vp.x, vp.y) * 0.45)
+		if vp.y > 0.0 and mp.y >= vp.y - margin:
+			return true   # 最底边：菜单栏不挡向下滚屏
+		var hc := get_viewport().gui_get_hovered_control()
+		if hc != null and not _is_menu_bar_control(hc):
+			return false
 	return true
+
+
+## 沿父链判断某控件是否属于常驻底部菜单栏（CanvasLayer "MenuBar" 在 group "menu_bar"）。
+## ⚠ `n` 必须显式声明成 **Node**：`var n := c` 会被推断成 Control，
+## 于是 `n = n.get_parent()`（返回 Node）每帧抛「Trying to assign Node to Control」——
+## 而且是**运行时**错误，会把 `edge_pan_active()` 的剩余代码整个吞掉
+## （见 MEMORY「隔山打牛」）。悬停到任何非菜单栏控件上都会踩到。
+func _is_menu_bar_control(c: Control) -> bool:
+	var n: Node = c
+	while n != null:
+		if n.is_in_group("menu_bar"):
+			return true
+		n = n.get_parent()
+	return false
 
 
 func _edge_pan_dir() -> Vector2:
@@ -169,6 +199,7 @@ func _edge_pan_dir() -> Vector2:
 
 ## 纯函数：给定鼠标位置（视口坐标）算出平移方向，分量为 -1/0/1。
 ## 拆出来的原因 —— 探针可以直接喂坐标断言，不必真的去挪用户的鼠标。
+## 底部不为菜单栏预留：鼠标一路推到窗口最底边就向下滚（原始手感）。
 func edge_pan_dir_at(m: Vector2) -> Vector2:
 	var vp := get_viewport_rect().size
 	if vp.x <= 0.0 or vp.y <= 0.0:

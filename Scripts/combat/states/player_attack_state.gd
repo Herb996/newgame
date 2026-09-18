@@ -68,7 +68,7 @@ func physics_update(delta: float) -> void:
 				# 出招发声：惊动附近敌人（DESIGN.md 第二部分 噪音机制）
 				# 取武器自己的噪音值 —— 弓比剑安静、强弩震天响，潜行时的可利用差异
 				# from_player=true：这是小队自己弄出的动静，计入菜单栏的噪音读数
-				NoiseSystem.emit(actor.global_position, actor.attack_noise(), true)
+				NoiseSystem.emit(actor.global_position, actor.attack_noise(), true, actor)
 		Phase.ACTIVE:
 			if not hit_once:
 				actor.resolve_attack_hit()   # 判定帧内每帧结算（内部按目标去重）

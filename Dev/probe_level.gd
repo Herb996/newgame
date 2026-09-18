@@ -5,7 +5,7 @@ extends Node
 ## 验八件事（headless 可跑，全是纯数据 + 节点组，不依赖渲染）：
 ##   A) config 真值：9 级上限、4 档边界 2/5/8/9、经验曲线、徽章参数
 ##   B) 档位映射：等级 → 档位 id / 档位名（含越界取值）
-##   C) 贴图集映射：武器 × 档位 → 精灵集名（12 条 + 未知武器回落）
+##   C) 贴图集映射：武器 × 档位 → 精灵集名（16 条 + 未知武器回落）
 ##   D) **贴图真的在**：4 档 × 3 武器的每一帧都能 ResourceLoader.exists ——
 ##      这是防「新 PNG 没跑 godot_import.py → load() 静默 null → 角色隐形」的那道闸。
 ##      同时断言各档帧数与蓝色基线完全一致（防某套配色只生成了一半）。
@@ -123,12 +123,15 @@ func _b_tiers() -> void:
 # ------------------------------------------------------------
 # C 段：武器 × 档位 → 精灵集
 # ------------------------------------------------------------
-var _weapons := ["spear", "bow", "sword"]
+var _weapons := ["spear", "bow", "sword", "staff"]
 var _tier_ids := ["blue", "purple", "black", "gold"]
 var _expected := {
 	"spear": ["sprites_lancer", "sprites_lancer_purple", "sprites_lancer_black", "sprites_lancer_gold"],
 	"bow": ["sprites_archer", "sprites_archer_purple", "sprites_archer_black", "sprites_archer_gold"],
 	"sword": ["sprites_ts", "sprites_ts_purple", "sprites_ts_black", "sprites_ts_gold"],
+	# staff（僧侣）2026-09-18 加入：**新增武器必须四档都补**，漏一档会回落 default 外观
+	# （症状是「升到某个等级换了个兵种」）。素材包 gold 档用 Yellow → 目录 yellow_monk。
+	"staff": ["sprites_monk", "sprites_monk_purple", "sprites_monk_black", "sprites_monk_gold"],
 }
 
 
@@ -533,11 +536,12 @@ func _h_panel(m: Node) -> void:
 	if panel == null:
 		return
 
-	# 造一个可预期的名册：3 人，其中一人 Lv3（紫档）
+	# 造一个可预期的名册：3 人，其中一人 Lv3（紫档）+ 攒了两个特性
 	Meta.roster = []
 	Meta.ensure_roster()
 	Meta.roster[1]["level"] = 3
 	Meta.roster[1]["xp"] = 40.0
+	Meta.roster[1]["traits"] = {"attack": 2, "hp": 3}
 
 	panel.call("open", [])
 	await _frames(3)
@@ -552,6 +556,12 @@ func _h_panel(m: Node) -> void:
 	_check(joined.find("经验 40 /") >= 0, "显示当前经验进度（实得含「经验 40」：%s）"
 			% ("是" if joined.find("经验 40") >= 0 else "否"))
 	_check(joined.find("枪手 · Lv0 新兵") >= 0, "0 级显示为「名字 · Lv0 新兵」")
+	# 升级特性层数：有特性的人列出「攻击×2 · 气血×3」，没特性的人显示「尚无」
+	_check(joined.find("特性：") >= 0 and joined.find("攻击×2") >= 0
+			and joined.find("气血×3") >= 0,
+			"有特性的人在行里列出层数（实得含「攻击×2 / 气血×3」：%s）"
+			% ("是" if joined.find("攻击×2") >= 0 else "否"))
+	_check(joined.find("特性：尚无") >= 0, "0 层特性的人显示「特性：尚无」提示")
 	var btn: Button = panel.get("_launch_btn")
 	_check(btn.text.find("已选 3 名") >= 0, "默认全选，按钮写「已选 3 名」（实得 %s）" % btn.text)
 
@@ -560,14 +570,16 @@ func _h_panel(m: Node) -> void:
 	await _frames(2)
 	_check(btn.text.find("已选 2 名") >= 0, "取消一人后按钮变「已选 2 名」（实得 %s）" % btn.text)
 
-	# 补招按钮：名册 3/8 → 每个兵种一个按钮
+	# 补招按钮：名册 3/8 → 每个兵种一个按钮（characters.list 现在 4 个原型）
+	# 顺带这也是「新角色有没有真的接进出击面板」的验收点：加了角色这里就该多一颗按钮。
 	var rrow: Node = panel.get("_recruit_row")
 	var recruit_btns: Array = []
 	for c in rrow.get_children():
 		if c is Button:
 			recruit_btns.append(c)
-	_check(recruit_btns.size() == 3, "名册不满时给出 3 个补招按钮（实得 %d）"
-			% recruit_btns.size())
+	var proto_n: int = (Config.get_value("characters.list", []) as Array).size()
+	_check(recruit_btns.size() == proto_n,
+			"补招按钮数 == 原型数 %d（实得 %d）" % [proto_n, recruit_btns.size()])
 	var before := Meta.roster.size()
 	if not recruit_btns.is_empty():
 		(recruit_btns[0] as Button).emit_signal("pressed")

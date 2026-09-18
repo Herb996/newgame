@@ -373,9 +373,10 @@ func _only_player_noise(cu: Dictionary, br: Dictionary) -> void:
 	_check(absf(got_with_amp - got_no_amp) < 0.5,
 			"敌人呼喊**没被放大**：有放大器 %.1f = 没放大器 %.1f"
 			% [got_with_amp, got_no_amp])
-	_check(NoiseSystem.current_noise == 0.0 and NoiseSystem.accumulated_noise == 0.0,
+	_check(is_equal_approx(NoiseSystem.team_self_noise(), 0.0)
+			and is_equal_approx(NoiseSystem.world_noise, 0.0),
 			"from_player=false 不动菜单栏读数（%.1f / %.1f）"
-			% [NoiseSystem.current_noise, NoiseSystem.accumulated_noise])
+			% [NoiseSystem.team_self_noise(), NoiseSystem.world_noise])
 
 	# 同样一句，换成小队发声 → 明显更响
 	listener.noise_alertness = 0.0
@@ -385,9 +386,9 @@ func _only_player_noise(cu: Dictionary, br: Dictionary) -> void:
 	_check(got_player > got_no_amp + 1.0,
 			"换成小队发声 → 传到旁观者的强度被放大（%.1f > %.1f）" % [got_player, got_no_amp])
 	var mult := NoiseSystem.player_noise_multiplier(at)
-	_check(NoiseSystem.current_noise >= base * mult - 0.5,
+	_check(NoiseSystem.team_self_noise() >= base * mult - 0.5,
 			"菜单栏读数用的是**放大后**的值（%.1f，倍率 %.2f）"
-			% [NoiseSystem.current_noise, mult])
+			% [NoiseSystem.team_self_noise(), mult])
 	_check(amplifier != null, "放大器实例还在（占位断言，保证上面那只是活的）")
 	await _phys(2)
 
@@ -488,8 +489,8 @@ func _global_switch(cu: Dictionary) -> void:
 	_check(is_equal_approx(off, 1.0), "关掉 → 倍率回到 1.0（实得 %.3f）" % off)
 	NoiseSystem.reset()
 	NoiseSystem.emit(pos, 120.0, true)
-	_check(is_equal_approx(NoiseSystem.current_noise, 120.0),
-			"关掉后发声按原强度记（实得 %.1f）" % NoiseSystem.current_noise)
+	_check(is_equal_approx(NoiseSystem.team_self_noise(), 120.0),
+			"关掉后发声按原强度记（实得 %.1f）" % NoiseSystem.team_self_noise())
 
 	Config.clear_override("enemy_traits.noise_amplify.enabled")
 	var back := NoiseSystem.player_noise_multiplier(pos)

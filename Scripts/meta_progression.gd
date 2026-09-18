@@ -233,6 +233,7 @@ func _sanitize_roster(raw) -> Array:
 				"name": str(e.get("name", "")),
 				"level": clampi(int(e.get("level", 0)), 0, max_level()),
 				"xp": maxf(0.0, float(e.get("xp", 0.0))),
+				"traits": _sanitize_traits(e.get("traits", {})),
 			})
 	# uid 撞号会让「谁是谁」彻底乱掉：重新分配一遍
 	var uid := 1
@@ -285,6 +286,7 @@ func recruit(archetype_id: String) -> Dictionary:
 		"name": base_name if same == 0 else "%s%d" % [base_name, same + 1],
 		"level": 0,
 		"xp": 0.0,
+		"traits": {},
 	}
 	roster.append(unit)
 	save_game()
@@ -320,6 +322,67 @@ func level_of(uid: int) -> int:
 	return int(unit_by_uid(uid).get("level", 0))
 
 
+# ------------------------------------------------------------
+# 升级特性（config progression.traits.list，2026-09-18 用户定）
+#
+# 每次升级随机 +1 层某个特性；收益按层累计 —— 等级越高攒的层越多。
+# 特性挂在具体的人身上（与 level/xp 同级），存在 roster 单位里：{"attack": 2, ...}。
+# 随机用全局 randi()（无头 --seed 可复现），抽取均匀、无权重。
+# ------------------------------------------------------------
+
+## 特性定义表（id → 定义字典），从 config progression.traits.list 读一次缓存
+var _trait_defs: Dictionary = {}
+
+
+func trait_defs() -> Dictionary:
+	if not _trait_defs.is_empty():
+		return _trait_defs
+	for t in Config.get_value("progression.traits.list", []):
+		if t is Dictionary:
+			var id := str(t.get("id", ""))
+			if id != "":
+				_trait_defs[id] = t
+	return _trait_defs
+
+
+func trait_ids() -> Array:
+	return trait_defs().keys()
+
+
+## 某特性的层数收益 = 层数 × per_stack（供面板显示用）
+func trait_value(id: String, stacks: int) -> float:
+	var d: Dictionary = trait_defs().get(id, {})
+	return float(d.get("per_stack", 0.0)) * float(stacks)
+
+
+## 清洗存档里的 traits：只保留已知 id、层数取非负整数
+func _sanitize_traits(raw) -> Dictionary:
+	var out := {}
+	if raw is Dictionary:
+		for id in (raw as Dictionary).keys():
+			var s := int(raw[id])
+			if s > 0 and trait_defs().has(str(id)):
+				out[str(id)] = s
+	return out
+
+
+## 升级时随机 +1 层某特性（就地改 u，不单独落盘 —— 调用方 add_xp 会统一 save）
+func _roll_trait(u: Dictionary) -> void:
+	var ids := trait_ids()
+	if ids.is_empty():
+		return
+	var picked := str(ids[randi() % ids.size()])
+	if not (u.get("traits", null) is Dictionary):
+		u["traits"] = {}
+	var tr: Dictionary = u["traits"]
+	tr[picked] = int(tr.get(picked, 0)) + 1
+
+
+## 取某人的特性层数表（拷贝，防止调用方改到存档内部字典）
+func traits_of(uid: int) -> Dictionary:
+	return Dictionary(unit_by_uid(uid).get("traits", {})).duplicate()
+
+
 ## 升到下一级所需经验 = round(base × growth^当前等级)
 func xp_to_next(level: int) -> float:
 	var base := float(Config.get_value("progression.xp.curve.base", 100.0))
@@ -342,6 +405,7 @@ func add_xp(uid: int, amount: float) -> int:
 		xp -= xp_to_next(lv)
 		lv += 1
 		gained += 1
+		_roll_trait(u)      # 每升 1 级随机 +1 层特性（按层累计，等级越高攒得越多）
 	u["level"] = lv
 	u["xp"] = xp
 	save_game()

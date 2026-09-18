@@ -10,11 +10,15 @@ extends CanvasLayer
 ##         下面一排按钮由 characters.list[].command_set 查 menu_bar.command_sets 得到。
 ##         战斗单位（当前 4 名角色）的指令集 combat：
 ##           自动攻击开关 / 索敌·最近 / 索敌·最强 / 指定攻击 / 巡逻 / 取消指令
-##   【右】噪音显示 —— 当前噪音（现时有多吵）+ 累积噪音（本局暴露度）+ 被惊动的敌人数
+##   【右】噪音显示（2026-09-18 改成互相喂养的两路，见 noise_system.gd 与 §5.2.1）——
+##         第 1 行「自身」= 角色自身噪音（**每人一份**，显示全队最大值，随即快降）
+##         + 第 2 行「世界」= 世界累计噪音（全局一份，降得慢）+ 标题右上「被惊动 N」
 ##
 ## 只在局内显示：main._enter_run 里 set_active(true)，回基地 set_active(false)。
-## 整条栏 mouse_filter = STOP —— 压在栏上的鼠标不会误给世界下移动令；
-## 代价是**贴底那条边的边缘滚屏在栏区域内失效**（左右上三边与 WASD 照常）。
+## 整条栏 mouse_filter = STOP —— 压在栏上的鼠标不会误给世界下移动令。
+## 底部边缘滚屏：camera_controller 已把常驻菜单栏（group "menu_bar"）从
+##   "悬停 UI 即停止滚屏" 的规则里豁免，所以贴底边的向下滚屏照常可用；
+##   只有真正贴到最底 margin 才触发方向，栏中部按钮在 margin 之上不会误滚。
 ##
 ## 谁下指令：本文件只负责「读按钮 → 调角色的指令 API」，
 ## 真正的行为全在 player.gd 的指令段（auto_attack_on / target_stance /
@@ -228,7 +232,9 @@ func _build_ui() -> void:
 	_alert_label = UiKit.label("", 13, UiKit.COL_WARN)
 	head.add_child(_alert_label)
 
-	var cur := _make_meter("当前", float(Config.get_value("noise.sources.sniper_shot", 240)))
+	# 第 1 行 = **角色自身噪音**（全队最大值，每个角色各有一份）—— 快涨快落，
+	# 读作「我此刻有多吵」；等级光球按它决定飘动与闪烁的快慢。
+	var cur := _make_meter("自身", float(Config.get_value("noise.self.max", 300.0)))
 	_cur_bar = cur["bar"]
 	_cur_fill = cur["fill"]
 	_cur_value = cur["value"]
@@ -236,14 +242,16 @@ func _build_ui() -> void:
 	_cur_level = UiKit.label("安静", 13, UiKit.COL_DIM)
 	_noise_col.add_child(_cur_level)
 
-	var acc := _make_meter("累积", float(Config.get_value("noise.display.accumulated_reference", 2000)))
+	# 第 2 行 = **世界累计噪音**（全局一份）—— 所有人的自身噪音都在往这里灌，
+	# 自己也会慢慢退，但比自身慢得多（时间常数十几秒）。读作「这局暴露了多少」。
+	var acc := _make_meter("世界", float(Config.get_value("noise.world.reference", 2000.0)))
 	_acc_bar = acc["bar"]
 	_acc_value = acc["value"]
 	_noise_col.add_child(acc["row"])
 	# 「累积」的含义写在标题的 tooltip 上而不是再加一行说明文字：
 	# 菜单栏高度是按屏高比例算的（默认 1/5），多一行就可能把内容顶得比栏还高，
 	# 栏会被自己的最小尺寸撑大、把上面 HUD 的文字压住。
-	_noise_title.tooltip_text = "当前 = 小队最近一次发声的强度（会衰减）；累积 = 本局发声总量（暴露度）；被惊动 = 警觉度已达『调查』的敌人数"
+	_noise_title.tooltip_text = "自身 = 小队里最吵的那个角色此刻的噪音（会快速衰减，光球跟着它加速）；世界 = 本局累积下来的紧张度（所有人都在往上灌，退得慢）；两者互相喂养：自身噪音会喂高世界噪音，世界噪音越高同样的动作自身涨得越多；被惊动 = 警觉度已达『调查』的敌人数"
 
 	_relayout()
 
@@ -497,7 +505,7 @@ func _hint_text(p) -> String:
 # ------------------------------------------------------------
 
 func _refresh_noise(delta: float) -> void:
-	var cur: float = NoiseSystem.current_noise
+	var cur: float = NoiseSystem.team_self_noise()
 	var lv: Dictionary = NoiseSystem.noise_level()
 	_cur_bar.value = minf(cur, _cur_bar.max_value)
 	_cur_value.text = "%.0f" % cur
@@ -505,8 +513,8 @@ func _refresh_noise(delta: float) -> void:
 	_cur_level.text = "档位：%s" % str(lv["name"])
 	_cur_level.add_theme_color_override("font_color", lv["color"])
 
-	_acc_bar.value = NoiseSystem.accumulated_ratio() * _acc_bar.max_value
-	_acc_value.text = "%.0f" % NoiseSystem.accumulated_noise
+	_acc_bar.value = NoiseSystem.world_ratio() * _acc_bar.max_value
+	_acc_value.text = "%.0f" % NoiseSystem.world_noise
 
 	# 被惊动的敌人数：0.25 秒一次就够（这是给玩家看的氛围读数，不是判定依据）
 	_alert_timer -= delta
@@ -516,9 +524,9 @@ func _refresh_noise(delta: float) -> void:
 	_alert_label.text = ("被惊动 %d" % _alert_count) if _alert_count > 0 else ""
 
 
-## 小地图点击 → 世界坐标 → 交给选中单位执行（与直接点地图完全同一条路径）
+## 小地图点击 → 世界坐标 → 大世界镜头平移到该处（RTS 式导航）。
+## 下令/指定攻击/巡逻设点改走「点大世界地图」（见 player.gd 世界左键 → command_click）。
 func _on_minimap_clicked(world_pos: Vector2) -> void:
-	var p = _selected_player()
-	if p == null:
-		return
-	p.command_click(world_pos)
+	var cam := get_tree().get_first_node_in_group(&"iso_cam")
+	if cam != null and cam.has_method("focus_world_pos"):
+		cam.focus_world_pos(world_pos)

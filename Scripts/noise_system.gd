@@ -3,10 +3,11 @@ extends Node
 ## NoiseSystem — 噪音系统（DESIGN.md 第二部分 噪音机制）
 ##
 ## 全局噪音广播中心（autoload，见 project.godot）。
-##   NoiseSystem.emit(source_pos, intensity, from_player := false)
+##   NoiseSystem.emit(source_pos, intensity, from_player := false, source_unit := null)
 ##     —— 一次噪音事件：向所有敌人按「距离衰减 + 墙体遮挡」派发，并在声源处
 ##        生成世界空间的扩散圆环（视觉反馈，让玩家知道"我刚才弄出动静了"）。
-##        from_player=true 表示这是小队自己弄出的动静（计入菜单栏噪音读数）。
+##        from_player=true 表示这是小队自己弄出的动静，**source_unit 传发声的那个
+##        player**（该角色的 self_noise 因此上涨 —— 等级光球与菜单第 1 行读的就是它）。
 ## 敌人接收后累加 noise_alertness，再由各自 FSM 的阈值决定行为
 ## （疑惑 / 调查 / 狂暴），完全符合设计稿推荐的「累加阈值 + 状态机」方案。
 ##
@@ -17,13 +18,27 @@ extends Node
 ##     绝不做每帧物理射线（100 敌人射线太贵）。
 ##   · 墙体衰减需要地图墙体网格：由 EnemySystem.setup 在地图生成后注入（setup()）。
 ##
-## 【局内菜单栏的噪音读数】2026-09-17 起本系统额外维护两路读数（右侧噪音表用）：
-##   current_noise    当前噪音：最近一次「小队发声」的强度，按 noise.display.decay_per_second
-##                    线性衰减到 0 —— 读作「我现在有多吵」。
-##   accumulated_noise 累积噪音：本局小队发出过的噪音总量 —— 读作「我暴露了多少」。
-## 两者**都只统计小队自己发出的声音**（emit 的 from_player 参数）：敌人发现玩家时的
-## 呼喊（enemy_chase_state）不算 —— 否则玩家会看到「我没动但噪音爆表」这种误读。
-## 这两个值纯展示用，不参与任何判定：敌人听到的仍然是衰减后的瞬时强度。
+## 【局内菜单栏右下那两条噪音】2026-09-18 重做成**互相喂养的两路**（用户定）：
+##   self_noise  角色自身噪音（**每个角色一份**，存在 player.self_noise）
+##               —— 我此刻有多吵。菜单第 1 行显示**全队最大值**；等级光球读自己那份。
+##   world_noise 世界累计噪音（**全局一份**）—— 这张地图的紧张度水位。菜单第 2 行。
+## 两条互相喂养，构成正反馈：
+##   ① 自身 → 世界：自身噪音在**每帧**按比例灌给世界（feed_world），**不从自身扣**
+##      （是「累加」不是「转移」——发声的那个人自己也还是那么吵）。
+##   ② 世界 → 自身：世界噪音越高，新发声计入自身的量越大（self_gain_from_world，
+##      世界到 reference 时 gain = 1 + link.world_to_self_gain）。
+## 于是「一处吵起来 → 全场变紧张 → 下一声更难压下去」，且两者衰减快慢不同：
+##   自身用**线性**衰减（每秒固定掉点）→ 小动静几秒归零（读作「快」）；
+##   世界用**比例**衰减（每秒掉自身 ×ratio）→ 有稳态、尾巴拖得长（读作「慢」）。
+##   为什么世界不用线性：线性的稳态不存在——「输入率 > 衰减」就一路涨到爆表、
+##   「输入率 < 衰减」就一路归零，读数是开关不是水位；比例衰减才有平衡点与长尾。
+## ⚠ **两条都 hard cap**（noise.self.max / noise.world.max）→ 正反馈**不会发散**，
+##   写坏了最多是「永远顶格」，不会出现 NaN / Infinity。探针数值校验见 probe_noise_link。
+## ⚠ 只统计小队自己发出的声音（emit 的 from_player / source_unit）：敌人发现玩家时的
+##   呼喊（enemy_chase_state）不算 —— 否则玩家会看到「我没动但噪音爆表」这种误读。
+## ⚠ 这两个值纯展示用，不参与判定：敌人听到的仍然是衰减后的瞬时强度。
+## ⚠ 探针 / 命令行直接 `emit(pos, x, true)` 却没传 source_unit 时，走 `_ambient_self`
+##   （一份**没有归属**的自身噪音），保证「发声了就该有读数」这条旧断言仍然成立。
 ##
 ## 【爆裂鼓手放大，2026-09-17】邪术师特性 burst_drum 会在**小队**发声时把强度乘一个倍率
 ## （player_noise_multiplier：按发声点与各邪术师的距离加权、多只叠加、全局封顶）。
@@ -47,39 +62,108 @@ var _tile_size: int = 16
 var _map_ready := false
 var _last_ring_time := -999.0
 
-# --- 菜单栏噪音表读数（见文件头说明）---
-var current_noise := 0.0        # 当前噪音（最近一次小队发声强度，随时间衰减）
-var accumulated_noise := 0.0    # 本局累积噪音（小队发声强度累加）
-var peak_noise := 0.0           # 本局峰值（菜单栏显示「峰值」用，也可供统计）
+# --- 菜单栏右下那两条噪音（见文件头）---
+var world_noise := 0.0          # 世界累计噪音（全局一份，慢衰减）
+var peak_noise := 0.0           # 本局峰值（按自身噪音计，统计用）
+## 没有归属的自身噪音：只在「发了声却不知道是谁发的」时用到（探针直接 emit、
+## 命令行路径）。正常游戏里发声一定带 source_unit，这份恒为 0。
+var _ambient_self := 0.0
 
 
-## 开新一局：清空读数。由 main._enter_run 调用（不放进 emit，避免误清）。
+## 开新一局：清空两路读数 + 所有角色的自身噪音。由 main._enter_run 调用。
+## ⚠ 这里**顺便**遍历 player 组清 self_noise：换成「每个 player 自己监听 reset」
+## 的话，谁负责订阅、谁先于谁 add_child 又是一摊事 —— 一处生效胜过两处约定。
 func reset() -> void:
-	current_noise = 0.0
-	accumulated_noise = 0.0
+	world_noise = 0.0
 	peak_noise = 0.0
+	_ambient_self = 0.0
+	for p in get_tree().get_nodes_in_group("player"):
+		if is_instance_valid(p) and p.has_method("clear_self_noise"):
+			p.call("clear_self_noise")
 
 
 func _process(delta: float) -> void:
-	if current_noise <= 0.0:
+	var dec := maxf(0.0, float(Config.get_value("noise.self.decay_per_second", 90.0)))
+	var smax := maxf(1.0, float(Config.get_value("noise.self.max", 300.0)))
+	var wr := clampf(float(Config.get_value("noise.world.decay_ratio_per_second", 0.06)),
+			0.0, 20.0)
+	var wmax := maxf(1.0, float(Config.get_value("noise.world.max", 4000.0)))
+	var transfer := maxf(0.0, float(Config.get_value(
+			"noise.link.self_to_world_per_second", 360.0)))
+	# ① 世界噪音衰减（**先衰再喂**，顺序不影响稳态，只是让「同时发生」的读数略低一点点）
+	world_noise *= maxf(0.0, 1.0 - wr * delta)
+	# ② 每个角色：自身噪音喂世界 + 自身线性衰减
+	var feed := 0.0
+	for p in get_tree().get_nodes_in_group("player"):
+		if not is_instance_valid(p):
+			continue
+		var raw = p.get("self_noise")
+		if raw == null:
+			continue
+		var s := float(raw)
+		if s <= 0.0:
+			continue
+		feed += s / smax * transfer * delta
+		p.set("self_noise", maxf(0.0, s - dec * delta))
+	if _ambient_self > 0.0:
+		feed += _ambient_self / smax * transfer * delta
+		_ambient_self = maxf(0.0, _ambient_self - dec * delta)
+	world_noise = clampf(world_noise + feed, 0.0, wmax)
+
+
+## 新一次发声计入**自身噪音**的量（已经乘过世界噪音的增益）。
+## `who` 为空 / 不带 add_self_noise → 落到没有归属的 `_ambient_self`。
+func add_player_noise(intensity: float, who: Node = null) -> void:
+	var add := intensity * self_gain_from_world()
+	var smax := maxf(1.0, float(Config.get_value("noise.self.max", 300.0)))
+	if who != null and is_instance_valid(who) and who.has_method("add_self_noise"):
+		who.call("add_self_noise", add)
 		return
-	current_noise = maxf(0.0, current_noise
-			- float(Config.get_value("noise.display.decay_per_second", 90.0)) * delta)
+	# 没归属的那份自己按同一套 cap 累加（探针/命令行路径）
+	_ambient_self = clampf(_ambient_self + add, 0.0, smax)
 
 
-## 当前噪音的档位：{"name": "吵闹", "color": Color, "index": 2}。
+## ② 世界 → 自身的增益：世界噪音越高，同样一下发声自身涨得越多。
+## world 到 reference 时封顶为 1 + link.world_to_self_gain（之后不再加成，故必有界）。
+func self_gain_from_world() -> float:
+	var g := maxf(0.0, float(Config.get_value("noise.link.world_to_self_gain", 1.2)))
+	var wref := maxf(1.0, float(Config.get_value("noise.world.reference", 2000.0)))
+	return 1.0 + g * clampf(world_noise / wref, 0.0, 1.0)
+
+
+## 未归属的自身噪音（探针 / 命令行路径用；正常游戏恒为 0）
+func ambient_self_noise() -> float:
+	return _ambient_self
+
+
+## 小队当前的**自身噪音** = 全队最大值（「我有多吵」看最吵的那个；
+## 光球是每人各读各的，本方法只给菜单第 1 行和档位判定用）。
+func team_self_noise() -> float:
+	var best := _ambient_self
+	for p in get_tree().get_nodes_in_group("player"):
+		if not is_instance_valid(p):
+			continue
+		var raw = p.get("self_noise")
+		if raw == null:
+			continue
+		best = maxf(best, float(raw))
+	return best
+
+
+## 当前噪音档位（菜单第 1 行的文字与配色）：{"name", "color", "index"}。
 ## 档位表来自 noise.display.levels（按 min 从高往低匹配第一个命中的）。
-## 表为空/缺配置时回落到单档「—」，保证菜单栏永远有东西显示。
+## 表为空/缺配置时回落到单档「安静」，保证菜单栏永远有东西显示。
 func noise_level() -> Dictionary:
 	var levels: Array = Config.get_value("noise.display.levels", [])
 	var best := {"name": "安静", "color": Color(0.48, 0.78, 0.42), "index": 0}
 	var best_min := -1.0
+	var cur := team_self_noise()
 	for i in range(levels.size()):
 		var lv = levels[i]
 		if not (lv is Dictionary):
 			continue
 		var m := float((lv as Dictionary).get("min", 0.0))
-		if current_noise >= m and m >= best_min:
+		if cur >= m and m >= best_min:
 			best_min = m
 			best = {
 				"name": str((lv as Dictionary).get("name", "")),
@@ -89,12 +173,24 @@ func noise_level() -> Dictionary:
 	return best
 
 
-## 累积噪音占参考值的比例（0~1，条形长度用）。参考值 = noise.display.accumulated_reference。
-func accumulated_ratio() -> float:
-	var ref := float(Config.get_value("noise.display.accumulated_reference", 2000.0))
-	if ref <= 0.0:
-		return 0.0
-	return clampf(accumulated_noise / ref, 0.0, 1.0)
+## 世界噪音占参考值的比例（0~1，第 2 行条形长度用）。参考值 = noise.world.reference。
+## ⚠ 与 opacity / 任何逻辑无关，只是一条给眼睛看的刻度。
+func world_ratio() -> float:
+	var ref := maxf(1.0, float(Config.get_value("noise.world.reference", 2000.0)))
+	return clampf(world_noise / ref, 0.0, 1.0)
+
+
+## 自身噪音占上限的比例（0~1，第 1 行条形长度用）。
+func self_ratio() -> float:
+	var smax := maxf(1.0, float(Config.get_value("noise.self.max", 300.0)))
+	return clampf(team_self_noise() / smax, 0.0, 1.0)
+
+
+## 把一股噪音灌进世界噪音。**接口与每帧灌注同源**（都在 `_process` 里按玩家组的
+## self_noise 算，这里给探针 / 一次性事件用）；同样不扣任何人自身的量。
+func feed_world(amount_world: float) -> void:
+	var wmax := maxf(1.0, float(Config.get_value("noise.world.max", 4000.0)))
+	world_noise = clampf(world_noise + amount_world, 0.0, wmax)
 
 
 ## 当前被惊动的敌人数量（警觉度 ≥ noise.thresholds.investigate 的敌人数）。
@@ -143,17 +239,18 @@ func player_noise_multiplier(at: Vector2) -> float:
 	return clampf(mult, 1.0, maxf(1.0, float(cfg.get("max_multiplier", 3.0))))
 
 
-## 发出一次噪音。intensity = 基础强度（config.noise.sources 的取值，如攻击=55）。
+## 发出一次噪音。intensity = 基础强度（config.noise.sources 的取值，如攻击=120）。
 ## 会自动向所有听力范围内的敌人派发（带衰减），并生成视觉圆环。
-## from_player = true 时这次发声计入菜单栏的「当前噪音 / 累积噪音」读数（默认 false：
-## 敌人自己的呼喊不算进玩家的暴露度）。三个玩家侧调用点（走/闪避/攻击）都要传 true。
-func emit(source_pos: Vector2, intensity: float, from_player := false) -> void:
+## from_player = true 时这次发声计入**该角色的自身噪音**（默认 false：敌人呼喊不算。
+## 三个玩家侧调用点 走/闪避/攻击 都传 true，并且要把 actor 作为 source_unit 一起传进来
+## —— 少了就只能落到 `_ambient_self` 那份没归属的读数里）。
+func emit(source_pos: Vector2, intensity: float, from_player := false,
+		source_unit: Node = null) -> void:
 	if from_player:
 		# 「爆裂鼓手」：附近有邪术师时，小队的动静被放大（读数也按放大后的算，
 		# 玩家能直接看到噪音表飙起来）。敌人自己的呼喊不走这条分支，不会被放大。
 		intensity *= player_noise_multiplier(source_pos)
-		current_noise = maxf(current_noise, intensity)
-		accumulated_noise += intensity
+		add_player_noise(intensity, source_unit)
 		peak_noise = maxf(peak_noise, intensity)
 	# 视觉圆环仅在大噪音时出现，避免脚步等轻噪音形成高频光圈
 	var ring_min_intensity := float(Config.get_value("noise.ring_min_intensity", 35.0))

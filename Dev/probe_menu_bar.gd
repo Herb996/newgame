@@ -125,7 +125,7 @@ func _ready() -> void:
 	_check(br.size.y <= maxf(vp.y * 0.35, expect_h + 1.0),
 			"栏高不超过屏高 1/3（栏 %.0f / 屏 %.0f）" % [br.size.y, vp.y])
 
-	# 坐标换算：槽中心 ↔ 地图中心（点小地图能下令的前提）
+	# 坐标换算：槽中心 ↔ 地图中心（点小地图导航镜头的前提）
 	var map_cells: float = float(int(Config.get_value("map.width", 128)))
 	var tile: float = float(int(Config.get_value("map.tile_size", 64)))
 	var center_world: Vector2 = minimap.world_pos_at(slot.size * 0.5)
@@ -143,57 +143,67 @@ func _ready() -> void:
 		return
 	var p = players[0]
 
-	# 点小地图 = 给选中单位下移动令。
-	# 目标点必须**离玩家有距离且不等于脚下那格**：目标格＝当前格时移动会立刻
-	# 判定为「已到达」并把目标清掉，断言会误报成「没送到」。
-	var walls: Array = main._last_map["walls"]
-	var open_world := _open_world_near(main, p.global_position, Vector2i(10, 0))
-	p.cancel_commands()
+	# 点小地图 = 大世界镜头平移到该处（RTS 式导航）。
+	# 取一个「离相机当前中心不远的点」当目标：肯定在镜头可达范围内，不会因每局随机
+	# 出生点 / 边界限位而时准时偏（精确等于贴边目标那种断言就是不稳）。断言只验
+	# 「镜头确实动了，且明显朝点击点靠近了」，这才是这个功能要保证的语义。
+	var cam = get_tree().get_first_node_in_group(&"iso_cam")
+	_check(cam != null and cam.has_method("focus_world_pos"),
+			"局内相机存在且可导航（focus_world_pos）")
+	var before: Vector2 = cam.global_position
+	var nav_target: Vector2 = before + Vector2(320.0, 320.0)
+	menu._on_minimap_clicked(nav_target)
 	await _frames(2)
-	menu._on_minimap_clicked(open_world)
-	await _frames(2)
-	_check(p.has_move_target(), "点小地图能把移动令送到选中单位（目标 %s）" % str(open_world))
-	p.cancel_commands()
-	await _frames(2)
+	_check(cam.global_position != before,
+			"点小地图后镜头确实移动了（%s → %s）" % [str(before), str(cam.global_position)])
+	_check(cam.global_position.distance_to(nav_target) < before.distance_to(nav_target) - 1.0,
+			"镜头明显朝点击处靠近（离目标：%.0f → %.0f）"
+			% [before.distance_to(nav_target), cam.global_position.distance_to(nav_target)])
+	_check(not p.has_move_target(), "点小地图不再给单位下移动令（镜头导航与下令已分离）")
 
-	_say("--- C 段：噪音读数（当前 / 累积）---")
+	_say("--- C 段：噪音读数（自身 / 世界）---")
 	# 先让角色完全安静下来：不移动（无脚步）、不开火（无攻击噪音），
-	# 这样「累积噪音 == 这一次发声音量」才是可断言的。
+	# 这样「读数 == 这一次发声」才是可断言的。
 	p.cancel_commands()
 	p.set_auto_attack(false)
 	await _frames(5)
 	NoiseSystem.reset()
-	_check(is_equal_approx(NoiseSystem.current_noise, 0.0)
-			and is_equal_approx(NoiseSystem.accumulated_noise, 0.0), "进局后读数从 0 开始")
-	NoiseSystem.emit(p.global_position, 120.0, true)
-	_check(is_equal_approx(NoiseSystem.current_noise, 120.0),
-			"小队发声 120 → 当前噪音 = 120（实得 %.0f）" % NoiseSystem.current_noise)
-	_check(is_equal_approx(NoiseSystem.accumulated_noise, 120.0),
-			"同一发声计入累积噪音（实得 %.0f）" % NoiseSystem.accumulated_noise)
+	_check(is_equal_approx(NoiseSystem.team_self_noise(), 0.0)
+			and is_equal_approx(NoiseSystem.world_noise, 0.0), "进局后两路读数都从 0 开始")
+	# 2026-09-18 起「当前/累积」改成了互相喂养的「自身/世界」，并且自身噪音是**每人一份**
+	# —— 所以 emit 要把发声的那个角色传进去，否则落到没归属那份、菜单照样有读数
+	# 但光球不会有任何反应（这类回归只有源码外观上看不出来）。
+	NoiseSystem.emit(p.global_position, 120.0, true, p)
+	_check(is_equal_approx(NoiseSystem.team_self_noise(), 120.0),
+			"小队发声 120 → 自身噪音 = 120（实得 %.0f）" % NoiseSystem.team_self_noise())
 	var lv: Dictionary = NoiseSystem.noise_level()
 	_check(str(lv["name"]) == "吵闹", "120 的档位 = 吵闹（实得 %s）" % str(lv["name"]))
 	NoiseSystem.emit(p.global_position, 300.0, false)
-	_check(is_equal_approx(NoiseSystem.accumulated_noise, 120.0),
-			"敌人呼喊（from_player=false）不计入累积噪音（实得 %.0f）"
-			% NoiseSystem.accumulated_noise)
+	_check(is_equal_approx(NoiseSystem.team_self_noise(), 120.0),
+			"敌人呼喊（from_player=false）不计入自身噪音（实得 %.0f）"
+			% NoiseSystem.team_self_noise())
 	await _frames(30)
-	_check(NoiseSystem.current_noise < 120.0,
-			"当前噪音随时间衰减（30 帧后 %.0f < 120）" % NoiseSystem.current_noise)
-	_check(NoiseSystem.accumulated_ratio() > 0.0 and NoiseSystem.accumulated_ratio() <= 1.0,
-			"累积噪音占参考值比例在 0~1 之间（实得 %.3f）" % NoiseSystem.accumulated_ratio())
+	_check(NoiseSystem.team_self_noise() < 120.0,
+			"自身噪音随时间衰减（30 帧后 %.0f < 120）" % NoiseSystem.team_self_noise())
+	_check(NoiseSystem.world_noise > 0.0,
+			"自身噪音喂进了世界噪音（30 帧后 %.1f）" % NoiseSystem.world_noise)
+	_check(NoiseSystem.world_ratio() > 0.0 and NoiseSystem.world_ratio() <= 1.0,
+			"世界噪音占参考值比例在 0~1 之间（实得 %.3f）" % NoiseSystem.world_ratio())
 
 	_say("--- C2 段：右侧噪音表（控件层面）---")
 	NoiseSystem.reset()
-	NoiseSystem.emit(p.global_position, 240.0, true)   # 强弩一发 = 240
+	NoiseSystem.emit(p.global_position, 240.0, true, p)   # 强弩一发 = 240
 	await _frames(3)
-	_check(menu._cur_bar.value > 200.0, "「当前」条跟着音量走（条值 %.0f / 满值 %.0f）"
+	_check(menu._cur_bar.value > 200.0, "「自身」条跟着噪音走（条值 %.0f / 满值 %.0f）"
 			% [menu._cur_bar.value, menu._cur_bar.max_value])
-	_check(str(menu._cur_value.text) != "0", "「当前」数值已刷新（%s）" % str(menu._cur_value.text))
+	_check(str(menu._cur_value.text) != "0", "「自身」数值已刷新（%s）" % str(menu._cur_value.text))
 	_check(str(menu._cur_level.text).find("震耳") >= 0,
 			"档位文字跟着音量走（实得「%s」）" % str(menu._cur_level.text))
 	_check(menu._cur_fill.bg_color.is_equal_approx(NoiseSystem.noise_level()["color"]),
 			"条的填充色取自档位配色（%s）" % str(menu._cur_fill.bg_color))
-	_check(menu._acc_bar.value > 0.0, "「累积」条有长度（%.0f）" % menu._acc_bar.value)
+	# 世界噪音靠每帧累加，多等几帧再看它到底有没有长度
+	await _frames(12)
+	_check(menu._acc_bar.value > 0.0, "「世界」条有长度（%.1f）" % menu._acc_bar.value)
 	NoiseSystem.reset()
 
 	_say("--- D 段：指令面板（按单位变）---")
@@ -243,12 +253,12 @@ func _ready() -> void:
 	_check(p.auto_target() == far, "策略=最强 → 改锁 115px 但血更厚的重甲（实锁 %s）"
 			% str(_tname(p.auto_target())))
 
-	_say("  · 指定攻击（含从小地图下令）")
+	_say("  · 指定攻击")
 	p.set_target_stance(&"nearest")
 	p.arm_designate()
 	_check(str(p.arm_mode()) == "designate", "「指定攻击」进入待点选模式")
-	# 走菜单栏这条入口：等价于点小地图上那个敌人所在的格
-	menu._on_minimap_clicked(far.global_position)
+	# 走世界点击这条入口（点小地图已改为只导航镜头）：等价于点地图上那个敌人所在的格
+	p.command_click(far.global_position)
 	await _frames(3)
 	_check(p.get("designated_target") == far, "点中重甲 → 已指定（实指定 %s）"
 			% str(_tname(p.get("designated_target"))))
@@ -289,7 +299,7 @@ func _ready() -> void:
 	p.set_auto_attack(true)
 	p.set_target_stance(&"strongest")
 	p.arm_designate()
-	menu._on_minimap_clicked(near.global_position)
+	p.command_click(near.global_position)
 	await _frames(3)
 	p.begin_patrol_setup()
 	p.command_click(pt_a)
@@ -300,34 +310,43 @@ func _ready() -> void:
 	_check(bool(p.get("auto_attack_on")) and str(p.get("target_stance")) == "strongest",
 			"取消指令不动「自动攻击开关」与「索敌策略」（那是持续偏好，不是一次性指令）")
 
-	_say("--- E 段：指令输入通道 ---")
-	var ev_l := InputEventMouseButton.new()
-	ev_l.button_index = MOUSE_BUTTON_LEFT
-	ev_l.pressed = true
-	p.arm_designate()
-	p._unhandled_input(ev_l)
-	_check(str(p.arm_mode()) == "", "待点选时左键点空处 → 退出待点选（不误设指定）")
+	_say("--- E 段：指令输入通道（左键经选择控制器 · 右键经角色）---")
+	var sel = get_tree().get_first_node_in_group(&"selection")
+	_check(sel != null, "局内已挂选择控制器（左键入口）")
+	if sel != null:
+		if not bool(p.selected):
+			p.select()
+		# 指定模式下的「空地左键」→ 控制器转 command_click → 退出待点选
+		# （左键已不在 Player._unhandled_input 里处理，改由此控制器统一裁决）
+		p.arm_designate()
+		_click_at(sel, p.global_position + Vector2(3000.0, 3000.0))
+		await _frames(2)
+		_check(str(p.arm_mode()) == "",
+				"空地左键经控制器下令 → 指定模式点空处退出待点选")
 	var ev_r := InputEventMouseButton.new()
 	ev_r.button_index = MOUSE_BUTTON_RIGHT
 	ev_r.pressed = true
 	p.set_target_stance(&"nearest")
 	p.arm_designate()
-	menu._on_minimap_clicked(near.global_position)
+	p.command_click(near.global_position)
 	await _frames(3)
 	p._unhandled_input(ev_r)
 	_check(p.get("designated_target") == null, "右键 = 取消指令（解除指定目标）")
 
 	_say("--- F 段：局间复位 ---")
-	NoiseSystem.emit(p.global_position, 240.0, true)
-	var acc_before: float = NoiseSystem.accumulated_noise
+	NoiseSystem.emit(p.global_position, 240.0, true, p)
+	# 世界噪音是每帧灌进去的，等几帧才会攒出非零值 —— 不等就等于拿 0 去比 0
+	await _frames(6)
+	var acc_before: float = NoiseSystem.world_noise
+	_check(acc_before > 0.0, "离局前世界噪音已经攒起来（%.1f）" % acc_before)
 	main._enter_base()
 	await _frames(5)
 	_check(not menu.visible, "回基地：菜单栏隐藏")
 	main._on_launch([{"id": "archer", "name": "弓兵"}])
 	await _frames(30)
-	_check(is_equal_approx(NoiseSystem.accumulated_noise, 0.0),
-			"再进一局：累积噪音清零（上一局 %.0f → 本局 %.0f）"
-			% [acc_before, NoiseSystem.accumulated_noise])
+	_check(is_equal_approx(NoiseSystem.world_noise, 0.0),
+			"再进一局：世界噪音清零（上一局 %.1f → 本局 %.1f）"
+			% [acc_before, NoiseSystem.world_noise])
 	var archers := get_tree().get_nodes_in_group("player")
 	_check(archers.size() == 1 and str(archers[0].character_name) == "弓兵",
 			"换一名角色进局（实得 %d 名：%s）"
@@ -356,6 +375,42 @@ func _ready() -> void:
 				% [t0, r0, t1, r1])
 		_check(t1.find("剑士") >= 0, "选中的是二号位时面板跟着换（实得「%s」）" % t1)
 
+	_say("--- H 段：框选多选 + 改选不打断移动 ---")
+	if squad.size() >= 2:
+		var a = squad[0]
+		var b = squad[1]
+		a.cancel_commands()
+		b.cancel_commands()
+		# (1) 给 a 下移动令，再改选 b —— a 的移动绝不能被「选中别人」打断（原 bug）
+		a.select()
+		var tgt_a := _open_world_near(main, a.global_position, Vector2i(8, 0))
+		a.command_click(tgt_a)
+		_check(a.has_move_target(), "a 已接到移动令")
+		b.select()
+		await _frames(3)
+		_check(a.has_move_target(), "改选 b 后 a 的移动不被打断（打断 bug 回归）")
+		_check(bool(b.selected) and not bool(a.selected), "单选互斥：选择集切到 b")
+		a.cancel_commands()
+		b.cancel_commands()
+		# (2) 框选两人 → 一次空地左键同时下达给两人（多选下令）
+		var sel2 = get_tree().get_first_node_in_group(&"selection")
+		if sel2 != null:
+			_drag_box(sel2, a.global_position + Vector2(-40, -40),
+					b.global_position + Vector2(40, 40))
+			await _frames(2)
+			_check(bool(a.selected) and bool(b.selected), "拖框把两人都纳入选择集")
+			var tgt := _open_world_near(main,
+					(a.global_position + b.global_position) * 0.5, Vector2i(5, 0))
+			_click_at(sel2, tgt)
+			await _frames(2)
+			_check(a.has_move_target() and b.has_move_target(),
+					"框选后一次空地左键同时下达给两名（多选一起行动）")
+			# 框住无人空地 → 清空选择
+			var far_corner: Vector2 = a.global_position + Vector2(2500.0, 2500.0)
+			_drag_box(sel2, far_corner + Vector2(-8, -8), far_corner + Vector2(8, 8))
+			await _frames(2)
+			_check(not bool(a.selected) and not bool(b.selected), "框住无人空地 → 清空选择")
+
 	_finish()
 
 
@@ -373,6 +428,34 @@ func _open_world_near(main: Node, from: Vector2, offset_cells: Vector2i) -> Vect
 	if open_cell.x < 0:
 		return from
 	return Vector2(open_cell) * tile + Vector2(tile, tile) * 0.5
+
+
+## 直接喂事件给选择控制器（绕过引擎拾取），测「点击 vs 拖框」两条路。
+func _click_at(sel: Node, world: Vector2) -> void:
+	var scr: Vector2 = sel.get_viewport().get_canvas_transform() * world
+	sel._unhandled_input(_lbtn(true, scr))
+	sel._unhandled_input(_lbtn(false, scr))
+
+
+func _drag_box(sel: Node, w_a: Vector2, w_b: Vector2) -> void:
+	var xf: Transform2D = sel.get_viewport().get_canvas_transform()
+	var sa: Vector2 = xf * w_a
+	var sb: Vector2 = xf * w_b
+	sel._unhandled_input(_lbtn(true, sa))
+	var mv := InputEventMouseMotion.new()
+	mv.position = sb
+	mv.global_position = sb
+	sel._unhandled_input(mv)
+	sel._unhandled_input(_lbtn(false, sb))
+
+
+func _lbtn(pressed: bool, pos: Vector2) -> InputEventMouseButton:
+	var e := InputEventMouseButton.new()
+	e.button_index = MOUSE_BUTTON_LEFT
+	e.pressed = pressed
+	e.position = pos
+	e.global_position = pos
+	return e
 
 
 func _finish() -> void:

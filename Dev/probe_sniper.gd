@@ -64,7 +64,8 @@ func _section_a() -> void:
 	for k in table.keys():
 		if not str(k).begins_with("_"):
 			ids.append(str(k))
-	_check(ids == ["sword", "spear", "bow", "sniper"], "武器 id = [sword, spear, bow, sniper]（实得 %s）"
+	_check(ids == ["sword", "spear", "staff", "bow", "sniper"],
+			"武器 id = [sword, spear, staff, bow, sniper]（staff 2026-09-18 随僧侣加入，实得 %s）"
 			% str(ids))
 
 	var sn: Dictionary = table.get("sniper", {})
@@ -155,8 +156,8 @@ func _section_c() -> void:
 	_check(_player != null, "场景里找到 group=player 的节点")
 	if _player == null:
 		return
-	_check(_player.weapon_ids() == ["sword", "spear", "bow", "sniper"],
-			"weapon_ids() = [sword, spear, bow, sniper]（实得 %s）" % str(_player.weapon_ids()))
+	_check(_player.weapon_ids() == ["sword", "spear", "staff", "bow", "sniper"],
+			"weapon_ids() = [sword, spear, staff, bow, sniper]（实得 %s）" % str(_player.weapon_ids()))
 
 	var switched: bool = _player.switch_weapon(&"sniper")
 	_check(switched, "switch_weapon(sniper) 返回 true")

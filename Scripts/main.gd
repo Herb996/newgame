@@ -14,6 +14,7 @@ const PLAYER_SCENE := preload("res://Scenes/Player.tscn")
 const CAMERA_SCRIPT := preload("res://Scripts/camera_controller.gd")
 const PLACEMENT_SCRIPT := preload("res://Scripts/placement_mode.gd")
 const SOAK_PROBE := preload("res://Scripts/soak_probe.gd")
+const SELECTION_SCRIPT := preload("res://Scripts/selection_controller.gd")
 
 enum Mode { BASE, RUN }
 
@@ -67,6 +68,9 @@ var _selected_units: Array = []
 ## 基地建筑重摆：当前 PlacementMode 节点 + 正在重摆的建筑 id（"" = 无）
 var _placement: Node = null
 var _placing_id := ""
+
+## 局内选择/框选/下令的鼠标控制器：每进一局挂到 HUD 下、回基地时销毁。
+var _selection: Control = null
 
 
 func _ready() -> void:
@@ -374,6 +378,13 @@ func _clear_game_root() -> void:
 		c.queue_free()
 
 
+## 局内选择控制器只在局内存在：进局重建、回基地销毁。
+func _clear_selection() -> void:
+	if _selection != null and is_instance_valid(_selection):
+		_selection.queue_free()
+	_selection = null
+
+
 ## 进入局外基地
 ## 基地不再生成玩家角色（2026-09-16 改）：角色在大门选人后才于局内生成。
 ## 建筑交互 = 鼠标左键点击建筑本体（building.gd 的 input_event）；
@@ -391,6 +402,7 @@ func _enter_base() -> void:
 	warehouse_panel.close()
 	statue_panel.close()
 	character_panel.close()
+	_clear_selection()
 	_clear_game_root()
 	base_system.setup(game_root)
 	var tile_size: int = int(Config.get_value("map.tile_size", 16))
@@ -450,6 +462,10 @@ func _enter_run() -> void:
 		# 按 level 决定穿哪套档位贴图、头顶画几级，晚一步会先套蓝甲再被换掉（闪一帧）。
 		player.roster_uid = int(c.get("uid", 0))
 		player.level = clampi(int(c.get("level", 0)), 0, Meta.max_level())
+		# 升级特性层数表：同样必须在 add_child 前注入 —— player._ready() 里就把
+		# 移速/气血等加成算进属性，晚一步这局第一帧的属性是裸值。
+		# uid==0（命令行/无头回归未走名册）→ traits_of 返回空，一切加成归零。
+		player.traits = Meta.traits_of(player.roster_uid)
 		# 多人时在出生点横向排开（各偏 0.8 格），避免挤在同一格互相顶
 		player.position = result.spawn \
 				+ Vector2((float(i) - float(squad.size() - 1) * 0.5) * tile_size * 0.8, 0.0)
@@ -477,6 +493,12 @@ func _enter_run() -> void:
 	)
 	# F 键"回到玩家"锚定首名角色；平时靠 WASD/边缘滚屏自由平移（RTS 手感）
 	cam.setup(map_size, players[0] if not players.is_empty() else null)
+	# 选择控制器：挂到 HUD 下，接管「空地左键」= 点击下令 / 按住拖框多选。
+	_clear_selection()
+	_selection = SELECTION_SCRIPT.new()
+	_selection.name = "SelectionController"
+	hud.add_child(_selection)
+	_selection.setup(cam)
 	extraction_system.setup(game_root, result)
 	enemy_system.setup(game_root, result)
 	animal_system.setup(game_root, result)

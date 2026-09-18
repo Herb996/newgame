@@ -15,8 +15,9 @@ extends Node
 ## 渲染管线（阶段二三）：
 ##   - _ripple_vp：波纹 SubViewport（半分辨率、透明底）。RippleRing 池改挂在这里，
 ##     波纹按 (r=亮度基, g=色散量) 编码进纹理，由 puddle shader 采样做提亮+色散。
-##   - _refl_vp：倒影 SubViewport（半分辨率、透明底）。内容 = 天空渐变 ColorRect +
-##     按贴图分组的 MultiMesh2D（静态装饰倒影）。相机 zoom.y 取负实现垂直镜像。
+##   - _refl_vp：倒影 SubViewport（半分辨率、透明底）。内容 = 天空渐变 Sprite2D +
+##     按贴图分组的 MultiMesh2D（静态装饰倒影）。倒影实例在 CPU 侧绕各自底边
+##     垂直镜像挂到脚下（真倒挂），视口正立渲染，水在哪倒影就在哪。
 ##   - puddle.gdshader：SCREEN_TEXTURE 折射 + reflection_tex 倒影 + ripple_tex 色散。
 ## ============================================================
 
@@ -44,7 +45,7 @@ var _ripple_vp: SubViewport = null
 var _refl_cam: Camera2D = null
 var _ripple_cam: Camera2D = null
 var _refl_root: Node2D = null
-var _sky_rect: ColorRect = null
+var _sky_rect: Sprite2D = null
 var _refl_meshes: Array = []          # 每贴图一组 MultiMesh2D
 var _placeholder_tex: ImageTexture = null   # deactivate 换掉 ViewportTexture 防 stale
 
@@ -68,6 +69,11 @@ var _puddle_shallow_cells := 0
 
 func _ready() -> void:
 	add_to_group("weather_system")
+	# 2×2 白占位图：deactivate 时把 puddle 的 ViewportTexture 参数换回它，
+	# 防止子视口销毁后 shader 仍采样 stale 纹理报错。
+	var img := Image.create(2, 2, false, Image.FORMAT_RGBA8)
+	img.fill(Color.WHITE)
+	_placeholder_tex = ImageTexture.create_from_image(img)
 	_build_audio()   # 合成占位音 + 建播放器（与地图无关，只做一次）
 
 
@@ -85,9 +91,11 @@ func setup(root: Node2D, map_data: Dictionary) -> void:
 	_tile_size = int(map_data.get("tile_size", 64))
 
 	_build_water_grid(map_data)
+	_build_viewports(root)
 	_build_puddle(map_data)
+	_build_reflection(map_data)
+	_build_ripples()
 	_build_rain(root)
-	_build_ripples(root)
 	_play_rain()
 
 	var total := _map_w * _map_h
@@ -110,6 +118,13 @@ func deactivate() -> void:
 	_puddle = null
 	_ripple_root_world = null
 	_ripples = []
+	_refl_vp = null
+	_ripple_vp = null
+	_refl_cam = null
+	_ripple_cam = null
+	_refl_root = null
+	_sky_rect = null
+	_refl_meshes = []
 	_water_cells = []
 	_root = null
 
@@ -127,6 +142,12 @@ func _exit_tree() -> void:
 			p.stream = null
 	_step_players = []
 	_step_wav = null
+	for p in _dry_players:
+		if p != null:
+			p.stop()
+			p.stream = null
+	_dry_players = []
+	_dry_wav = null
 
 
 ## 该世界坐标是否踩在积水上（浅滩 ∪ 水洼）。供 player_move_state 每脚步 tick 查询。
@@ -152,7 +173,7 @@ func on_water_step(world_pos: Vector2) -> void:
 		r.spawn(world_pos,
 				float(Config.get_value("weather.ripple.radius_px", 46.0)),
 				float(Config.get_value("weather.ripple.duration_s", 0.55)),
-				_ripple_color())
+				_ripple_color(float(Config.get_value("weather.ripple.alpha", 0.8))))
 	var p := _get_free_step_player()
 	if p != null:
 		p.global_position = world_pos
@@ -166,12 +187,171 @@ func on_dry_step(world_pos: Vector2) -> void:
 		return
 	var r := _get_free_ripple()
 	if r != null:
-		var c := Color.from_string(str(Config.get_value("weather.ripple.color", "#bfe3ff")), Color(0.75, 0.89, 1.0))
-		c.a = float(Config.get_value("weather.ripple.dry_alpha", 0.35))
 		r.spawn(world_pos,
-				float(Config.get_value("weather.ripple.dry_radius_px", 22.0)),
-				float(Config.get_value("weather.ripple.dry_duration_s", 0.4)),
-				c)
+				float(Config.get_value("weather.ripple.dry_radius_px", 30.0)),
+				float(Config.get_value("weather.ripple.dry_duration_s", 0.6)),
+				_ripple_color(float(Config.get_value("weather.ripple.dry_alpha", 0.55))))
+	var p := _get_free_dry_player()
+	if p != null:
+		p.global_position = world_pos
+		p.play()
+
+
+# ============================================================
+# 双离屏 SubViewport（半分辨率）：倒影 / 波纹
+# 都挂在 game_root 下，随 _clear_game_root() 自动销毁。
+# ============================================================
+
+func _build_viewports(root: Node2D) -> void:
+	var scale := float(Config.get_value("weather.viewports.scale", 0.5))
+	var vp := get_viewport().get_visible_rect().size
+	var sub := Vector2i(maxi(1, int(vp.x * scale)), maxi(1, int(vp.y * scale)))
+
+	# 倒影视口：内容根 + 相机（正 zoom 渲染；垂直镜像由 puddle shader 采样翻 V 实现）
+	_refl_vp = _make_sub_vp(sub, "ReflectionViewport")
+	root.add_child(_refl_vp)
+	_refl_root = Node2D.new()
+	_refl_root.name = "ReflectionRoot"
+	_refl_vp.add_child(_refl_root)
+	_refl_cam = Camera2D.new()
+	_refl_cam.name = "ReflCam"
+	_refl_root.add_child(_refl_cam)
+	_refl_cam.make_current()   # 只影响所属 SubViewport 的当前相机，不抢主视口
+
+	# 波纹视口：RippleRing 池挂在世界坐标内容根下，spawn 协议不变
+	_ripple_vp = _make_sub_vp(sub, "RippleViewport")
+	root.add_child(_ripple_vp)
+	_ripple_root_world = Node2D.new()
+	_ripple_root_world.name = "RippleLayer"
+	_ripple_vp.add_child(_ripple_root_world)
+	_ripple_cam = Camera2D.new()
+	_ripple_cam.name = "RippleCam"
+	_ripple_root_world.add_child(_ripple_cam)
+	_ripple_cam.make_current()
+
+	print("[Weather] 子视口建好 %dx%d ×2（scale=%.2f）" % [sub.x, sub.y, scale])
+
+
+func _make_sub_vp(size: Vector2i, vp_name: String) -> SubViewport:
+	var v := SubViewport.new()
+	v.name = vp_name
+	v.size = size
+	v.transparent_bg = true   # 透明底：天空渐变由视口内节点自绘，缺省不污染成黑/灰
+	v.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	v.gui_disable_input = true
+	return v
+
+
+## 每帧把主相机位姿同步到两个子视口相机：
+## - zoom = 主相机 zoom × scale（半分辨率视口显示同一世界区域，SCREEN_UV 与贴图 UV 逐点对应）
+## - 倒影视口 zoom.y 取负 → 内容绕视口水平中线垂直镜像（相机一行实现翻转）
+func _sync_viewports() -> void:
+	if _refl_vp == null or _ripple_vp == null:
+		return
+	var cam := get_viewport().get_camera_2d()
+	if cam == null or not is_instance_valid(cam):
+		return
+	var vp := get_viewport().get_visible_rect().size
+	var scale := float(Config.get_value("weather.viewports.scale", 0.5))
+	var sub_px := Vector2i(maxi(1, int(vp.x * scale)), maxi(1, int(vp.y * scale)))
+	if _refl_vp.size != sub_px:
+		_refl_vp.size = sub_px      # 窗口缩放自愈
+		_ripple_vp.size = sub_px
+	var z := maxf(cam.zoom.x, 0.05)
+	var zs := z * scale
+	_refl_cam.global_position = cam.global_position
+	# 正 zoom 正立渲染：镜像已在 _build_reflection 的实例变换里完成（绕各装饰底边翻转）。
+	_refl_cam.zoom = Vector2(zs, zs)
+	_ripple_cam.global_position = cam.global_position
+	_ripple_cam.zoom = Vector2(zs, zs)
+	if _sky_rect != null and is_instance_valid(_sky_rect):
+		var vis := vp / z   # 可见世界区域（与 RainAnchor 同款算法）
+		_sky_rect.position = cam.global_position - vis * 0.5
+		_sky_rect.scale = vis / 64.0   # GradientTexture2D 默认 64px
+
+
+# ============================================================
+# 倒影内容：天空渐变底 + 按贴图分组的 MultiMesh2D 批量静态装饰
+# 倒影 = 每个装饰绕自身底边垂直镜像的副本（CPU 侧翻转实例变换，真倒挂），
+# 视口正立渲染，puddle shader 直接按 SCREEN_UV 采样即逐点对齐。
+# ============================================================
+
+func _build_reflection(map_data: Dictionary) -> void:
+	if _refl_root == null:
+		return
+
+	# 天空渐变底：先添加 → 垫在所有倒影之下。Sprite2D 拉伸 64px 渐变贴图，
+	# _sync_viewports 每帧按可见世界区域同步位置/缩放。
+	var gtex := GradientTexture2D.new()
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, 1.0])
+	grad.colors = PackedColorArray([
+		Color.from_string(str(Config.get_value("weather.reflection.sky_top_color", "#3c4c60")), Color(0.24, 0.30, 0.38)),
+		Color.from_string(str(Config.get_value("weather.reflection.sky_bottom_color", "#6d8ba6")), Color(0.43, 0.55, 0.65)),
+	])
+	gtex.gradient = grad
+	gtex.fill_from = Vector2(0, 0)
+	gtex.fill_to = Vector2(0, 1)   # 垂直渐变：世界坐标顶部深、底部浅
+	_sky_rect = Sprite2D.new()
+	_sky_rect.name = "SkyGradient"
+	_sky_rect.texture = gtex
+	_sky_rect.centered = false
+	_refl_root.add_child(_sky_rect)
+
+	# 收集带 refl 标记的装饰（map_generator 侧 set_meta），按贴图分组
+	var map_root: Node2D = map_data["node"]
+	var decor: Node2D = map_root.get_node_or_null("DecorLayer") if map_root != null else null
+	if decor == null:
+		return
+	var frags: Array = Config.get_value("weather.reflection.exclude_path_fragments", ["crack"])
+	var groups := {}   # texture -> Array[Sprite2D]
+	var total := 0
+	for c in decor.get_children():
+		var sp := c as Sprite2D
+		if sp == null or not sp.has_meta("refl") or sp.texture == null:
+			continue
+		var skip := false
+		for f in frags:
+			if str(f) != "" and sp.texture.resource_path.contains(str(f)):
+				skip = true   # 剔除贴地裂缝类（双保险：meta 本就不会打给它们）
+				break
+		if skip:
+			continue
+		if not groups.has(sp.texture):
+			groups[sp.texture] = []
+		groups[sp.texture].append(sp)
+		total += 1
+
+	# 每组一个 MultiMesh2D：静态装饰 setup 建一次，不每帧更新
+	for tex in groups:
+		var sprites: Array = groups[tex]
+		var ts := Vector2((tex as Texture2D).get_size())
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_2D
+		mm.use_colors = true   # 本引擎版本无 color_format 枚举，布尔开关；必须先于 instance_count
+		var quad := QuadMesh.new()
+		quad.size = ts
+		mm.mesh = quad
+		mm.instance_count = sprites.size()
+		for i in range(sprites.size()):
+			var s: Sprite2D = sprites[i]
+			# 倒影 = 绕自身底边（脚线）垂直镜像的副本：
+			# 世界矩形 [P, P+S]，P = position + offset*scale，S = tex_size*scale；
+			# 底边 y_b = P.y + S.y，镜像后矩形占 [P.y+S.y, P.y+2S.y]（正挂脚下），
+			# 中心 y = P.y + 1.5*S.y。basis.y 取负 → quad 内容上下翻转（真倒挂）；
+			# basis.x 延续 flip_h 的水平镜像。倒影直接挂在物体脚下的水里，位置永远正确。
+			var p0 := s.position + s.offset * s.scale
+			var sx := s.scale.x * (-1.0 if s.flip_h else 1.0)
+			var origin := Vector2(p0.x + ts.x * s.scale.x * 0.5, p0.y + ts.y * s.scale.y * 1.5)
+			mm.set_instance_transform_2d(i, Transform2D(Vector2(sx, 0.0), Vector2(0.0, -s.scale.y), origin))
+			mm.set_instance_color(i, s.modulate)   # 烘焙群系色调/亮度抖动
+		var mm2d := MultiMeshInstance2D.new()
+		mm2d.multimesh = mm
+		mm2d.texture = tex
+		_refl_root.add_child(mm2d)
+		_refl_meshes.append(mm2d)
+
+	print("[Weather] 倒影 MultiMesh %d 组 / %d 个装饰" % [_refl_meshes.size(), total])
 
 
 # ============================================================
@@ -181,9 +361,29 @@ func on_dry_step(world_pos: Vector2) -> void:
 func _build_water_grid(map_data: Dictionary) -> void:
 	var walls: Array = map_data["walls"]
 	var decor: Array = map_data["decor"]
+	var biome: Array = map_data.get("biome", [])
 	_map_w = (walls[0] as Array).size()
 	_map_h = walls.size()
 	var spawn_cell: Vector2i = map_data.get("spawn_cell", Vector2i(_map_w / 2, _map_h / 2))
+
+	# 积水只允许出现在指定群系（默认草地0/森林2）的地板格上
+	var allowed_raw: Array = Config.get_value("weather.puddle.allowed_biomes", [0, 2])
+	var eligible: Array = []
+	for y in range(_map_h):
+		var erow: Array = []
+		erow.resize(_map_w)
+		for x in range(_map_w):
+			var ok := not bool(walls[y][x])
+			if ok and not biome.is_empty():
+				var bid := int(biome[y][x])
+				var inb := false
+				for a in allowed_raw:
+					if int(a) == bid:
+						inb = true
+						break
+				ok = inb
+			erow[x] = ok
+		eligible.append(erow)
 
 	var fn := FastNoiseLite.new()
 	fn.noise_type = FastNoiseLite.TYPE_SIMPLEX
@@ -193,12 +393,12 @@ func _build_water_grid(map_data: Dictionary) -> void:
 
 	var ratio := clampf(float(Config.get_value("weather.puddle.floor_ratio", 0.10)), 0.0, 0.9)
 
-	# 先收集所有地板格的噪声值，用分位数定阈值 → 水洼占比精确命中 ratio
-	# （与 map_generator._biome_quantile_edges 同一思路：simplex 近似钟形，固定阈值会失衡）。
+	# 分位数阈值只在"可选格(草地/森林地板)"里统计 → floor_ratio 是"占这些格的比例"，
+	# 保证部分地面有水、且精确命中占比（simplex 近似钟形，固定阈值会失衡）。
 	var samples: Array = []
 	for y in range(_map_h):
 		for x in range(_map_w):
-			if not bool(walls[y][x]):
+			if bool(eligible[y][x]):
 				samples.append(fn.get_noise_2d(float(x), float(y)))
 	samples.sort()
 	var thr := 1e9
@@ -212,12 +412,12 @@ func _build_water_grid(map_data: Dictionary) -> void:
 		row.resize(_map_w)
 		mask.append(row)
 
-	# 噪声水洼（仅地板格）
+	# 噪声水洼（仅可选格）
 	_puddle_noise_cells = 0
 	for y in range(_map_h):
 		for x in range(_map_w):
 			var w := false
-			if not bool(walls[y][x]) and fn.get_noise_2d(float(x), float(y)) >= thr:
+			if bool(eligible[y][x]) and fn.get_noise_2d(float(x), float(y)) >= thr:
 				w = true
 			mask[y][x] = w
 			if w:
@@ -242,6 +442,11 @@ func _build_water_grid(map_data: Dictionary) -> void:
 	var iters := int(Config.get_value("weather.puddle.smooth_iterations", 2))
 	for _it in range(iters):
 		mask = _majority_pass(mask, walls)
+	# 平滑可能把水漫到非草地/森林格（或墙），最后再与 eligible 求交收回。
+	for y in range(_map_h):
+		for x in range(_map_w):
+			if not bool(eligible[y][x]):
+				mask[y][x] = false
 
 	_water_cells = mask
 
@@ -287,10 +492,10 @@ func _build_puddle(map_data: Dictionary) -> void:
 	if map_root == null:
 		return
 
-	var img := Image.create(_map_w, _map_h, false, Image.FORMAT_R8)
+	var img := Image.create(_map_w, _map_h, false, Image.FORMAT_RGBA8)
 	for y in range(_map_h):
 		for x in range(_map_w):
-			img.set_pixel(x, y, Color8(255 if bool(_water_cells[y][x]) else 0, 0, 0, 255))
+			img.set_pixel(x, y, Color(1, 1, 1, 1) if bool(_water_cells[y][x]) else Color(0, 0, 0, 0))
 	var mask_tex := ImageTexture.create_from_image(img)
 
 	var rect := ColorRect.new()
@@ -316,7 +521,22 @@ func _build_puddle(map_data: Dictionary) -> void:
 	mat.set_shader_parameter("scroll_dir", Vector2(float(scroll[0]), float(scroll[1])))
 	mat.set_shader_parameter("wobble", float(Config.get_value("weather.puddle.wobble", 0.65)))
 	mat.set_shader_parameter("edge_soft", float(Config.get_value("weather.puddle.edge_soft", 0.30)))
-	mat.set_shader_parameter("shimmer", float(Config.get_value("weather.puddle.shimmer", 0.08)))
+	# ---- 阶段二：倒影 / 折射 / 波纹 ----
+	# 两张视口纹理与 SCREEN_UV 逐点对应（半分辨率视口渲染同一世界区域）。
+	mat.set_shader_parameter("reflection_tex",
+			_refl_vp.get_texture() if _refl_vp != null else _placeholder_tex)
+	mat.set_shader_parameter("ripple_tex",
+			_ripple_vp.get_texture() if _ripple_vp != null else _placeholder_tex)
+	mat.set_shader_parameter("reflection_alpha", float(Config.get_value("weather.reflection.alpha", 0.55)))
+	mat.set_shader_parameter("wobble_scale", float(Config.get_value("weather.reflection.wobble_scale", 0.12)))
+	mat.set_shader_parameter("wobble_speed", float(Config.get_value("weather.reflection.wobble_speed", 0.8)))
+	mat.set_shader_parameter("wobble_strength", float(Config.get_value("weather.reflection.wobble_strength", 0.012)))
+	mat.set_shader_parameter("dispersion", float(Config.get_value("weather.reflection.dispersion", 0.015)))
+	mat.set_shader_parameter("refraction_strength", float(Config.get_value("weather.refraction.strength", 0.008)))
+	mat.set_shader_parameter("reflection_blend", float(Config.get_value("weather.puddle.reflection_blend", 0.65)))
+	mat.set_shader_parameter("ripple_glow", float(Config.get_value("weather.ripple.glow", 0.35)))
+	mat.set_shader_parameter("ripple_tint",
+			Color.from_string(str(Config.get_value("weather.ripple.color", "#bfe3ff")), Color(0.75, 0.89, 1.0)))
 	rect.material = mat
 
 	map_root.add_child(rect)
@@ -455,17 +675,16 @@ func _process(_delta: float) -> void:
 	_rain.process_material.emission_box_extents = Vector3(half.x, half.y, 0)
 	if _splash != null and is_instance_valid(_splash):
 		_splash.process_material.emission_box_extents = Vector3(half.x * 0.9, half.y * 0.5, 0)
+	_sync_viewports()
 
 
 # ============================================================
 # 踩水波纹对象池
 # ============================================================
 
-func _build_ripples(root: Node2D) -> void:
-	_ripple_root_world = Node2D.new()
-	_ripple_root_world.name = "RippleLayer"
-	# 晚于地图根添加 → 同 z 下画在积水之上；玩家 z=1 仍在波纹之上。
-	root.add_child(_ripple_root_world)
+func _build_ripples() -> void:
+	if _ripple_root_world == null:
+		return
 	var n := int(Config.get_value("weather.ripple.pool_size", 16))
 	for _i in range(n):
 		var r := RIPPLE_SCRIPT.new()
@@ -481,10 +700,14 @@ func _get_free_ripple() -> Node2D:
 	return null
 
 
-func _ripple_color() -> Color:
-	var c := Color.from_string(str(Config.get_value("weather.ripple.color", "#bfe3ff")), Color(0.75, 0.89, 1.0))
-	c.a = float(Config.get_value("weather.ripple.alpha", 0.8))
-	return c
+## 波纹颜色 = 通道编码（puddle shader 拆通道用）：
+## r=亮度基（提亮水面），g/b=色散量（偏移 UV）。单圈一次绘制即完成通道拆分。
+func _ripple_color(alpha: float) -> Color:
+	var disp := float(Config.get_value("weather.ripple.disp_channel", 0.5))
+	return Color(
+		float(Config.get_value("weather.ripple.base_channel", 0.85)),
+		disp, disp,
+		alpha)
 
 
 # ============================================================
@@ -514,6 +737,18 @@ func _build_audio() -> void:
 		add_child(p)
 		_step_players.append(p)
 
+	# 干脚步池：与踩水音同构但音色区分（低通截止/时长/音量全部走 config）。
+	_dry_wav = _gen_dry_step_wav()
+	var dry_db := float(Config.get_value("weather.step.dry_volume_db", -14.0))
+	for _i in range(pc):
+		var p := AudioStreamPlayer2D.new()
+		p.bus = sfx_bus
+		p.volume_db = dry_db
+		p.max_distance = max_d
+		p.stream = _dry_wav
+		add_child(p)
+		_dry_players.append(p)
+
 
 func _sfx_bus_name() -> String:
 	# SFX 总线由 DisplaySettings._ensure_bus() 在 autoload 阶段建好；取不到回落 Master(0)。
@@ -538,6 +773,21 @@ func _get_free_step_player() -> AudioStreamPlayer2D:
 		return null
 	var p0: AudioStreamPlayer2D = _step_players[_step_idx]
 	_step_idx = (_step_idx + 1) % _step_players.size()
+	return p0
+
+
+func _get_free_dry_player() -> AudioStreamPlayer2D:
+	# 与踩水音池同款轮转策略：优先空闲，全忙复用最旧。
+	for i in range(_dry_players.size()):
+		var idx := (_dry_idx + i) % _dry_players.size()
+		var p: AudioStreamPlayer2D = _dry_players[idx]
+		if p != null and not p.playing:
+			_dry_idx = (idx + 1) % _dry_players.size()
+			return p
+	if _dry_players.is_empty():
+		return null
+	var p0: AudioStreamPlayer2D = _dry_players[_dry_idx]
+	_dry_idx = (_dry_idx + 1) % _dry_players.size()
 	return p0
 
 
@@ -606,6 +856,30 @@ static func _gen_step_wav() -> AudioStreamWAV:
 		var f := lerpf(850.0, 220.0, t / dur)
 		ph += TAU * f / float(rate)
 		buf[i] = (lp * 0.7 + sin(ph) * 0.3) * env * 0.6
+	return _pack_wav(buf, rate)
+
+
+## 干脚步：900Hz 低通噪声脆响（短促闷响）+ 弱低频体感。
+## 刻意与踩水音区分：干地闷而脆，踩水亮而溅（高频 + 下滑「啾」）。
+static func _gen_dry_step_wav() -> AudioStreamWAV:
+	var dur := float(Config.get_value("weather.audio.step_dry_duration_s", 0.10))
+	var rate := int(Config.get_value("weather.audio.sample_rate", 22050))
+	var low_hz := float(Config.get_value("weather.audio.step_dry_lowpass_hz", 900.0))
+	var n := int(dur * float(rate))
+	var buf := PackedFloat32Array()
+	buf.resize(n)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 0xD212   # 固定种子：每次启动音色一致
+	var a_lp := 1.0 - exp(-TAU * low_hz / float(rate))
+	var lp := 0.0
+	var ph := 0.0
+	for i in range(n):
+		var t := float(i) / float(rate)
+		var env := exp(-t * 42.0)   # 比 wet 的 26 更陡：干脚步更短促
+		lp += a_lp * (rng.randf_range(-1.0, 1.0) - lp)
+		var f := lerpf(240.0, 120.0, t / dur)   # 弱低频体感，模拟脚底闷响
+		ph += TAU * f / float(rate)
+		buf[i] = (lp * 0.85 + sin(ph) * 0.15) * env * 0.55
 	return _pack_wav(buf, rate)
 
 
