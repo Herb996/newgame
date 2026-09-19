@@ -10,7 +10,7 @@
 ## 0. 设计思路（风格 / 技术 / 规范）
 
 ### 0.1 风格定位
-- 俯视 2D 撤离冒险：进局 → 限时搜刮 → 撤离点开放 → 带资源撤离；**死亡 / 超时则本局携带资源全失**（硬核塔科夫向惩罚）。
+- 俯视 2D 撤离冒险：进局 → 限时搜刮 → 撤离点开放 → 带资源撤离；**死亡 / 超时则本局携带资源全失**（硬核塔科夫向惩罚）。⚠ 背包 2026-09-19 起**一人一份**：单个角色阵亡是先把整包**就地撒成一地**（队友走近可捡回），"全失"发生在**场上没活人**或超时那一刻（§5.11）。
 - 世界观为「昔日王国遗迹上的拾荒」卡通奇幻；**与蒸汽朋克无关**。`menu.title` 已改为卡通奇幻口吻「王国废墟：拾荒撤离」。仍带 SteamPunk 字样的只剩英文副标题 `menu.subtitle`（`SteamPunk Extraction`）与工程名 `config/name`（`SteamPunkExtraction`，改名会牵动存档/路径，暂不动）；数据资源键 `oil`（对应内部 `steam`/`oil`/`gear` 命名）保留不动以兼容存档 —— 属命名/兼容残留，非主题。
 
 ### 0.2 技术基线
@@ -117,6 +117,7 @@
 - 入口非「开始游戏」按钮，而是**新建存档 / 历史存档** → 打开 6 槽面板（`slot_panel.gd`）→ 选槽 `SaveSlots.activate()` → `launch_requested` → 切场景到 `menu.game_scene`（Main.tscn）。
 - `menu.enter_base_from_menu = true`：点开始后**先落主基地**（运行时把 `debug.auto_enter_run` 覆盖为 false，绕过 config 出厂的 true）。`ESC` 返回上一级 / 关子面板。
 - 设置改动**先暂存**，点面板右下「确认应用」才写 `user://settings.json` 并生效；返回则丢弃未确认改动。
+- **主菜单五个选项悬停不弹介绍**（2026-09-19 用户定）：按钮只留名字，`UiKit.menu_button(text)` 已经没有提示参数位、原来的说明文字整列从 `entries` 表里删掉。守卫 `Dev/probe_menu_hover.gd`（整棵菜单树非空 `tooltip_text` 必须为 0，兼查图标/对齐/回调/顺序没被删坏）。子面板（设置/杂项/存档槽）右上「关闭」的 tooltip 不在撤销范围内。
 
 ### 2.3 存档槽（`save_slots.gd` / `meta_progression.gd`）
 - 6 槽 `user://saves/slot_%02d.json`；`user://saves/state.json` 记 last_slot / migrated。
@@ -188,12 +189,12 @@
 - **建筑**：Area2D 碰撞矩形触发（宽 = `building_cells × tile × 0.86`），进入按物理 `E`。⚠ `base.interact_radius_cells=4.5` 在 2D 线**无消费点**（仅 `entity_visual_3d.gd` 用），不据此调 2D 交互范围。
 - **资源点 / 掉落物**：走近 `loot.pickup_radius_px=80` 自动拾取入背包 —— 一人一份背包，所以**由压住它的角色里最近的那个活人**拿走；他的格子满（新种类）则失败并 `pickup_retry_seconds=0.5` 后重试。详见 §5.11。
 - **撤离点**：站入 `extraction.trigger_radius=96` 保持 `session.extraction_hold_seconds=3` → 撤离；离开或点关闭则进度清零。
-- **敌人**：身体接触造成伤害（`enemy.contact_cooldown_seconds=1.0`）。
+- **敌人**：近战出手按**射程**判定，不再靠身体重叠 —— 圆心距 ≤ `enemy.attack.range_px(52)` 就挥砍，前摇 `windup_seconds(0.18)` 走完后结算 `damage`，两次出手间隔 `cooldown_seconds(1.0)`（详见 §5.1）。⚠ 旧写法是 Area2D `body_entered`（触发半径只有 14+16=30px），而分离层把敌人钉在 42px 外 ⇒ 一刀都打不出来，2026-09-19 修。
 - **菜单栏**：整条栏是 `mouse_filter=STOP` 的 Control —— 压在它上面的鼠标事件不会穿到世界（不会误下移动令），按钮/小地图各自接自己的点击。底部边缘滚屏：`camera_controller.edge_pan_active()` 已把常驻菜单栏（group `menu_bar`）从"悬停 UI 即停止滚屏"的规则里**豁免**，所以贴底边的向下滚屏照常可用（只有真正贴到最底 `edge_pan_margin` 才触发方向，栏中部按钮在其之上不会误滚）；仓库/雕像等**模态面板**仍会挡住滚屏。
 
 ### 3.3 设置面板（8 页，表驱动，`settings_panel.gd`）
 - 页签：**画面 / 性能 / 音频 / 玩法 / 资源 / 操作 / 语言 / 调试**。
-- **「资源」页**：上半「地形出现比例」= 四群系面积权重 `map.biome_weights.0~3`（草地/荒原/森林/沼泽，越大越占地方）；下半「地图资源成簇」= `tree/rock/iron/oil` 各自的 `count`（每群系簇数）+ 四群系 `weight`（最小聚合格数兼总量比例）。均下次生成地图生效。
+- **「资源」页**：上半「地形出现比例」= 四群系面积权重 `map.biome_weights.0~3`（越大越占地方）+「最小地块尺寸」`map.biome_min_region_cells`（被别的地形包住、小于此值的小地块并入周围，0=不去）；下半「地图资源成簇」= `total`（全图总簇数）+ 每类型 `share`（占总数比例）/`min_size`/`max_size`（每簇大小随机区间）/`biome_weight`（该类型在各群系的分布）。均下次生成地图生效。
 - **「性能」页（降配提速）**：暴露此前未进面板、但被 2D 代码消费的降配杠杆——`enemy.ai_active_radius_cells`（休眠半径，每帧读取即生效）、`enemy.los_step_cells`（视线采样步长，即生效）、`player.vision_radius_cells`（迷雾揭示半径，下次进局）、`map.decor.shadow`（装饰投影，下次生成地图）；并给 **「性能优先」/「恢复均衡」一键预设**（`_PERF_BUNDLE`：一次性把 `decor.shadow/density`、`macro_light/grade.enabled`、`vision_radius`、`ai_active_radius`、`los_step`、`enemy.count`、`animals.count`、`loot.density`、`max_fps` 写入**用户层**，恢复均衡逐项清除回落出厂）。其余降配项散在「玩法」（资源点密度/敌人中立数量/装饰密度）与「画面」（明暗/调色/帧率上限/垂直同步）。
 - **暂存 + 确认生效**：面板内所有编辑先进内存暂存（`_pending_set`/`_pending_clear`），**点右下「确认应用」才批量落盘 `user://settings.json` 并 `DisplaySettings.apply_all()`**（`display.*`/`audio.*` 即时作用，其余项下次进局 / 生成地图读到）；未确认前不写盘、不生效。每行右上有「默认」把该项暂存回出厂值。
 - **界面形态**：全屏铺满（外层 Margin 留 28px）；每行标签左对齐、控件右对齐（两边对齐）；底部「确认应用」主按钮（无改动时禁用）+「N 处未确认」计数；「返回」若有未确认改动会弹二次确认再丢弃。
@@ -222,6 +223,7 @@
   - 目标选取优先级：`指定目标（仍在射程内）` → `按索敌策略挑`；两者都受「观察视野 ∩ 有效攻击距离」约束（§5.8）。
   - 巡逻路线用 `Line2D` 闭环画在世界里（仅选中时可见）；`_patrol_index` **下令时就自增**，某段被攻击打断不会原地重走同一个点。
 - **右槽 · 噪音显示**（2026-09-18 改）：**第 1 行 `自身`**＝角色自身噪音（每人一份，显示全队最大值，条按 `self.max 300` 归一）+ 档位名/配色；**第 2 行 `世界`**＝世界累计噪音（全局一份，条按 `world.reference 2000` 归一）；标题右上角 `被惊动 N`（警觉度 ≥ `thresholds.investigate` 的敌人数，0.25s 刷新一次）。两路互相喂养（自身喂高世界、世界让自身涨得更快），详见 **§5.2.1**；数据源见 §5.2。
+- **验证**：`Dev/probe_menu_bar.tscn` headless **67 项** / 开窗 **69 项** —— 栏高公式与上下夹取、基地模式隐藏（小地图是独立 CanvasLayer，`visible` 不继承父层，要各自断言）、局内小地图 embed 常驻、左槽正方形与贴底、槽中心 ↔ 地图中心换算（⚠ 期望值按 `map.width` **和** `map.height` 各自算，地图不是正方形）、`world_pos_at()` 反查、点小地图下令。⚠ **「整条栏贴屏幕底边」「栏高不超过屏高 1/3」两条只在真实视口量**：无头视口是退化的 64×64、比栏本身还矮，那种情况探针改验 `UiKit.menu_bar_height()` 比例公式并把原因打进报告（不是静默跳过）。该探针**尚未登记进 `tools/run_regression.py`**，跑法 `python tools/run_probe.py _mb Dev/probe_menu_bar.tscn [--window]`。
 
 
 ---
@@ -266,7 +268,8 @@
 | 键 | 值 |
 |---|---|
 | `enemy.count` | 100（距玩家 ≥20 格生成）|
-| `enemy.max_hp` / `contact_damage` / `contact_cooldown` | 40 / 10 / 1.0s |
+| `enemy.max_hp` / `contact_damage` | 40 / 10（兵种 `damage` 覆盖）|
+| `enemy.attack` | `range_px 52` / `cooldown_seconds 1.0` / `windup_seconds 0.18` / `min_duration_seconds 0.3`；兵种可用 `attack_range_px` 覆盖射程 |
 | `enemy.speed` / `chase_speed_multiplier` | 360 / ×1.35 |
 | `enemy.knockback_px` | 32 |
 | `enemy.vision_cells` / `blocked_by_walls` / `los_step` | 10 / true / 0.35 |
@@ -289,7 +292,7 @@
 | cultist 邪术师 | red/monk | 2 | 55 | 14 | 0.85 | **爆裂鼓手**（放大玩家噪音 + 残血减伤，§5.5）|
 | marauder 掠夺者 | yellow/pawn | 2 | 70 | 16 | 1.0 | **死亡分裂 / 死亡再生**（二选一，随机，§5.5）|
 
-> ⚠ raider 用弓手外观与 attack 帧，但**代码不发弹道**——所有敌人均近战接触伤害（见 §5.5）。
+> ⚠ raider 用弓手外观与 attack 帧，但**代码不发弹道**——所有敌人均近战挥砍（按射程出手，见 §5.1）。
 > 特性的通用写法（2026-09-17 扩成**池**）：兵种配置里的 `traits` 数组，每项 `id` 决定行为、`weight` 决定抽中率；
 > **每个实例在生成时随机分配池里的一个**——一个角色只有一种特性；仍兼容旧的单数 `trait`（当作只有一个候选的池）。
 > 敌人本身只负责「上报死亡 + 我是哪个特性」，策略与刷怪都在 `enemy_system.gd`，加新特性不用动 enemy.gd。
@@ -317,13 +320,13 @@
 
 ### 4.5 地图与资源
 - 地图 128×128，tile 64；`force_seed=20260915`（固定测试）；`noise_freq 0.03 / threshold 0.25`；`biome_freq 0.008`、`border_freq 0.08`、`spread 1.35`、`edge_blend 0.45`。
-- **群系聚合/去飞地**（`map_generator.gd` 后处理）：`biome_smooth_iterations=3`（3×3 多数投票，同类聚团）→ `biome_remove_islands=true` + `biome_min_region_cells=40`（把不接边缘、被别的群系包住且 <40 格的孤立碎块并入周围主导群系；≥40 格的大块保留，避免整片群系被吃掉）。效果：每个群系成几大块、可互相接壤、但无“一个地形包含另一个”。
+- **群系聚合/去小地块**（`map_generator.gd` 后处理）：`biome_smooth_iterations=3`（3×3 多数投票，同类聚团）→ `biome_remove_islands=true` + `biome_min_region_cells`（**绝对最小地块尺寸**：任何小于该值的连通群系地块——含贴地图边缘的——都并入包围它最多的群系；设 N 就没有比 N 小的地块。连锁收敛，最多 64 遍）。⚠ 副作用：某地形权重太低、凑不出 ≥N 的大块时会被整片吞掉（如沼泽 weight 0.2 + min 200 → 沼泽消失），需权衡权重与最小值。
 - 可达性兜底：`cluster_freq 0.05 / threshold 0.5`、`min_reachable_ratio 0.3`、`max_regen_attempts 10`。
 - **群系**（`map.biomes` 存 tileset/speed/floor/tint 等；**面积权重已迁到 `map.biome_weights`**，唯一真相源、设置面板「资源」页可调）：id0 草地 w3.4（`color1`）、id1 荒原 w1.05（`color4`，铁/油主要聚在此）、id2 森林 w1.25（`color3`）、id3 沼泽 w0.95（`color5`，`speed 0.62`，暖色 tint）。占比 ≈ 权重/Σ ≈ 草51%/荒16%/林19%/沼14%。
 - **河流：已彻底删除**。`_place_water` 及全部辅助函数（`_pick_water_start`/`_grow_river`/`_grow_lake`/`_water_ok`/`_enforce_water_sizes`）与 `generate()` 里的调用均已移除，`map.river` 只剩 `slow`（涉水减速系数，供 `speed_mult` 兜底，无水源时不触发）。`DECOR_WATER` 类型与水面渲染仍保留，但已无任何逻辑生成水格 → 地图无水。
 - **裂缝：已删除**（`map.crack.enabled=false`，`generate()` 不再调用裂缝绘制）。
 - 观感：`grade.enabled=false`（对比 1.12/饱和 0.92 待启用）；`macro_light.enabled=true`（freq 0.013 strength 0.1）；`decor.density 1.05`、`clear_spawn 3` 格、`shadow=true`、`decor_collision.enabled=true`；`nav.snap_radius 3 / unstick 4`。
-- **地图资源成簇**（`map.resource_clusters`，替代旧 `map.veins`）：`tree/rock/iron/oil` 四种，每种给 `count`（每个 weight>0 群系放几簇）+ `weight{0草/1荒/2林/3沼}`（**同时是最小聚合格数与该资源在各群系的总量比例**，0=不出）。`_place_clustered_resources` 对每群系放 `count` 个 4 邻相连簇、每簇 `size=weight`，凑不够 size 整簇丢弃。树/石写进 `decor`（`DECOR_TREE/ROCK`，阻挡）；铁/油追加进 `veins`（`{res_id,gx,gy}`，非阻挡、可采集）。默认：树 18×{草3,荒1,林6}、石 12×{草2,荒6,林2}、铁 6×{草1,荒8,林1}、油 5×{草1,荒1,林1}，沼泽均 0 → 实测 树180/石120/矿脉75(铁60+油15)，比例即 weight 比。
+- **地图资源成簇**（`map.resource_clusters`，替代旧 `map.veins`）：`{ total, types }`——`total` = 全图 4 种加起来的总簇数；每类型 `tree/rock/iron/oil` 含 `share`（占总数比例）、`min_size`/`max_size`（每簇大小随机区间）、`biome_weight{0草/1荒/2林/3沼}`（该类型在各群系的分布比例，0=不出）。`_place_clustered_resources` 先按 `share` 把 `total` 分给各类型、再按 `biome_weight` 分到各群系、每簇大小在 `[min,max]` 随机、凑不够整簇丢弃。树/石写进 `decor`（阻挡）；铁/油追加进 `veins`（可采集）。默认：`total=100`，树 share40 min6 max16 {草3荒1林6}、石 share25 min3 max8 {草2荒6林2}、铁 share20 min3 max8 {草1荒8林1}、油 share15 min2 max5 {草1荒1林1}，沼泽均 0。最小值调大即避免"过小的碎簇/被夹的小簇"。
 - **灌木/碎石**：仍按 `map.decor.density` + 群系 `bush/pebble` 概率逐格点缀撒（不参与上面的成簇比例）。**金币不再作为地图矿脉**（仅可能从 loot 拾取/敌人掉落获得）。
 - **资源**（`resources`）：
 
@@ -386,7 +389,7 @@
 ## 5. 机制系统
 
 ### 5.1 仇恨 / 敌人 AI 状态机（`enemy.gd` + `combat/states/enemy_*`）
-- **仅 3 态**：`patrol` / `investigate` / `chase`。**无 idle/attack 状态**——「攻击」＝接触伤害瞬间置 `_attack_timer`（≈0.35s）驱动挥击帧，非 FSM 节点。
+- **仅 3 态**：`patrol` / `investigate` / `chase`。**无 idle/attack 状态**——「攻击」＝`enemy.gd::_tick_attack()` 每物理帧问一次「圆心距 ≤ `attack.range_px(52)`？」，是则 `_start_attack()`：置 `_attack_timer`（挥击帧时长 = 帧数/帧率，无攻击帧的兵种用 `min_duration_seconds(0.3)` 保底并退化成 WALK）+ 进 `cooldown_seconds(1.0)` + 起 `windup_seconds(0.18)` 前摇，前摇走完才 `_deal_attack_damage()`（此时玩家已跑出射程 = 挥空，但动作与冷却**不回收**）。非 FSM 节点。追击态进了射程会**主动停步**（`EnemyChaseState` 里 `clear_move_target()`），否则边走边挥会让动作下一帧就被 walk 覆盖。
 - 转换：`patrol→chase`＝`can_see_player()`；`patrol→investigate`＝`alertness ≥ investigate(30)`；`investigate→chase`＝看见玩家，或 `alertness ≥ combat(70)` 用追击速度「狂暴」；`investigate→patrol`＝`alertness < suspicious(15)` 放弃。⚠ suspicious/combat 不产生独立状态，只作 tint 与速度/放弃下限。config 实际阈值 15/30/70（代码硬编码回退 20/50/100 已被覆盖）。
 - `can_see_player`：距离 `vision_cells(10) × tile(64) ≈ 640px`；墙遮挡沿线段按 `los_step 0.35` 采样墙格；玩家死亡看不见。
 - 跟丢：`chase` 累计看不到 > `lose_sight_seconds(3.0)` → 把最后已知位置当声源，`alertness ≥ 30` 进 investigate 否则回 patrol（不透视实时追）。
@@ -394,7 +397,7 @@
 - **「其他怪只在一个固定的范围内移动」（2026-09-17 用户定，逐字落实）**：默认所有敌人 `ai.roam.mode = home_radius` —— `patrol` 只在本兵种 `ai.roam.patrol_radius_cells(6)` 的**方形**范围里选点（斜角最远 = 6×√2 格 ≈ 543px）。只有**听到噪音**或**挨了打**才会离开这一片。劫掠者是唯一例外（`whole_map`，见 §5.5）。
 - **挨打也会动（2026-09-17，所有敌人通用）**：玩家造成伤害后，三个调用点（近战 `player.resolve_attack_hit`、箭 `combat/projectile.gd`、强弩 `player.fire_hitscan`）各补一句 `alert_from_attacker(攻击者位置)` ⇒ 该敌人 `noise_alertness += noise.sources.hurt(100)` 并把攻击者位置记为声源，下一帧就转 `investigate` 朝攻击者走（近战 = 玩家位置、箭 = **出膛点**，用命中点等于让它原地不动）。刻意**不塞进 `take_damage()` 签名**：那会逼探针里所有假敌人跟着改。`noise.sources.hurt = 0` 可整条关掉。
 - **成群（`ai.pack`，2026-09-17，目前只有劫掠者开）**：同 `type_id` 的敌人靠近到 `join_radius_px(176)` 内即结伙，全群**共享同一个字典** `{leader, members}`（引用语义）。**群主**按 `roam` 模式选目标；**成员**只跟队形（距群主 > `follow_distance_px(48)` 才启程，每 `repath_interval 0.4s` 重算路径）。每群硬上限 `max_members(5)`；个体只投奔**不小于自己**的群（否则小群互相拆伙、群主每秒换人）；群主死亡 → 同群下一个活着的自动接任（`_promote_pack_leader`，在读取处懒惰修复、不埋钩子）。
-- 追击速度 = `speed(360) × speed_mult(兵种) × chase_mult(1.35)`；最快 raider≈559 < 玩家 640，可风筝。接触伤害按兵种 `damage`，成功则 `contact_cooldown 1.0`。
+- 追击速度 = `speed(360) × speed_mult(兵种) × chase_mult(1.35)`；最快 raider≈559 < 玩家 640，可风筝。伤害按兵种 `damage`（默认回落 `enemy.contact_damage`），出手节拍按 `enemy.attack.cooldown_seconds(1.0)` —— **只要挥了就进冷却**，打没打中都一样。
 
 ### 5.2 噪音机制（`noise_system.gd` + `combat/fx_ring.gd`）
 - `emit(pos, intensity)`：① `intensity ≥ ring_min_intensity(35)` 才画环；② 遍历 `enemies` 组，`d > hear_radius(16×tile)` 跳过；③ 距离线性衰减 `att = 1 − d/hear_radius`；④ 隔墙 `att ×= wall_attenuation(0.5)`（独立 LOS 采样）；⑤ `received = intensity × att`，`≥ min_notice(4)` 才 `e.hear_noise()`。
@@ -442,14 +445,16 @@
 
 ### 5.4 掉落机制
 - 敌人死亡（`enemy.gd _spawn_drop`）：`randf > chance(1.0)` 则不掉；按 `drop.weights` 加权选种类，`randi_range(2,6)` 数量，生成**地面 LootNode**（视觉 ×0.8 区别地图资源点），走近 `pickup_radius 80` 才自动进背包 —— 2026-09-19 起背包**一人一份**，所以「进谁的包」有明确规则：**压住这个点的角色里最近的那个活人**（`loot_node.gd::_nearest_living_carrier()`，详见 §5.11）。
+  - **兵种可自带掉落表**：`enemy_types.types[*].drop` 里的任意键（`chance` / `amount_min` / `amount_max` / `weights`）逐键覆盖全局 `enemy.drop`（`_drop_cfg()`）。目前没有任何兵种写这一段 = 行为与之前一致；以后「某种怪必掉某种货」只改 config（2026-09-19 用户定：「先做会掉落物品的机制，具体的后面加」）。
 - 羊死亡：`chance 1.0` 掉 food 1–3（地面 LootNode）。
 - ⚠ **调试期统一拉满（2026-09-17 用户要求「掉落都先改到 1，后面单独调」）**：`enemy.drop.chance` / `animals.drop.chance` 均为 `1.0`，掠夺者 `trait.drop_from_splits` 也为 `true`。⇒ 现在**每只敌人/羊必掉**，掠夺者分裂体也掉（一窝 79 只 × 2–6 个，地面会被铺满，注意性能）。这两个数值后续由用户单独调，改动点都在 `Data/config.json`。
 - 资源点：按 `loot.density(0.05)` 撒于可达地板，每点 `amount_per_node 10`；新种类且**那个人的**背包满则拾取失败、资源点留在原地并 `pickup_retry 0.5` 后重试（下一帧换个还没满的人也可能拿走）。
 - **角色阵亡 = 整包就地撒成一地**：走的正是上面这条 LootNode 路（`player.drop_inventory()`），故队友走近能捡回，见 §5.11。
 
 ### 5.5 怪物特性
-- **全部近战接触伤害**，4 兵种强度递进（§4.3）；无远程、无技能系统（已删）。
-- 受击＝瞬时泛红（`hit_flash 0.18`，tint lerp 红）；死亡＝tween 并行「淡出 + 缩 ×0.7 + 下沉」（`death_fade 0.45`），**无专用帧**。
+- **全部近战挥砍**（按 `enemy.attack.range_px` 出手，见 §5.1），4 兵种强度递进（§4.3）；无远程、无技能系统（已删）。
+- 受击＝瞬时泛红（`hit_flash 0.18`，tint lerp 红）。
+- 死亡＝先结算（上报特性 → 掉落 → 收血条 → 清幻影），再分两条表现路：**有 `dead` 帧的兵种**（素材包里目前只有 ep_troll，10 帧）按 `enemy.death_fps(8)` 逐帧播倒地动画，播完才淡出；**没有死帧的兵种**直接进淡出 —— tween 并行「透明 + 缩 ×0.7 + 下沉 12px」（`death_fade_seconds 0.45`），读完是"倒下"不是"被抠掉"。淡出期间 `_dying=true`：AI、受伤、出手全停。
 - **平衡缺口（真实）**：玩家远程（弓弹道 640px、狙 hitscan 900px 穿透 2）可风筝；但敌人视野 ≈640px ≈ 弓射程，贴边对射窗口窄。全员近战 ⇒ 远程无威胁。若走全员远程需补**远程敌人 / 掩体 / 弹速压制**。
 
 #### 死亡特性（`marauder` 掠夺者专属，2026-09-17 用户定）
@@ -551,7 +556,7 @@
 
 - **血量各自独立**（2026-09-17 从早先的「共享血池」改掉）：分身有自己的一份 = 本体 `max_hp` × 20%，挨打扣自己的、打光就自己消失（`vanish_as_phantom()`），**不**把伤害转嫁给本体。`_phantom_pool` 那张共享 Dictionary 仍在，但只剩**记账 + 血条广播**两个用途。
 - **血条：整组按组内最低血量显示** —— `display_hp_ratio()` = `min(本体 hp, 全部分身 hp) ÷ 本体 max_hp`。分母恒用**本体**的 `max_hp`，而分身天生只有 20% 的血 ⇒ 只要场上有分身，整组血条就固定落在 20% 以下的「残血」区间，**打哪个都是同一条、都像快死了**（这就是本特性迷惑玩家的核心）。组内谁掉血都走 `refresh_group_hp_bar()` 广播全组。**别按 `is_phantom()` 给分身换血条颜色/尺寸**，会一秒破功。
-- **分身无法造成伤害**：分身 `damage = 0`，且 `_on_body_entered` 里接触伤害直接 return（撞上玩家一滴血不掉、也不播挥击动作）。这是用户明确要的效果 —— 玩家发现「这只打我不疼」就知道是假的。
+- **分身无法造成伤害**：分身 `damage = 0`，且 `_tick_attack()` / `_deal_attack_damage()` 里分身直接 return（进了射程也不挥、一滴血不掉）。这是用户明确要的效果 —— 玩家发现「这只打我不疼」就知道是假的。
 - **换位**：本体每跨过一个 `swap_hp_step_ratio` 台阶 → `_swap_with_random_phantom()` 随机挑一具活分身交换 `global_position`，**双方的巡逻中心 `_home` 也跟着挪**（不然本体一步走回老窝就露馅）。台阶用**整数血量**算（`已掉 / (max_hp × 比例)`）—— 24/30 这种比例在二进制里是 0.19999999999999996，用 `hp_ratio()` 会 floor 成 0、白白吞掉一次互换（实测踩过）。没分身可换时台阶照样记账，不攒着事后连闪；一次伤害跨多个台阶也只换一次（同帧连换等于随机打乱）。
 - **血条本体件**：`Scripts/enemy_hp_bar.gd`（项目此前**根本没有敌人血条**，是为这条特性补的通用件，所有敌人共用）+ `enemy.hp_bar` 配置，规则是「满血不画、挨打亮 3 秒」。
 - **分身也泛红**：分身受击时自己也 `_hit_flash`，否则「我打的那只没红、旁边那只红了」当场穿帮。
@@ -606,7 +611,7 @@
 - **触发点 = 消耗失败，不是「背包空」**：开局背包本来就没东西，用「上一次 tick 没扣到」当短缺成立的条件，才留得出第一分钟的宽限。
 - **饥饿掉血保留但封底**：仍每 `starvation_interval_seconds 30` 掉 `starvation_damage 5` 血（`apply_direct_damage(5, floor)` —— 不走硬直/击退/无敌帧），但**只掉短缺那几个人的血**（背包够的人不该替队友挨饿），且血量不低于 `survival.starvation_hp_floor 1`；**最后一滴只能由敌人补刀**（战斗伤害不吃这条下限）。
 - 按 `H` 主动进食仍是**食物专属**，吃的是**目标角色自己包里**的那一份：非满血且他有食物才扣 1 份 `heal(25)`，进 `eat_cooldown 1.0`；满血/无食物/冷却中失败。`eat(who)` 省略 `who` = 当前被指挥的角色。
-- HUD（`hud.gd::_refresh_survival`）逐项列**全队总账**存量与「下次消耗 Ns」，短缺时把人名写进「短缺：枪手、弓兵」（`hungry_names()`）并标红降了哪几条属性 + 「补上即恢复，不会死」；单个人的短缺明细在头顶背包弹窗里（§5.11）。
+- HUD（`hud.gd::_refresh_survival`）生存栏逐项列**全队总账**存量，尾巴固定写「每人各扣一份」提醒口径；短缺时用 `hungry_names()` **点名谁缺**：`【短缺：枪手、弓兵 · <属性扣减> · 补上即恢复，不会死】`；单个人的短缺明细在头顶背包弹窗里（§5.11）。
 - **验证**：`Dev/probe_supplies.tscn` **39 项**（A 配置结构自洽 / B 逐项扣、各吃各的（甲扣不到、乙够） / C 攻击力·移速真的按表下降，未配的射程·视野一动不动，未注入的新角色不受影响，**且掉属性的只有缺的那个** / D 补货后只等帧不等 tick 就还原 / E 饥饿 6 次停在封底且 `is_dead()` 为假、敌人 500 伤害照样打死 / F override 加第二种物资（油）不改代码即生效且扣减相加 / G 进食回血吃自己包里的、满血拒绝）。已登记进 `tools/run_regression.py`。
 
 ### 5.8 战斗判定（`player.gd` + `combat/`）
@@ -616,7 +621,8 @@
 - **有效攻击距离 = min(攻击距离, 观察视野)** —— 强弩表上 900px 超过 10 格视野（640px），实际只打到 640px。
 - 索敌：`_update_auto_target()` 每 `combat.auto_attack.scan_interval_seconds=0.15` 扫一次 `enemies` 组，取「视野内 ∩ 有效攻击距离内」最近的敌人；**够不着的不追击、原地不动**（角色不会自己跑过去）。
 - 起手：**只有 idle 状态**在 `auto_target() != null` 时转 `attack`；**move 状态不索敌**（2026-09-19 改，见下）。起手朝向锁定目标（`aim_at_auto_target()`）；打完回到 idle（若还有移动指令则回 move 继续赶路）。连打节奏由武器时长决定，无额外冷却。
-- **玩家的移动指令优先于自动战斗**（2026-09-19，用户报「点十几下之后控制不了」）：以前 `attack/hitstun/dodge/idle` 进状态一律 `stop_moving()`，等于每次起手都把玩家刚点的那一下抹掉；再加上 move 状态自己也会让位给索敌，结果是"点了地 → 半路开打一停 → 指令没了 → 再点也没反应"。现在拆成两条：`stop_moving()` 只在**玩家主动取消 / 死亡**时调用，被打断改用 `halt_in_place()`（只停脚、留指令）；move 状态不再被索敌抢走，要打断得先有新指令。守卫：`Dev/probe_click_move.tscn`（连点 16 次，逐条判定"未受理 / 原地卡死 / 中途丢指令 / 预算内没走到"）。
+- **玩家的移动指令优先于自动战斗**（2026-09-19，用户报「点十几下之后控制不了」）：以前 `attack/hitstun/dodge/idle` 进状态一律 `stop_moving()`，等于每次起手都把玩家刚点的那一下抹掉；再加上 move 状态自己也会让位给索敌，结果是"点了地 → 半路开打一停 → 指令没了 → 再点也没反应"。现在拆成两条：`stop_moving()` 只在**玩家主动取消 / 死亡**时调用，被打断改用 `halt_in_place()`（只停脚、留指令）；move 状态不再被索敌抢走，要打断得先有新指令。守卫：`Dev/probe_click_move.tscn` **7 项**（A 连点 16 次，逐条判定"未受理 / 原地卡死 / 中途丢指令 / 预算内没走到"；B 陷在实心格里仍要挪得动；C **自动战斗起手不吞指令** —— 进 attack 后移动目标仍在、打完那一刀继续赶往刚才那一点）。
+  - ⚠ 这个探针在无头下出过**四个假警**，全是探针自身的问题而非游戏（排查时差点去动 `follow_path()`，幸而先量了轨迹）：① dummy 驱动给视口 **64×64**，合成点击的屏幕坐标被夹回视口里 → 落点全在角色脚下，`_ready()` 里要先 `get_tree().root.size = Vector2i(1280, 720)` **再**实例化 Main；② teleport 相机后 `get_canvas_transform()` 还是**上一帧冻结值**（平滑跟随），世界→屏幕→世界来回换算能差几百 px，得 `reset_smoothing()` 并等到变换稳定（`_sync_cam()`）；③ 无头的 `_process` 远快于 60Hz 物理 tick，**移动预算必须按 `physics_frame` 数**，且要按角色当下缓存的 A\* 折线长度算（直线距离会严重低估绕路的局）；④ 落点投影到底部菜单栏会被栏吃掉（§3.2），候选格要先过 `_on_map()` 过滤。⇒ 通用口径：**回归探针里凡是"点击 / 时间预算 / 屏幕坐标"三类的断言，都要按无头视口退化 + 物理帧 ≠ 处理帧这两条来写**。
 - 小队**全员**自动战斗（不只被选中的那个）；只锁 `enemies` 组，中立生物（羊）不会自动开火。
 - 目标死亡 / 被回收 / 跑出有效射程 → 立刻重扫换目标（只判 `is_dead` 会导致"对空气空挥"，已按距离复核）。
 - 开关：`combat.auto_attack.enabled`（设置面板「玩法」页，默认开）。关掉后完全不开火。
@@ -628,7 +634,7 @@
 - `player.target_stance`：`nearest` / `strongest`；strongest 威胁评分 = `max_hp + damage × 0.5`。
 - `designated_target`：菜单栏「指定攻击」点选（`designate_pick_radius_px 96` 内取最近敌人）；目标死亡/回收/出射程即自动回落策略索敌。
 - 巡逻：`_patrol_points` 环形路线，`_patrol_active` 时朝 `_patrol_index` 的下一点走；到点＝移动目标被清空（`has_move_target()` 转 false，由移动状态自己判到达），停 `patrol_wait_seconds 0.6` 再取下一个。`_patrol_index` **下令时就自增**，被打断不会原地重走同一点。路线用 `Line2D` 闭环画世界（仅选中可见），`cancel_commands()` 清点停走。
-- 输入：左键 = `command_click(世界坐标)`（待点选时＝点敌/点地，否则＝移动/路由到小地图）；右键 = `cancel_commands()`；ESC = 仅退出待点选模式（**不再吞整局 ESC**）。
+- 输入：左键 = `command_click(世界坐标)`（待点选时＝点敌/点地，否则＝移动/路由到小地图）；右键**没命中角色**时 = `cancel_commands()`（点在角色身上那一下被背包弹窗先吃掉，§5.11）；ESC = 仅退出待点选模式（**不再吞整局 ESC**；弹窗开着时那一下归弹窗）。
 
 **三种分型的判定**
 - **melee**（`player_attack_state` + `resolve_attack_hit`）：WINDUP→ACTIVE→RECOVERY；ACTIVE 每帧取 Hitbox `get_overlapping_areas()`，`arc 200°`(半角 100° 过滤)、`max_targets 3` 去重、`range 120`=Hitbox 半径；伤害经 `DamagePipeline.compute`（当前无暴击/减伤/浮动≈原值）。
@@ -703,8 +709,13 @@
 - **RunManager 不再自己记账**（`run_manager.gd`）：只留三样 —— `total_loot()` 全队总账（HUD「背包」栏与撤离入库都读它）、`carrier()` 第一名存活角色、`backpack_capacity()`。`add_loot()` 保留但语义是**把东西交给第一名存活角色**（给 `main.gd` 自检与 `--walk-test` 那类"凭空塞东西"的调试路径用），不是"放进公共池"；场上没活人时才挂进 `_unassigned_loot`（正常局内恒空，别拿它当第二本背包）。
 - **拾取归属 = 范围内最近的那个活人**（`loot_node.gd::_nearest_living_carrier()`）：资源点 Area2D 半径 = `loot.pickup_radius_px 80`，`_physics_process` 在**压住它的角色**里挑离得最近的那个，由**他** `add_item()`。为什么要挑：小队 2~4 人挤一起时 `get_overlapping_bodies()` 一次给好几个，按节点顺序发会变成"先出生的那个永远通吃"。拒收（格子满）→ 资源点留在原地、`loot.pickup_retry_seconds 0.5` 后自动重试；本局已结算则不再进包。
 - **消耗与短缺按人算**：见 §5.7 —— 到点逐个角色从**他自己那份**扣 `per_meal`，扣不到只记在他名下、只掉他自己的属性。
-- **阵亡 = 整包就地撒成一地**（`player.drop_inventory()`，由 `on_death()` 调）：每种资源变成一个 `LootNode`（视觉 ×0.8 与敌人掉落同路），绕尸体均匀撒开一圈 —— 半径 `loot.drop_spread_px`（代码默认 22px），十来种叠在同一像素会糊成一坨、也分不清掉了什么。**不随人消失、也不凭空回仓库：想留东西就得有人活着把它捡回来。** 只有阵亡走这条路 —— 撤离按 `total_loot()` 入库、超时本来就全丢（探针 I 段守的就是这三条不串门）。
-- **右键角色 → 头顶弹窗**（`inventory_popup.gd`，由 HUD 创建、挂在 HUD 这个 CanvasLayer 下，group `inventory_popup`）：
+- **阵亡 = 整包就地撒成一地**（`player.drop_inventory()`，由 `on_death()` 调）：每种资源变成一个 `LootNode`（视觉 ×0.8 与敌人掉落同路），绕**倒下的那个坐标**均匀撒开一圈 —— 半径 `loot.drop_spread_px`（代码默认 22px），十来种叠在同一像素会糊成一坨、也分不清掉了什么。**掉落物是挂在世界节点下的，不会跟着人一起消失（人自己怎么消失见下一条）；也不凭空回仓库：想留东西就得有人活着把它捡回来。** 只有阵亡走这条路 —— 撤离按 `total_loot()` 入库、超时本来就全丢（探针 I 段守的就是这三条不串门）。
+- **人从场上消失，货留在原地**（用户 2026-09-19 定：「我就要他消失啊」）：`player.on_death()` 在 `drop_inventory()` 之后调 `start_death_fade()` —— tween `modulate:a → 0`（时长 `combat.player.death_fade_seconds`，代码默认 0.45，与敌人 `enemy.death_fade_seconds` 同口径），`chain().tween_callback(queue_free)` 把节点移出场景；`_fade_started` 保证只排程一次（重复进 dead 态不会起第二条 tween），配置 ≤0 就是当帧直接移除。淡出那零点几秒只服务一件事：让人看清**谁**倒了；之后场上不再立着尸体，掉在地上的货还在原坐标。
+  - ⚠ `combat.player.death_fade_seconds` **目前只有代码默认值**，`Data/config.json` 还没这一项（那文件另有会话在改），跑起来按 missing-key 刷一条警告。
+  - 为什么"直接 free 掉"是安全的：缓存角色引用的地方**全部带 `is_instance_valid` 守卫**（背包弹窗 `inventory_popup._process()` 靠 `_alive(unit)` 自己收起、`menu_bar._inspected_player()`、`selection_controller` / `camera_controller` / `survival_system` / `hud`、`enemy.gd` 的锁定目标），探针 A 段专门把"人没了之后弹窗自己收"钉成断言。
+  - 旧结论留个底，免得下次再查一遍：**改之前**本局内确实没有任何代码会 free 或 hide 阵亡角色（`player_dead_state.gd` 只做 `stop_moving()` + `on_death()`，之后每帧零速度 `move_and_slide()`；当时唯一释放点是 `main.gd::_clear_game_root()`，只在切基地/切局时跑）—— 所以缺的正是这条移除逻辑，不是渲染问题。`player_animator.gd` 的 `Anim.DEAD` 因此保持原样（倾 0.4 弧度 + 下沉 2.5 像素单位 + 灰 `Color(0.55,0.55,0.55)`），反正只在淡出的那零点几秒里看得见。
+- **消失的唯一时机就是阵亡淡出**：回基地 / 再次出击那条 `_clear_game_root()` 照旧连整个世界一起清。跨局没有任何遗留物（本机钉了 `map.force_seed`，下一局是同一张图，但当前设计没有墓碑/遗迹这一层 —— 要做是另一个决定）。
+- **右键角色 → 头顶弹窗**（`inventory_popup.gd`；`hud.gd::_ready()` 建出名为 `InventoryPopup` 的子节点，与 HUD 同一个 CanvasLayer ⇒ 基地模式跟着隐藏；group `inventory_popup`）：
   - **只读**面板 —— 只解决「看清楚谁身上有什么、他缺什么」；没有丢弃/转移按钮，搬运只有上面那两条路（走进范围 / 阵亡撒地）。
   - **触发点在弹窗自己的 `_input()`**，不是 player 的 `SelectArea.input_event`：右键那一下本来归 `player._unhandled_input` 的「右键 = 取消指令」管，两条规则会抢同一次点击；`Node._input` 跑在所有 `_unhandled_input` 之前，命中就 `set_input_as_handled()`，外面的规则根本看不到这一下。附带好处：无头探针没法伪造 Area2D 拾取，却可以直接调 `right_click_at(screen)`。面板内部点击也吃掉，不外泄成移动令；ESC 这次只收弹窗。
   - 命中判定用 `player.select_radius_px`，**先把屏幕点换算到世界再比** → 缩放/平移自动跟手。`right_click_at()` 的四种落点：点**另一个**角色＝换人、点**同一个**人＝开关切换、点**空白**＝收起（⚠ 这一下同样被吃掉，不会顺手触发"右键 = 取消指令"）、没弹窗时点空白＝返回 false 走老规矩。
@@ -714,6 +725,7 @@
 - **菜单栏同步**（`menu_bar.gd::_inspected_player()`）：弹窗开着 → 明细行显示**弹窗那个人**、行首写成 `背包（剑士）`；没开 → 显示正被指挥的那个。⚠ **只影响这一行**：上面的单位信息与下面的指令按钮始终归被指挥的角色，否则就成了"按钮打在甲身上、明细显示乙"两处状态各说各话。`bag_line_text()` 是探针断言同步的读点。
 - **HUD 左下角背包栏**（`hud.gd`）：`背包 全队 N 种：<总账明细>` + 各人占几格 `剑士 3/10格`，数字全来自 `total_loot()` 与各自的 `inventory.size()`。
 - **验证**：`Dev/probe_inventory.tscn` headless **103 项** / 开窗 **107 项**（A 每人一份互不干扰 / B 格子按人算（满格只满自己）/ C 同一轮消耗甲扣不到、乙扣到 → 只有乙掉属性 / D 乙补上货当帧还原、甲照旧 / E 拾取归属给范围内最近那个人、够不到的人一分不得、满包拒收后腾格子自动重试 / F 右键 → 头顶弹窗（含点空白与 ESC 收起、换人、位置钉在头顶）/ G 底部菜单栏与弹窗显示同一个人 / H 阵亡当场撒成一地且能被队友捡回 / I 死亡与超时局不入库、只有撤离入库）。已登记进 `tools/run_regression.py`（`_r_inventory.log`）。UI 部分另按 §5.10 末「视觉改动必须开窗实拍 + 放大看」的口径复查：`panel_rect()`（= `_panel.get_global_rect()`）量位置，开窗截图看排版 —— 断言全绿也可能画面是歪的。
+- **验证（阵亡消失）**：`Dev/probe_dead_body.tscn` headless **16 项**（A 队友在场时甲阵亡：淡出先发生（`modulate:a` 真的往下走）→ 60 个物理帧内节点移出场景树、甲那一包 3 种货仍在**死亡的坐标**上、开着的背包弹窗自己收起、场上只剩乙、本局继续 / B 最后一名（弓兵，另一套精灵集）也倒下：同样消失、他的货同样落在原地、run 照常结算、Main 不被牵连 / C 按 R 回基地：世界清空）。已登记进 `tools/run_regression.py`（`_r_deadbody.log`）。数值全绿不等于画面对：配套两个**开窗实拍**脚本，看的是"人真的没了、货还在"——`Dev/shot_dead_body.tscn`（两人拉开站位 → 死后 1s / 镜头跟活人 / 拉回死亡点 / 20s 各一张）与 `Dev/shot_dead_combat.tscn`（**真刷怪单人出击被打死**，死后每 2 秒连拍）—— 出图目录同 §5.10 口径，不进回归套件。
 
 ### 5.9 已定义未接线 / 失效清单（当前真实状态）
 | 对象 | 状态 | 说明 |
@@ -730,7 +742,9 @@
 ## 6. 音频系统
 
 ### 6.1 现状（真实）
-- **零音频素材 + 零播放逻辑**：`Assets/Audio/` 仅 `.gitkeep`；全项目无 `.ogg/.mp3/.opus`，无 `AudioStreamPlayer` / `.play()` / 音频加载代码。
+- **素材仍为零**：`Assets/Audio/` 仅 `.gitkeep`，全项目无 `.ogg/.mp3/.opus`；但**已有播放逻辑** —— `weather_system.gd` 用 `_pack_wav()` 运行时合成三段采样（雨底 / 踩水 / 干脚步）直接播，不依赖任何磁盘音频资源。
+  - 雨底：`AudioStreamPlayer`（`RainLoop`，SFX 总线）；脚步：两组 `AudioStreamPlayer2D` 池（各 `weather.step.players` 个，轮转取空闲）。
+  - **一次性采样不许循环**（2026-09-19 用户报「踩水的音效会一直在」）：`_pack_wav(buf, rate, loop=false)` 默认 `LOOP_DISABLED`，只有做过首尾交叉淡化的背景音（雨底）才传 `loop=true`。旧代码给所有采样统一钉 `LOOP_FORWARD`，0.18 秒的踩水音于是播完从头再来 —— 听着就是"响个不停"。守卫见 `Dev/probe_step_audio.gd`（A 段循环标志 + 长度、B 段开窗真播会自己停、C 段调用点只许 `PlayerMoveState`）。
 - 仅有 `Assets/Audio` 之外的游离草稿 `_mv/{f,g,h,n}.wav` + 抽帧图（Godot 已导入为 `AudioStreamWAV` 但**无任何引用**，属 MV 草稿，非游戏资源）。
 - **总线脚手架已就位**：`display_settings.gd _ensure_bus()` 在应用音量时按需 `AudioServer.add_bus()` 动态创建 `Music`/`SFX`（send→Master）；`project.godot` 无 `default_bus_layout`，config `audio` 段注释明确「暂无资源、总线按需创建」。
 

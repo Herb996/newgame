@@ -33,8 +33,20 @@ SUITES = [
     ("Dev/probe_supplies.tscn", "_r_supplies.log", ("[probe_supplies]",)),
     ("Dev/probe_inventory.tscn", "_r_inventory.log", ("[probe_inventory]",)),
     ("Dev/probe_click_move.tscn", "_r_clickmove.log", ("[probe_click_move]",)),
+    ("Dev/probe_dead_body.tscn", "_r_deadbody.log", ("[probe_dead_body]",)),
+    ("Dev/probe_hit_feedback.tscn", "_r_hitfb.log", ("[HitFbProbe]",)),
+    ("Dev/probe_collision_separation.tscn", "_r_sep.log", ("[SepProbe]",)),
+    ("Dev/probe_move_giveup.tscn", "_r_giveup.log", ("[GiveupProbe]",)),
     ("Dev/probe_second_launch.tscn", "_r_launch2.log", ("[probe_second_launch]",)),
     ("Dev/probe_water_step.tscn", "_r_water.log", ("[WaterProbe]", "[Weather]")),
+    # 2026-09-19 两条新规的守卫：主菜单悬停不许有介绍、脚步采样不许循环。
+    # probe_step_audio 的 B 段（真播会自己停）要 --window，无头里会自己跳过并写明，
+    # 不会假绿；A/C 段（循环标志 + 调用点）无头就能量。
+    ("Dev/probe_menu_hover.tscn", "_r_menuhover.log", ("[probe_menu_hover]",)),
+    ("Dev/probe_step_audio.tscn", "_r_stepaudio.log", ("[probe_step_audio]",)),
+    # 2026-09-19「敌人不会攻击」那条 bug 的守卫：出手改成按射程判定，探针实算
+    # 「射程 > 分离层最小间距」这条几何不等式，另盯冷却/前摇/挥空/挡下仍出手/掉落/死亡画面。
+    ("Dev/probe_enemy_attack.tscn", "_r_enemylk.log", ("[EnemyAttackProbe]",)),
 ]
 
 BAD_MARKS = ("SCRIPT ERROR", "Parse Error", "Invalid call", "Invalid access",

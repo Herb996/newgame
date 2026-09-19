@@ -3,7 +3,7 @@ extends Area2D
 ## Enemy — 敌人单位（功能组件层 + 巡逻/追击 AI）
 ##
 ## 分层（与 player.gd 同构）：
-##   · 本文件 = 功能组件层：导航、寻路、感知、移动、受击、接触伤害
+##   · 本文件 = 功能组件层：导航、寻路、感知、移动、受击、近战出手
 ##   · Scripts/combat/states/enemy_*.gd = 行为决策层（FSM）：决定巡逻还是追击
 ##
 ## AI（2026-09-14 用户定：巡逻 + 追击）：
@@ -16,9 +16,29 @@ extends Area2D
 ##   can_see_player() = 距离判定 + 视线射线（沿线段按 los_step_cells 采样墙体格）。
 ##   隔墙看不见；跟丢后不再追玩家实时位置，只走向最后已知位置（last known position）。
 ##
+## 近战出手（2026-09-19 用户定：「敌人应该要有攻击距离这个属性，进入攻击距离就开始攻击」）：
+##   中心距 ≤ attack_range_px() 就出手：立刻播攻击动作 + 进冷却，前摇 windup_seconds 之后
+##   才结算伤害（玩家跑出射程就是挥空，但动作和冷却不回收）。见 _tick_attack()。
+##   **出手与"掉没掉血"是两件事**：早先整段写在 `if player.take_damage(...)` 里面，于是
+##   玩家闪避无敌帧 / 防御叠满挡下时，敌人既不播动作也不进冷却，看着就是"贴着我一动不动"。
+##   事故记录：再早接触伤害靠 Area2D 的 body_entered（敌人半径 14 + 玩家 16 = 30px 内才触发），
+##   而分离层（combat.separation）把敌人钉在 enemies 22 + player 20 = 42px 外 —— 两个半径
+##   没对上，全图敌人一刀都打不出来，且探针（直调 take_damage）全绿。
+##   这条几何关系由 Dev/probe_enemy_attack.gd 按 config 实算把住，改半径会立刻红。
+##
 ## 掉落（2026-09-15 用户定：击杀掉落）：
 ##   死亡时按 enemy.drop.chance 概率在原地生成一个 LootNode（复用资源点场景），
 ##   种类按 enemy.drop.weights 加权随机，数量在 amount_min~amount_max 之间。
+##   兵种可在自己的 drop 段里逐键覆盖全局表（_drop_cfg()）—— 用户 2026-09-19 说
+##   「先做会掉落物品的机制，具体的后面加」，那个"具体的"就是往 type_cfg.drop 里写表。
+##
+## 死亡画面（2026-09-19 复查，用户预期「要有死亡画面」）：
+##   _die() 先结算（上报特性 / 掉落 / 收血条 / 清幻影），再走两条表现分支：
+##     · 兵种有 dead 帧 → _tick_death() 按 enemy.death_fps 一帧帧贴死亡帧，播完才淡出
+##       （素材包里目前**只有 ep_troll 有 dead 帧**，其余兵种没有 = 直接进淡出）；
+##     · 淡出 _fade_out() = 透明 + 缩小 + 下沉三件事同时做（读起来是"倒下"不是"被抠掉"），
+##       时长 enemy.death_fade_seconds，播完 queue_free。
+##   全程 _dying=true：AI 停摆、不再受伤、也不再出手（尸体不能打人）。
 ##
 ## 死亡特性（2026-09-17 用户定，目前只有掠夺者带）：
 ##   config 里兵种可以写 traits[]（特性池）或旧式 trait（单个）。**每个实例在生成时
@@ -51,7 +71,7 @@ extends Area2D
 ##       min(本体 hp, 全部分身 hp) ÷ 本体 max_hp；组内谁掉血都 refresh_group_hp_bar() 广播全组。
 ##       分身天生只有本体 20% 的血 ⇒ 场上有分身时整组血条一直是「残血」的样子，
 ##       打哪个都是同一条、都像快死了（这就是"迷惑玩家"的核心）。
-##     · 分身 `damage = 0` 且 _on_body_entered 里的接触伤害直接返回 ⇒ 打玩家不掉血。
+##     · 分身 `damage = 0` 且 _tick_attack() / _deal_attack_damage() 里分身直接返回 ⇒ 打玩家不掉血。
 ##     · 本体每跨过一个 swap_hp_step_ratio(20%) 台阶 → _swap_with_random_phantom()
 ##       随机挑一个活着的分身**交换坐标**（本体/分身各自的巡逻中心也跟着挪，
 ##       否则本体一步走回原地就露馅了）。
@@ -101,12 +121,19 @@ const GROUP_NOISE_AMPLIFIERS := "noise_amplifiers"
 
 var hp := 0
 var max_hp := 0
-var damage := 10                   # 接触伤害（由类型覆盖）
+var damage := 10                   # 单发伤害（由类型覆盖）
 var speed_mult := 1.0              # 相对 enemy.speed 的速度倍率
 var type_id := &""                 # 类型 id（调试/统计用）
 var type_name := ""                # 类型中文名（HUD/调试用）
-var _contact_cooldown := 0.0
 var _last_known := Vector2.ZERO   # 玩家最后被看到的位置（跟丢后走这里）
+
+# --- 近战出手（数值在 _apply_type 里从 enemy.attack 读进来，热路径不反复查 config）---
+var _attack_cooldown := 0.0        # 两次出手之间的间隔剩余秒
+var _attack_range := 52.0          # 出手距离 px；必须 > 分离层把敌人顶住的那圈（见文件头）
+var _attack_cd_seconds := 1.0
+var _attack_windup := 0.18         # 前摇：出手后多久结算伤害
+var _attack_min_dur := 0.3         # 攻击动作保底时长（无攻击帧的兵种也用得上）
+var _attack_hit_at := 0.0          # >0 = 这一刀已出手还在前摇，归零时结算（挥空也要走完）
 
 # --- 表现层 ---
 var _body: Sprite2D = null
@@ -114,10 +141,16 @@ var _animator: PlayerAnimator = null
 var _hp_bar: Node = null           # 头顶血条（enemy_hp_bar.gd）；受伤才显示
 var _anim_state := PlayerAnimator.Anim.IDLE
 var _attack_timer := 0.0           # >0 表示正在播攻击动作，播完回 idle/walk
+var _attack_frames := 0            # 该兵种 attack 帧数（用于按帧率算挥砍时长）
+var _attack_fps := 14.0            # 攻击帧率（与 PlayerAnimator.DEFAULT_FPS.attack 一致）
 var _hit_flash := 0.0              # 受击泛红剩余秒数（白闪→红 两段的驱动）
 var _hit_tween: Tween = null       # 受击 squash/击退回弹动画（命中瞬间重开，连击不打结）
 var _hit_stun := 0.0               # 受击微停顿(hitlag)剩余秒，>0 时 AI 让位（敌人"被打愣"）
 var _dying := false                # 已进入死亡淡出，不再参与 AI/受伤
+var _fading := false               # _fade_out 已执行，防死亡动画结束后再调一次
+var _death_frames: Array = []      # 死亡动画帧（Texture2D）；空 = 不播死亡帧，用旧淡出
+var _death_elapsed := 0.0          # 死亡动画已播放秒数
+var _death_fps := 8.0              # 死亡动画帧率
 
 # --- 死亡特性（判定与派发在 enemy_system.gd）---
 var _type_cfg: Dictionary = {}     # 本实例的兵种配置（特性池在它的 traits[] 里）
@@ -172,18 +205,22 @@ func _ready() -> void:
 	# 兜底：类型由 setup() 注入，但 _ready 早于 setup，先用全局默认值起手
 	max_hp = int(Config.get_value("enemy.max_hp", 40))
 	hp = max_hp
-	body_entered.connect(_on_body_entered)
 	_home = global_position
 	_init_state_machine()
 
 
 func _physics_process(delta: float) -> void:
 	if _dying:
-		return                       # 死亡淡出中：不再跑 AI、不再受伤
-	if _contact_cooldown > 0.0:
-		_contact_cooldown -= delta
+		_tick_death(delta)           # 死亡动画推进（播完才淡出）；不跑 AI、不再受伤
+		return
+	if _attack_cooldown > 0.0:
+		_attack_cooldown -= delta
 	if _attack_timer > 0.0:
 		_attack_timer -= delta
+	if _attack_hit_at > 0.0:
+		_attack_hit_at -= delta
+		if _attack_hit_at <= 0.0:
+			_deal_attack_damage()      # 前摇走完：这一刀落地（或挥空）
 	if _hit_flash > 0.0:
 		_hit_flash -= delta
 	# 幻影分身：本体活着就每隔 resummon_interval_seconds 再补召 1~2 具。
@@ -205,6 +242,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		_tick_pack(delta)          # 成群：找同类结伙 + 成员跟上群主（只有带 pack 的兵种有开销）
 		state_machine.physics_update(delta)
+		_tick_attack(delta)        # 近战出手：进了射程就挥（见文件头「近战出手」）
 	_update_anim(delta)
 	# 染色必须在动画器之后：动画器每帧会写 modulate，放前面会被覆盖掉
 	_update_alert_visual()
@@ -270,7 +308,7 @@ func _setup_phantom(pool: Dictionary) -> void:
 	_is_phantom = not pool.is_empty()
 	if _is_phantom:
 		_phantom_pool = pool
-		damage = 0                  # 分身无法造成伤害（_on_body_entered 里还会再拦一道）
+		damage = 0                  # 分身无法造成伤害（_tick_attack 里还会再拦一道）
 		var members = _phantom_pool.get("members", null)
 		if members is Array:
 			members.append(self)
@@ -507,6 +545,13 @@ func _apply_type(type_cfg: Dictionary) -> void:
 		damage = int(type_cfg.get("damage", Config.get_value("enemy.contact_damage", 10)))
 		speed_mult = float(type_cfg.get("speed_mult", 1.0))
 	hp = max_hp
+	# 近战出手参数。放在 `if _body == null: return` 之前：没有 Body 的假敌人/无头探针
+	# 照样要有射程与冷却，否则它们永远不打人，探针也就测不出东西。
+	var atk: Dictionary = Config.get_value("enemy.attack", {})
+	_attack_range = float(type_cfg.get("attack_range_px", atk.get("range_px", 52.0)))
+	_attack_cd_seconds = float(atk.get("cooldown_seconds", 1.0))
+	_attack_windup = float(atk.get("windup_seconds", 0.18))
+	_attack_min_dur = float(atk.get("min_duration_seconds", 0.3))
 
 	if _body == null:
 		return
@@ -525,10 +570,27 @@ func _apply_type(type_cfg: Dictionary) -> void:
 	}
 	# 用 PlayerAnimator.Anim 的名字约定做键：idle / walk / attack
 	var spec := {}
-	for key in ["idle", "walk", "attack"]:
+	for key in ["idle", "walk", "attack", "dead"]:
 		if type_cfg.has(key):
 			spec[key] = type_cfg[key]
 	spec["fps"] = type_cfg.get("fps", {})
+	# 攻击帧数 + 帧率：用于按真实帧数算挥砍时长，让整套挥砍完整播完
+	# （否则固定 0.35s 只播约 5 帧，挥砍刚起手就停）。无 attack 帧的冲撞型兵种 = 0。
+	_attack_frames = 0
+	if type_cfg.has("attack"):
+		_attack_frames = int(type_cfg["attack"].size())
+	var _fps_d: Dictionary = type_cfg.get("fps", {})
+	_attack_fps = float(_fps_d.get("attack", 14.0))
+	# 死亡动画帧单独存一份，死亡时由 _tick_death 手动推进（不依赖动画器的
+	# "帧数 > 1 才算动画"判断：单帧死亡帧也能正确显示，且不会回退到 idle 帧）。
+	_death_frames = []
+	_death_fps = float(type_cfg.get("dead_fps", Config.get_value("enemy.death_fps", 8.0)))
+	if type_cfg.has("dead"):
+		for p in type_cfg["dead"]:
+			if ResourceLoader.exists(p):
+				var tex = load(p)
+				if tex != null:
+					_death_frames.append(tex)
 	_animator = PlayerAnimator.new(_body)
 	_animator.load_from_config(spec, view_cfg, "")   # 空 label = 不打印（100 个会刷屏）
 
@@ -653,13 +715,14 @@ func repath_to_noise_source() -> void:
 
 
 ## 表现层每帧推进：把 FSM/移动状态翻译成动画状态。
-## ATTACK 优先级最高（接触伤害时短暂播放），其次是"有路径在走"→ walk，否则 idle。
+## ATTACK 优先级最高（近战出手时播放一段时间），其次是"有路径在走"→ walk，否则 idle。
 func _update_anim(delta: float) -> void:
 	if _animator == null:
 		return
 	var st := PlayerAnimator.Anim.IDLE
 	if _attack_timer > 0.0:
-		st = PlayerAnimator.Anim.ATTACK
+		# 没有攻击帧的冲撞型兵种（洞穴兽/野猪）用 walk 表现"攻击"，避免静止不动
+		st = PlayerAnimator.Anim.ATTACK if _attack_frames > 0 else PlayerAnimator.Anim.WALK
 	elif _has_target and not _path.is_empty():
 		st = PlayerAnimator.Anim.WALK
 	_anim_state = st
@@ -667,21 +730,14 @@ func _update_anim(delta: float) -> void:
 	_animator.update(delta, st, Vector2(0.0, 1.0))
 
 
-## 警觉视觉反馈：本体染色（红=巡逻常态，黄=疑惑，橙=调查，亮红=看见玩家）
-## 官方包没有受击帧，受击反馈只能靠"瞬间泛红"叠加在这套警觉色之上。
+## 受击视觉反馈：白闪 → 泛红回落（官方包没有受击帧，只能靠 modulate 闪一下）。
+## **不再做警觉染色**（2026-09-19 用户反馈：Enemy Pack 彩色素材被警觉红整只盖成红色，
+## 素材原色全无）——敌人看见玩家这件事靠行为本身（转身追击）传达，不再染身体。
 ## 调用时机必须在 _update_anim 之后 —— 动画器每帧都会写 modulate。
 func _update_alert_visual() -> void:
 	if _body == null or _dying:
 		return                        # 死亡淡出由 tween 独占 modulate
-	var susp := float(Config.get_value("noise.thresholds.suspicious", 20.0))
-	var inv := float(Config.get_value("noise.thresholds.investigate", 50.0))
-	var tint := Color(1.0, 1.0, 1.0)
-	if can_see_player():
-		tint = Color(1.0, 0.35, 0.2)
-	elif noise_alertness >= inv:
-		tint = Color(1.0, 0.7, 0.2)    # 调查：橙
-	elif noise_alertness >= susp:
-		tint = Color(1.0, 0.9, 0.4)    # 疑惑：浅黄
+	var tint := Color(1.0, 1.0, 1.0)  # 常态 = 原色，不染
 	if _hit_flash > 0.0:
 		var full := maxf(float(Config.get_value("enemy.hit_flash_seconds", 0.22)), 0.01)
 		var r := clampf(_hit_flash / full, 0.0, 1.0)   # 1=刚命中 → 0=结束
@@ -1264,7 +1320,7 @@ func _sub_feat(key: String) -> Dictionary:
 
 
 ## 死亡结算：上报死亡分裂 → 按概率掉落资源 → 淡出 → 移除自身。
-## 不再"瞬间消失"：淡出期间 _dying=true，AI、受伤、接触伤害全部停摆，
+## 不再"瞬间消失"：淡出期间 _dying=true，AI、受伤、近战出手全部停摆，
 ## 敌人不会在倒下动画里还能打人，也不会被重复结算掉落。
 func _die() -> void:
 	if _dying:
@@ -1275,7 +1331,15 @@ func _die() -> void:
 	_spawn_drop()
 	_hide_hp_bar()
 	_vanish_phantoms()       # 本体倒下 → 幻影一并消失（分身自己不会单独死）
-	_fade_out()
+	# 有死亡动画帧 → 先播死亡帧，播完再淡出；否则直接淡出（旧行为）。
+	# 这里**不** set_physics_process(false)：死亡动画靠 _physics_process 里的
+	# _tick_death 推进，淡出内部才会关物理。
+	if _death_frames.is_empty():
+		_fade_out()
+	else:
+		_death_elapsed = 0.0
+		if _body != null:
+			_body.modulate = Color.WHITE    # 死亡帧以原色显示，不被警觉染色盖住
 
 
 ## 死亡特性上报：把「我死了 + 我是哪个特性」交回 EnemySystem，由它决定刷不刷、刷几个。
@@ -1365,10 +1429,30 @@ func is_trait_spawn() -> bool:
 	return is_split_spawn()
 
 
+## 死亡动画推进：手动把 _death_frames 一张张贴到 _body（不依赖动画器），
+## 按 _death_fps 走，播完最后一帧即触发 _fade_out()。无头/无 Body 时直接淡出。
+func _tick_death(delta: float) -> void:
+	var n := _death_frames.size()
+	if n == 0:
+		_fade_out()
+		return
+	_death_elapsed += delta
+	var idx := mini(int(_death_elapsed * _death_fps), n - 1)
+	if _body != null:
+		var tex = _death_frames[idx]
+		if tex != null and _body.texture != tex:
+			_body.texture = tex
+	var dur := float(n) / _death_fps
+	if _death_elapsed >= dur:
+		_fade_out()
+
+
 ## 死亡淡出：同时做 透明 / 缩小 / 下沉，读起来像"倒下了"而不是"被抠掉"。
 ## 时长取 0，或没有 Body 节点时，直接释放（无头跑测试更干净）。
 func _fade_out() -> void:
 	var dur := float(Config.get_value("enemy.death_fade_seconds", 0.45))
+	if _fading:
+		return
 	if _body == null or dur <= 0.0:
 		queue_free()
 		return
@@ -1380,6 +1464,18 @@ func _fade_out() -> void:
 	tween.chain().tween_callback(queue_free)
 
 
+## 掉落配置 = 全局 enemy.drop 打底，兵种自己的 drop 段按键覆盖。
+## 现在还没有兵种写 drop 段（行为与之前完全一致），但"某种怪必掉某种货"这种具体掉落表
+## 以后只改 config 就够了，不用回来改代码。
+func _drop_cfg() -> Dictionary:
+	var out: Dictionary = (Config.get_value("enemy.drop", {}) as Dictionary).duplicate(true)
+	var own = _type_cfg.get("drop", null)
+	if own is Dictionary:
+		for k in (own as Dictionary):
+			out[k] = (own as Dictionary)[k]
+	return out
+
+
 ## 掉落：在原地生成一个资源点（复用 LootNode 场景，玩家走近自动拾取）
 func _spawn_drop() -> void:
 	# 幻影分身不掉落：它连独立个体都不算（随本体消失），掉一地资源等于白送
@@ -1389,29 +1485,30 @@ func _spawn_drop() -> void:
 	# （要开就改 config 的 trait.drop_from_splits）
 	if is_split_spawn() and not bool(_trait_cfg().get("drop_from_splits", false)):
 		return
-	if randf() > float(Config.get_value("enemy.drop.chance", 0.75)):
+	var drop := _drop_cfg()
+	if randf() > float(drop.get("chance", 0.75)):
 		return
-	var res_id := _pick_drop_resource()
+	var res_id := _pick_drop_resource(drop)
 	if res_id.is_empty():
 		return
-	var amount: int = int(Config.get_value("enemy.drop.amount_min", 2))
-	var amount_max: int = int(Config.get_value("enemy.drop.amount_max", 6))
+	var amount: int = int(drop.get("amount_min", 2))
+	var amount_max: int = int(drop.get("amount_max", 6))
 	if amount_max > amount:
 		amount = randi_range(amount, amount_max)
 	var parent := get_parent()
 	if parent == null:
 		return
-	var drop := DROP_SCENE.instantiate()
-	parent.add_child(drop)
-	drop.global_position = global_position
-	drop.setup(res_id, amount, 0.8)   # 比地图资源点略小，便于区分
+	var node := DROP_SCENE.instantiate()
+	parent.add_child(node)
+	node.global_position = global_position
+	node.setup(res_id, amount, 0.8)   # 比地图资源点略小，便于区分
 	print("[Combat] 敌人被击杀，掉落 %s x%d" % [
 		str(Config.get_value("resources.%s.name" % res_id, res_id)), amount])
 
 
-## 按 enemy.drop.weights 加权随机抽一种资源；未配置则退回 resources 稀有度权重
-func _pick_drop_resource() -> String:
-	var weights = Config.get_value("enemy.drop.weights", {})
+## 按 drop.weights 加权随机抽一种资源；未配置则退回 resources 稀有度权重
+func _pick_drop_resource(drop: Dictionary) -> String:
+	var weights = drop.get("weights", {})
 	if not (weights is Dictionary) or (weights as Dictionary).is_empty():
 		weights = {}
 		for res in Config.get_value("resources", {}):
@@ -1471,19 +1568,52 @@ func apply_knockback(impulse: Vector2) -> void:
 	global_position += impulse.normalized() * float(Config.get_value("enemy.knockback_px", 8.0))
 
 
-## 玩家碰到敌人 → 接触伤害（带冷却，避免每帧掉血）
-func _on_body_entered(body: Node) -> void:
-	if _dying:
+## 出手距离（探针和 AI 都用这个数，不要在别处再算一遍）
+func attack_range_px() -> float:
+	return _attack_range
+
+
+## 玩家是否已进入本敌人的近战射程 —— 「进了射程就出手」的唯一判据
+func in_attack_range() -> bool:
+	var p := _get_player()
+	if p == null:
+		return false
+	return global_position.distance_to(p.global_position) <= _attack_range
+
+
+## 每物理帧问一次：能不能出手。
+## 动作/冷却正在跑 → 不出手；被 AI 判定为休眠或刚被打愣（上层不会走到这里）也不出手。
+## 【幻影分身】分身不能造成伤害（用户明确要求）——"打了半天没掉血"就是要让玩家
+## 立刻看出这只不是真身，别改成能打。
+func _tick_attack(_delta: float) -> void:
+	if _is_phantom or _dying:
 		return
-	# 【幻影分身】分身无法造成伤害（用户明确要求）—— 撞上玩家也不掉血、也不播挥击动作，
-	# 玩家被"打了半天没掉血"会立刻明白这只不是真身（这是设计要的效果，别改成能打）。
-	if _is_phantom:
+	if _attack_timer > 0.0 or _attack_cooldown > 0.0:
 		return
-	if not body.is_in_group("player"):
+	if not in_attack_range():
 		return
-	if _contact_cooldown > 0.0:
+	_start_attack()
+
+
+## 出手：一次性把「动作时长 + 冷却 + 前摇」三件事全部记好，之后不再改。
+## 关键设计：出手必然进冷却、必然播动作，和"这一刀砍没砍到"无关 ——
+## 早期把两件事写在 `if body.take_damage(...)` 里，所以玩家防御叠满或有无敌帧时
+## 敌人既不播动作也不进冷却，看上去就是"敌人根本不会攻击"。
+func _start_attack() -> void:
+	# 按攻击帧数算挥砍时长（帧数/帧率），让整套挥砍完整播完；无攻击帧的兵种用保底时长。
+	_attack_timer = maxf(_attack_min_dur, _attack_frames / maxf(_attack_fps, 1.0))
+	_attack_cooldown = _attack_cd_seconds
+	_attack_hit_at = _attack_windup
+
+
+## 前摇结束：这一刀落地。玩家已经跑出射程就是挥空（动作和冷却照旧不回收）。
+## 这里刻意**不发噪音**：250 个敌人同时挥砍会把噪音系统刷爆，波及范围毫无意义。
+func _deal_attack_damage() -> void:
+	if _dying or _is_phantom:
 		return
-	if body.take_damage(damage, global_position):
-		_contact_cooldown = float(Config.get_value("enemy.contact_cooldown_seconds", 1.0))
-		# 打中玩家的同时播一下挥击动作，让"谁在打我"一眼可辨
-		_attack_timer = float(Config.get_value("enemy.attack_anim_seconds", 0.35))
+	var p := _get_player()
+	if p == null or not p.has_method("take_damage"):
+		return
+	if global_position.distance_to(p.global_position) > _attack_range:
+		return
+	p.take_damage(damage, global_position)

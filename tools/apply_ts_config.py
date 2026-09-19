@@ -34,7 +34,6 @@ PX_SCALE = 4.0   # 16px 网格 → 64px 网格
 PX_KEYS = [
     "player.speed",
     "player.select_radius_px",
-    "player.path_arrive_threshold_px",
     "camera.pan_speed",
     "combat.player.knockback_speed",
     "combat.attack.range_px",

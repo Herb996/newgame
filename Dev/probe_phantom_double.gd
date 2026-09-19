@@ -50,7 +50,7 @@ var _fails: Array = []
 var _walls: Array = []
 
 
-## 假玩家：只为验「接触伤害有没有真的打进来」。真实 Player 太重（要贴图/状态机/小队）。
+## 假玩家：只为验「近战出手有没有真的打进来」。真实 Player 太重（要贴图/状态机/小队）。
 class FakePlayer extends Area2D:
 	var hp := 100
 	func take_damage(amount: int, _from: Vector2) -> bool:
@@ -355,20 +355,27 @@ func _no_damage_and_group_bar(raider: Dictionary) -> void:
 	o.set_physics_process(false)      # 钉住位置/状态，免得巡逻把断言搅乱
 	p.set_physics_process(false)
 
-	# ① 接触伤害：本体打得到，分身一点都打不到
+	# ① 近战出手：本体打得到，分身一点都打不到
+	# 接触伤害（body_entered）已删 —— 这里改走真实路径 _start_attack() → _deal_attack_damage()。
+	# 直接调这两个函数、跳过前摇计时器：本段验的是"谁能造成伤害"，
+	# "射程/前摇/冷却的数值对不对"由 Dev/probe_enemy_attack.gd 守。
 	var fp := FakePlayer.new()
 	world.add_child(fp)
 	fp.add_to_group("player")
-	o._contact_cooldown = 0.0
-	o._on_body_entered(fp)
+	fp.global_position = o.global_position + Vector2(o.attack_range_px() - 6.0, 0.0)
+	_check(o.in_attack_range(), "玩家在射程内 → 判定为可出手")
 	var owner_dmg := int(o.damage)
-	_check(fp.hp == 100 - owner_dmg, "本体撞玩家 → 掉 %d 血（实得掉 %d）"
+	o._attack_cooldown = 0.0
+	o._start_attack()
+	o._deal_attack_damage()
+	_check(fp.hp == 100 - owner_dmg, "本体出手 → 掉 %d 血（实得掉 %d）"
 			% [owner_dmg, 100 - int(fp.hp)])
 	var hp_after_owner := int(fp.hp)
-	p._contact_cooldown = 0.0
-	p._on_body_entered(fp)
+	p._attack_cooldown = 0.0
+	p._start_attack()
+	p._deal_attack_damage()
 	_check(int(fp.hp) == hp_after_owner,
-			"分身撞玩家 → 一滴血都不掉（实得掉 %d）" % (hp_after_owner - int(fp.hp)))
+			"分身出手 → 一滴血都不掉（实得掉 %d）" % (hp_after_owner - int(fp.hp)))
 	_check(int(p.damage) == 0, "分身的 damage 被清零（实得 %d）" % int(p.damage))
 
 	# ② 打分身 = 只扣分身自己那份血，本体一滴不掉（2026-09-17 从"转嫁本体"改掉）

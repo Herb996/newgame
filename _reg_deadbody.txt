@@ -1,0 +1,175 @@
+==============================================================================
+Dev/probe_registry.tscn   EXIT=1
+   [Probe] 群系分布：草地=16822 / 荒原=5135 / 森林=6257 / 沼泽=4554
+   [Probe] OK   群系数 = 4（草地/荒原/森林/沼泽），实际 4
+   [Probe] OK   群系 0「草地」有格数 16822（应 > 0）
+   [Probe] OK   群系 1「荒原」有格数 5135（应 > 0）
+   [Probe] OK   群系 2「森林」有格数 6257（应 > 0）
+   [Probe] OK   群系 3「沼泽」有格数 4554（应 > 0）
+   [Probe] OK   格数最多的群系是「草地」(id=0，16822 格)；期望草地(id=0)
+   [Probe] OK   权重边界单调递增且末项=1.0：[0.51127819548872, 0.66917293233083, 0.85714285714286, 1.0]
+   [Probe] OK   草地独占噪声区间 0.511（应 > 0.4，即大部分平地）
+   [Probe] OK   群系 0「草地」面积占比 51.3%（权重期望 51.1%，容差 5pp）
+   [Probe] OK   群系 1「荒原」面积占比 15.7%（权重期望 15.8%，容差 5pp）
+   [Probe] OK   群系 2「森林」面积占比 19.1%（权重期望 18.8%，容差 5pp）
+   [Probe] OK   群系 3「沼泽」面积占比 13.9%（权重期望 14.3%，容差 5pp）
+   [Probe] 装饰物：树 180 / 石 120 / 残骸 398 / 灌木 1012 / 裂缝 0 / 河水 0
+   [Probe] OK   装饰 kind=1 数量 180（应 > 0）
+   [Probe] OK   装饰 kind=2 数量 120（应 > 0）
+   [Probe] OK   装饰 kind=3 数量 398（应 > 0）
+   [Probe] OK   装饰 kind=6 数量 1012（应 > 0）
+   [Probe] OK   河水不阻挡通行（被阻挡的格数 0，应 0）
+   [Probe] OK   裂缝不阻挡通行（被阻挡的格数 0，应 0）
+   [Probe] 矿脉：{ "iron": 66, "oil": 15 }
+   [Probe] OK   iron 矿脉节点数 66（应 > 0；为 0 通常是 map.resource_clusters 里没有 iron 条目）
+   [Probe] FAIL gold 矿脉节点数 0（应 > 0；为 0 通常是 map.resource_clusters 里没有 gold 条目）
+   [Probe] OK   oil 矿脉节点数 15（应 > 0；为 0 通常是 map.resource_clusters 里没有 oil 条目）
+   [Probe] OK   矿脉只落在各自配置的限定群系（越界 0 个，应 0）
+   [Probe] OK   result 含 speed_mult 网格
+   [Probe] OK   沼泽格 4554 全部 <1.0（异常 0）
+   [Probe] OK   河水格 0 全部 ≤ 0.20（异常 0；地图已移除河水，0 格视为通过）
+   [Probe] OK   草地空格 16209 全部 ==1.0（异常 0）
+   [Probe] OK   配置里沼泽 speed = 0.62（应 < 1.0）
+   [Probe] 资源节点分类：{ "wood": 180, "stone": 120, "iron": 66, "oil": 15 }
+   [Probe] OK   wood 节点数 180（应 > 0）
+   [Probe] OK   stone 节点数 120（应 > 0）
+   [Probe] OK   有未采集的 wood 节点
+   [Probe] OK   harvest 返回 ok
+   [Probe] OK   harvest 后 amount 20 → 19
+   [Probe] OK   get_by_grid(93,1) 反查到 id=1
+   [Probe] 总储量 wood=3599 stone=2400
+   [Probe] OK   wood 总储量 3599（应 > 0）
+   [Probe] ==== 共 34 项断言，失败 1 项 ====
+   [Probe] !! gold 矿脉节点数 0（应 > 0；为 0 通常是 map.resource_clusters 里没有 gold 条目）
+   异常行: 0
+   <<< 退出码 1（探针自己的断言没全过；回归以退出码为准）
+==============================================================================
+Dev/probe_player_anim.tscn   EXIT=0
+   [ProbeAnim] walk(right) 贴图序列 10 项：
+   [ProbeAnim] 朝上 →res://Assets/Art/Sprites/Player/player_walk_up_01.png
+   [ProbeAnim] attack（无帧，应回退 idle）→res://Assets/Art/Sprites/Player/player_idle_right_00.png offset=(3.0, -24.0)
+   [ProbeAnim] 验证全部通过：序列帧播放 / 朝向切换 / 缺帧回退均正常
+   异常行: 0
+==============================================================================
+Dev/probe_zoom.tscn   EXIT=1
+   [ZoomProbe] OK   A1 步进对称：46.0000 →(上3格)→ 32.7419 →(下3格)→ 46.0000（应回到 46.0000）
+   [ZoomProbe] OK   A1 单档进/出乘数互为倒数：0.892857 × 1.120000 = 1.000000000
+   [ZoomProbe] OK   A2 光标锚点 (32,32)：地面点 (64.000, 64.000) → (64.000, 64.000)，偏移 0.0000 世界单位
+   [ZoomProbe] OK   A2 光标锚点 (32,14)：地面点 (47.345, 47.345) → (47.345, 47.345)，偏移 0.0000 世界单位
+   [ZoomProbe] OK   A2 光标锚点 (15,32)：地面点 (52.969, 75.031) → (52.969, 75.031)，偏移 0.0000 世界单位
+   [ZoomProbe] OK   A2 光标锚点 (46,44)：地面点 (84.041, 65.373) → (84.041, 65.373)，偏移 0.0000 世界单位
+   [ZoomProbe] OK   A3 基地缩到底 hi=67.84：可见地面 67.8×95.1（地图 64×64，应不小于）
+   [ZoomProbe] OK   A3 上限确实被地图收敛：hi=67.84 < config 上限 150
+   [ZoomProbe] OK   A4 一直放大：target=16.000 停在 lo=16.000
+   [ZoomProbe] OK   A4 一直缩小：target=67.840 停在 hi=67.840
+   [ZoomProbe] OK   A5 缩到底时焦点被居中到 (32,32)，实测 (32.00,32.00)
+   [ZoomProbe] OK   B1 Main3D 相机已装配
+   异常行: 0
+   <<< 退出码 1（探针自己的断言没全过；回归以退出码为准）
+==============================================================================
+Dev/probe_terrain_map.tscn   EXIT=0
+   [Map] 装饰碰撞体：300 格（树/石，物理层与寻路层已对齐）
+   [Map] 地图生成完成：128x256 瓦片（8192x16384 像素），地板 26017 格，可达 25944 格（100%），贴图=AI
+   [Map] 装饰物：树 180 / 石头 120 / 灌木 931 / 碎石 397 / 裂缝 0 / 河水 0，出生点 (4128.0, 8224.0)
+   [Map] 矿脉 80 处
+   [Map] 群系分布：草地 10431, 荒原 10468, 森林 10964, 沼泽 905
+   [TerrainProbe] 已输出 terrain_stats.png / terrain_decor.png（512x1024）
+   异常行: 0
+==============================================================================
+Dev/probe_level.tscn   EXIT=0
+   [probe_level] 通过 164 / 164
+   异常行: 0
+==============================================================================
+Dev/probe_supplies.tscn   EXIT=0
+   [probe_supplies] 通过 39 / 39
+   异常行: 0
+==============================================================================
+Dev/probe_inventory.tscn   EXIT=0
+   [probe_inventory] 通过 103 / 103
+   异常行: 0
+==============================================================================
+Dev/probe_click_move.tscn   EXIT=0
+   [probe_click_move] 通过 7 / 7
+   异常行: 0
+==============================================================================
+Dev/probe_dead_body.tscn   EXIT=0
+   [probe_dead_body] fails=0 -> PASS
+   异常行: 0
+==============================================================================
+Dev/probe_second_launch.tscn   EXIT=0
+   [probe_second_launch] 通过 23 / 23
+   异常行: 0
+==============================================================================
+Dev/probe_water_step.tscn   EXIT=0
+   [Weather] 波纹子视口建好 32x32（scale=0.50）
+   [Weather] 雨湿地面 16008 格（占全图 48.9%）＝群系 [0.0, 2.0]，半径 2 格 × 3 轮模糊
+   [WaterProbe]   OK   地图上确实有湿地
+   [WaterProbe]   OK   漫出 allowed_biomes=[0, 2] 的湿格 ≤ 湿格总数的 5%（实测 297 / 16008）
+   [WaterProbe]   OK   湿地覆盖 ≥ 可选格的 70%（实测 95.2%）
+   [WaterProbe]   OK   地图上有水面格可测
+   [WaterProbe]   OK   水面格的湿度场一颗都不带（实测漏 0）
+   [WaterProbe]   OK   水面格的逻辑判定全干（实测漏 0）
+   [WaterProbe]   OK   边界模糊真的产出了连续过渡格
+   [WaterProbe]   OK   过渡格成规模（实测 19367 个 / 湿格 16008 个）
+   [WaterProbe]   OK   从出生点能找到湿地（找不到 = 玩家开局永远看不到踩水效果）
+   [WaterProbe]   OK   湿地在出生点 20 步以内（草地/森林连片，本就该贴着出生点）
+   [WaterProbe]   OK   邻域判定命中率不低于单格硬判定（r=1：17716 vs 15734）
+   [WaterProbe]   OK   找到一个湿格用于定点判定 (14,5)
+   [WaterProbe]   OK   湿格中心 is_wet_at 为真
+   [WaterProbe]   OK   离湿地 (r+2) 格以上的干地不误判 (37,4)
+   [WaterProbe]   OK   越界坐标安全返回 false
+   [WaterProbe]   OK   波纹池建好 16 条
+   [WaterProbe]   OK   一次踩水占用一条波纹（实际占用 1）
+   [WaterProbe]   OK   波纹生成在脚步坐标上
+   [WaterProbe]   OK   展开半径来自 config（66.0 px）
+   [WaterProbe]   OK   寿命来自 config（0.60 s）
+   [WaterProbe]   OK   波纹可见（不可见＝踩水等于没做）
+   [WaterProbe]   OK   椭圆压扁系数在 (0,1)（实测 0.45）
+   [WaterProbe]   OK   每次踩水掷出 4 段碎片弧（实际 4）
+   [WaterProbe]   OK   单段是部分弧不是整圈（28.1°）
+   [WaterProbe]   OK   碎片亮度非零
+   [WaterProbe]   OK   单段是部分弧不是整圈（53.6°）
+   [WaterProbe]   OK   碎片亮度非零
+   [WaterProbe]   OK   单段是部分弧不是整圈（60.1°）
+   [WaterProbe]   OK   碎片亮度非零
+   [WaterProbe]   OK   单段是部分弧不是整圈（34.1°）
+   [WaterProbe]   OK   碎片亮度非零
+   [WaterProbe]   OK   碎片合计只占 176°＜360°（必然留缺口）
+   [WaterProbe]   OK   各碎片半径倍率不同（4 种）→ 不共圆，读不成白色虚线靶子
+   [WaterProbe]   OK   各碎片角度彼此分开（最近间隔 71.9°）
+   [WaterProbe]   OK   重掷一次碎片角度就变了（每次踩水图案不同）
+   [WaterProbe]   OK   干地脚步不出波纹
+   [WaterProbe]   OK   连续两脚出两条波纹（实际 2）
+   [WaterProbe]   OK   波纹播完全部回池、池子不扩容（节点数不增长）
+   [WaterProbe]   OK   雨湿地面层 = 覆盖全图的 ColorRect
+   [WaterProbe]   OK   雨湿地面层不吃鼠标（否则局内点不动）
+   [WaterProbe]   OK   雨湿地面层尺寸 == 地图格数 × tile（(8192.0, 16384.0)）
+   [WaterProbe]   OK   雨湿地面层挂 rain_ground.gdshader
+   [WaterProbe]   OK   斑驳水光开着
+   [WaterProbe]   OK   亮斑 0.35 / 暗斑 0.12 成对（缺一边就读成油渍）
+   [WaterProbe]   OK   亮斑增益来自 config（0.35）
+   [WaterProbe]   OK   各向异性方向没写反：x 低频 y 高频 → 横向条带（(0.8, 1.4)）
+   [WaterProbe]   OK   湿地明暗与水光都不滚动（scroll_dir=(0.0, 0.0) mottle_speed=(0.0, 0.0)）
+   [WaterProbe]   OK   阈值 0.74 两侧留得下过渡带 0.06（否则亮斑恒满或恒空）
+   [WaterProbe]   OK   雨湿地面层排在 MapRoot 子序 1（地形之后、装饰之前）
+   [WaterProbe]   OK   波纹子视口已建
+   [WaterProbe]   OK   雨滴层数 == config.weather.rain.layers 条数（3）
+   [WaterProbe]   OK   RainFar：preprocess == lifetime（参考步骤 2）
+   [WaterProbe]   OK   RainFar：世界空间模拟，镜头平移不拖雨滴
+   [WaterProbe]   OK   RainFar：叠加混合材质已挂上
+   [WaterProbe]   OK   RainMid：preprocess == lifetime（参考步骤 2）
+   [WaterProbe]   OK   RainMid：世界空间模拟，镜头平移不拖雨滴
+   [WaterProbe]   OK   RainMid：叠加混合材质已挂上
+   [WaterProbe]   OK   RainNear：preprocess == lifetime（参考步骤 2）
+   [WaterProbe]   OK   RainNear：世界空间模拟，镜头平移不拖雨滴
+   [WaterProbe]   OK   RainNear：叠加混合材质已挂上
+   [WaterProbe]   OK   节点结构 = RainFar/RainMid/RainNear（实得 ["RainFar", "RainMid", "RainNear"]）
+   [WaterProbe]   OK   同屏总滴数 800 在参考区间 400-800 附近
+   [WaterProbe]   OK   屏幕雨幕已建且不吃鼠标
+   [WaterProbe] 通过 63 / 63
+   [WaterProbe] fails=0 -> PASS
+   异常行: 0
+==============================================================================
+flow_test 已跳过（--no-flow）：Data/config.json 一个字节没动
+==============================================================================
+全部异常行合计: 2

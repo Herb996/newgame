@@ -288,7 +288,7 @@ func _format_value(v: float, entry: Dictionary) -> String:
 
 ## 按出厂值的类型决定存 int 还是 float：
 ## enemy.count 是整数（存 100.5 会让 `int(...)` 读出来变成截断值，读代码的人会困惑），
-## map.river.width_cells 是小数（存成 int 就把河宽精度丢了）。
+## enemy.attack.cooldown_seconds 是小数（存成 int 就把 0.35 秒存成 0 了）。
 func _typed(entry: Dictionary, v: float) -> Variant:
 	var base = Config.get_base_value(str(entry["path"]), null)
 	if typeof(base) == TYPE_INT:
@@ -704,12 +704,6 @@ func _schema_gameplay() -> Array:
 		{"path": "map.force_seed", "label": "固定种子", "type": "number",
 			"min": 0, "max": 999999, "step": 1,
 			"note": "0 = 每局随机；非 0 = 每局同一张图（复现 bug 用）。"},
-		{"path": "map.river.enabled", "label": "河流", "type": "bool",
-			"note": "图中蜿蜒的河带，可以涉水但减速。"},
-		{"path": "map.river.width_cells", "label": "河流宽度", "type": "number",
-			"min": 0.0, "max": 4.0, "step": 0.05, "note": "单位是格；0 等于没有河。"},
-		{"path": "map.river.slow", "label": "涉水速度系数", "type": "number",
-			"min": 0.2, "max": 1.0, "step": 0.02, "fmt": "times"},
 		{"path": "map.crack.enabled", "label": "地表裂缝", "type": "bool"},
 		{"path": "map.decor.density", "label": "装饰密度", "type": "number",
 			"min": 0.0, "max": 2.0, "step": 0.05, "fmt": "times",
@@ -768,8 +762,15 @@ func _schema_gameplay() -> Array:
 			"min": 100, "max": 800, "step": 20, "note": "像素/秒；追击时还会乘倍率。"},
 		{"path": "enemy.max_hp", "label": "基础生命", "type": "number",
 			"min": 10, "max": 500, "step": 10},
-		{"path": "enemy.contact_damage", "label": "接触伤害", "type": "number",
-			"min": 1, "max": 100, "step": 1},
+		{"path": "enemy.contact_damage", "label": "近战伤害", "type": "number",
+			"min": 1, "max": 100, "step": 1,
+			"note": "敌人一刀的基础伤害；兵种在 enemy_types 里写的 damage 会盖掉它。"},
+		{"path": "enemy.attack.range_px", "label": "近战射程", "type": "number",
+			"min": 30, "max": 200, "step": 2,
+			"note": "与玩家的圆心距小于这个数才挥砍。必须「大于」单位分离把敌人顶住的那圈（敌人半径 + 玩家半径，默认 42px），否则敌人永远够不着玩家（2026-09-19 那个「敌人不打人」的 bug 就是这两个数没对上）。兵种可用 attack_range_px 单独覆盖。改完对「新刷出」的敌人生效。"},
+		{"path": "enemy.attack.cooldown_seconds", "label": "出手间隔", "type": "number",
+			"min": 0.2, "max": 5.0, "step": 0.1,
+			"note": "两刀之间的间隔秒数。只要挥了就进冷却 —— 被玩家挡下或挥空都不回收。"},
 		{"path": "enemy.vision_cells", "label": "视野（格）", "type": "number",
 			"min": 2, "max": 30, "step": 1},
 	]
@@ -783,20 +784,28 @@ func _schema_resources() -> Array:
 	out.append({"path": "map.biome_weights.1", "label": "荒原", "type": "number", "min": 0.1, "max": 8.0, "step": 0.05})
 	out.append({"path": "map.biome_weights.2", "label": "森林", "type": "number", "min": 0.1, "max": 8.0, "step": 0.05})
 	out.append({"path": "map.biome_weights.3", "label": "沼泽", "type": "number", "min": 0.1, "max": 8.0, "step": 0.05})
+	out.append({"path": "map.biome_min_region_cells", "label": "最小地块尺寸（格）", "type": "number",
+		"min": 0, "max": 200, "step": 5,
+		"note": "小于此格数的独立地形块会被并入周围地形（去掉过小的碎地块/被夹的小地块）；0 = 不去小地块。下次生成地图生效。"})
 	out.append({"type": "divider", "label": "地图资源成簇（树/石/铁/油）"})
-	out.append({"type": "info", "label": "每种资源在每个群系放「簇数」个相连簇，每簇格数 = 该群系的 weight。"
-		+ "weight 同时决定「最小聚合格数」和「各群系之间的总量比例」（0 = 该群系不出这种）。全部下次生成地图才生效。"})
+	out.append({"type": "info", "label": "全图一共放「总簇数」个簇，按各类型 share 比例分给树/石/铁/油；"
+		+ "每种类型的簇再按其 biome_weight 分到各群系；每簇大小在 [最小, 最大] 随机（最小调大即避免过小孤簇）。全部下次生成地图才生效。"})
+	out.append({"path": "map.resource_clusters.total", "label": "总簇数（全图）", "type": "number",
+		"min": 0, "max": 400, "step": 5, "note": "所有类型加起来一共放多少个簇。"})
 	var biome_cols: Array = [["草地", "0"], ["荒原", "1"], ["森林", "2"], ["沼泽", "3"]]
 	var res_defs: Array = [["tree", "树木"], ["rock", "石头"], ["iron", "钢铁"], ["oil", "魔法油潭"]]
 	for rd in res_defs:
 		var key: String = str(rd[0])
 		out.append({"type": "divider", "label": str(rd[1])})
-		out.append({"path": "map.resource_clusters.%s.count" % key, "label": "每群系簇数", "type": "number",
-			"min": 0, "max": 40, "step": 1,
-			"note": "在每个 weight>0 的群系各放这么多簇。调大=该资源更多。"})
+		out.append({"path": "map.resource_clusters.types.%s.share" % key, "label": "占总数比例", "type": "number",
+			"min": 0, "max": 100, "step": 1, "note": "该类型分到总簇数的相对份额（四类型之和不必为100）。"})
+		out.append({"path": "map.resource_clusters.types.%s.min_size" % key, "label": "每簇最小格数", "type": "number",
+			"min": 1, "max": 24, "step": 1})
+		out.append({"path": "map.resource_clusters.types.%s.max_size" % key, "label": "每簇最大格数", "type": "number",
+			"min": 1, "max": 40, "step": 1})
 		for bc in biome_cols:
-			out.append({"path": "map.resource_clusters.%s.weight.%s" % [key, str(bc[1])],
-				"label": "  %s（聚合/比例）" % str(bc[0]), "type": "number",
+			out.append({"path": "map.resource_clusters.types.%s.biome_weight.%s" % [key, str(bc[1])],
+				"label": "  %s（分布比例）" % str(bc[0]), "type": "number",
 				"min": 0, "max": 12, "step": 1})
 	return out
 

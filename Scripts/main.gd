@@ -15,6 +15,7 @@ const CAMERA_SCRIPT := preload("res://Scripts/camera_controller.gd")
 const PLACEMENT_SCRIPT := preload("res://Scripts/placement_mode.gd")
 const SOAK_PROBE := preload("res://Scripts/soak_probe.gd")
 const SELECTION_SCRIPT := preload("res://Scripts/selection_controller.gd")
+const SEPARATION_SCRIPT := preload("res://Scripts/combat/unit_separation.gd")
 
 enum Mode { BASE, RUN }
 
@@ -348,6 +349,14 @@ func _process(delta: float) -> void:
 		_capture_left -= delta
 		if _capture_left < 0.0:
 			_capture_now()
+	# 出图开关：受击方向红楔只有真实窗口能看出来，无头探针最多断言"上报进来了"。
+	# 开着它每帧喂一次上报 → 楔常驻，好对截图。绕开 take_damage：不扣血、不进硬直。
+	if bool(Config.get_value("debug.force_player_hit", false)) and mode == Mode.RUN:
+		var u: Node = get_tree().get_first_node_in_group("player")
+		if u != null:
+			var off: Array = Config.get_value("debug.force_player_hit_offset", [260, -150])
+			get_tree().call_group(HitDirectionIndicator.GROUP, "report_hit",
+					u.global_position, u.global_position + Vector2(float(off[0]), float(off[1])))
 	# 局结束后按 R 回基地（局内运行中无效）
 	if Input.is_physical_key_pressed(KEY_R) and mode == Mode.RUN \
 			and run.state == run.State.ENDED:
@@ -404,6 +413,7 @@ func _enter_base() -> void:
 	_sync_minimap_fog()   # 此时返回 null：摘掉上一局的遮罩引用，不留隔局数据
 	weather_system.deactivate()
 	get_tree().paused = false
+	HitStop.reset()   # 别把半截冻结带进基地（Engine.time_scale ≠1 会让基地全程慢放）
 	warehouse_panel.close()
 	statue_panel.close()
 	character_panel.close()
@@ -433,6 +443,7 @@ func _enter_run() -> void:
 	# 菜单栏的噪音读数是「本局」的：开局清零，否则上一局的暴露度会带进来
 	NoiseSystem.reset()
 	get_tree().paused = false
+	HitStop.reset()   # 上一局末尾卡着的冻结不能带进这一局
 	# 重摆没结束也能出击（点大门走的是建筑交互，不经过放置模式的取消流程）。
 	# 这里必须主动收尾：_placement 挂在 game_root 下，下面 _clear_game_root() 会把它
 	# 连着释放，但字段仍指着那个已死节点 —— _overlay_open() 从此恒真（ESC 退不出去），
@@ -512,6 +523,12 @@ func _enter_run() -> void:
 	extraction_system.setup(game_root, result)
 	enemy_system.setup(game_root, result)
 	animal_system.setup(game_root, result)
+	# 单位分离层（碰撞方案 A）：敌人/动物照旧自己写坐标，这里每物理帧收尾把它们互相
+	# 推开再夹回可走格。挂在 game_root 下 → 回基地随 _clear_game_root() 一起释放。
+	var separation := SEPARATION_SCRIPT.new()
+	separation.name = "UnitSeparation"
+	game_root.add_child(separation)
+	separation.setup(result)
 	loot_system.setup(game_root, result)
 	fog_system.setup(game_root, result)
 	if _no_fog:

@@ -44,6 +44,7 @@ var hp := 0
 var max_hp := 0
 var facing := Vector2.RIGHT
 var _dead := false
+var _fade_started := false             # 死亡淡出已排程（防重复进 dead 态起第二条 tween）
 var _dodge_invincible := false       # 冲刺无敌帧
 var _invincible_timer := 0.0         # 受击后短暂无敌
 var _dodge_cooldown := 0.0
@@ -138,6 +139,16 @@ const STALL_REPATH_FRAMES := 20             # 卡住约 1/3 秒后强制重算�
 const STALL_GIVE_UP_REPATHS := 5
 var _stall_repaths := 0                     # 连续无效重算次数（走动了就清零）
 const WAYPOINT_REACH_DIST := 4.0            # 距路点小于此值视为已通过该路点
+
+## "到不了地到达了"的判据数据（配合 _blocked_near_goal）。
+## 现有 stall 计数要求"这一帧几乎没挪动（<0.2px）"，而被同伴身体挡住的角色
+## 每帧都在侧滑，那个计数永远清零 → 指令永远不结束（表现：有人一直在跑）。
+## 所以改看"离目标最近到过几像素"，并且按窗口比较：只用"有没有打破历史最近值"
+## 当判据是不行的 —— 挤成一团的人会来回抖动，随机游走的最小值每隔几十帧就破一次
+## 纪录，计数器永远攒不满（实测 420 帧一次都没触发）。
+var _goal_win_min := INF      # 本窗口内到目标格心的最近距离
+var _goal_prev_min := INF     # 上一窗口的最近距离
+var _goal_win_frames := 0    # 本窗口已统计的帧数
 
 var state_machine: StateMachine
 
@@ -1060,6 +1071,9 @@ func resolve_attack_hit() -> void:
 		if area.has_method("play_hit_fx"):
 			area.call("play_hit_fx", global_position)
 		print("[Combat] 命中 %s，造成 %d 伤害" % [area.name, dmg])
+	if hits > 0:
+		# 一次挥击只顿一下（不是每中一个目标各顿）：多目标同帧命中在真实时间里仍是同一瞬
+		HitStop.pulse(get_tree(), "on_deal_damage")
 
 
 ## 发射一枚弹道（远程武器进入判定帧时调用）。返回是否真的发射了。
@@ -1143,6 +1157,8 @@ func fire_hitscan() -> int:
 				else (targets[-1] as Node2D).global_position
 		_spawn_ring_at(impact, float(cfg.get("impact_radius", 26.0)),
 				Color(str(cfg.get("impact_color", "#ff9a3d"))))
+	if not targets.is_empty():
+		HitStop.pulse(get_tree(), "on_deal_damage")
 	return targets.size()
 
 
@@ -1204,6 +1220,10 @@ func take_damage(amount: int, source_pos: Vector2 = Vector2.ZERO) -> bool:
 	if source_pos != Vector2.ZERO:
 		knockback = (global_position - source_pos).normalized() \
 				* float(Config.get_value("combat.player.knockback_speed", 140.0))
+		# 「谁在打我」：无敌帧本身零反馈，镜头又没跟着角色 → 不报方向就等于莫名其妙掉血。
+		# 走 call_group 而不是接线：角色是局内动态生成的，指示层归 HUD 管（见该脚本）。
+		get_tree().call_group(HitDirectionIndicator.GROUP, "report_hit", global_position, source_pos)
+	HitStop.pulse(get_tree(), "on_receive_damage")
 	print("[Combat] 玩家受到 %d 伤害（减免 %d），剩余 HP %d/%d" % [mitigated, amount - mitigated, hp, max_hp])
 	if hp <= 0:
 		state_machine.force_transition(&"dead")
@@ -1257,6 +1277,8 @@ func on_death() -> void:
 	# 背包随人一起倒：整包就地撒成一地资源点（用户 2026-09-19 定）。
 	# 不跟着人消失、也不凭空回到仓库 —— 想留东西就得有人活着把它捡回来。
 	drop_inventory()
+	# 人自己则从场上消失（用户 2026-09-19 定：不留尸体）。东西留在原地，人不留。
+	start_death_fade()
 	if selected:
 		for p in get_tree().get_nodes_in_group("player"):
 			if p != self and is_instance_valid(p) and not bool(p.is_dead()):
@@ -1299,6 +1321,22 @@ func drop_inventory() -> void:
 		drop.setup(res_id, amount, 0.8)
 	inventory = {}
 	inventory_changed.emit()
+
+
+## 阵亡后不留尸体（用户 2026-09-19 定）：淡出这几帧是为了让人看清"谁倒了"，
+## 之后节点移出场景 —— 东西在 drop_inventory() 里已经变成一地资源点，人走了、
+## 东西还留在原地。时长与敌人死亡淡出同口径；<=0 就是当帧直接移除。
+func start_death_fade() -> void:
+	if _fade_started:
+		return
+	_fade_started = true
+	var dur := float(Config.get_value("combat.player.death_fade_seconds", 0.45))
+	if dur <= 0.0:
+		queue_free()
+		return
+	var tw := create_tween()
+	tw.tween_property(self, "modulate:a", 0.0, dur)
+	tw.chain().tween_callback(queue_free)
 
 
 # ------------------------------------------------------------
@@ -1364,6 +1402,16 @@ func follow_path() -> void:
 		clear_move_target()
 		return
 
+	# 到不了、但已经在目标附近干耗着 → 就地停下，把这条指令了结（用户 2026-09-19 定）。
+	# 多选下令时每个角色拿到的是同一个点：先到的站在目标格里，后面的被它的身体挡住
+	# （两个半径 16 的圆最多贴近到 32px），这一格可能就踩不进去；而它每帧都在侧滑，
+	# 下面那套"几乎没挪动"的 stall 计数根本不触发 —— 于是一队伍里总有几个人一直在跑。
+	if _blocked_near_goal(end_cell):
+		velocity = Vector2.ZERO
+		move_and_slide()
+		clear_move_target()
+		return
+
 	# 只在必要时重算路径：进入新格子 / 缓存为空 / 连续被挡住
 	var need_repath := _cached_path.is_empty() or my_cell != _path_cell \
 			or _stall_frames >= STALL_REPATH_FRAMES
@@ -1422,6 +1470,32 @@ func follow_path() -> void:
 		_stall_repaths = 0        # 真的挪动了 → 之前的无效重算记录作废
 
 
+## 是否"到不了地到达了"：已在目标附近（player.blocked_give_up_radius_px），
+## 且一整窗（player.blocked_give_up_frames 帧）都没比上一窗更近
+## player.blocked_give_up_progress_px 以上。
+## 用"窗口内的最近距离不再变小"而不是"这帧没挪动"当地面真相：绕圈、贴墙侧滑、
+## 和同伴互相顶着，都会移动，但都不会靠近。
+func _blocked_near_goal(end_cell: Vector2i) -> bool:
+	# 格心公式复用 MapGenerator：路径点本来就是它算的，别另起一套
+	var goal: Vector2 = MapGenerator.ids_to_centers([end_cell], _tile_size)[0]
+	var dist := global_position.distance_to(goal)
+	_goal_win_min = minf(_goal_win_min, dist)
+	_goal_win_frames += 1
+	var patience := maxi(2, int(Config.get_value("player.blocked_give_up_frames", 45)))
+	if _goal_win_frames < patience:
+		return false
+	var prev := _goal_prev_min
+	_goal_prev_min = _goal_win_min
+	_goal_win_min = dist
+	_goal_win_frames = 0
+	# 只有"已经在目标附近"才掐：路还远时绕开一片林子本来就要几秒不靠近，那是正常绕路。
+	var near := float(Config.get_value("player.blocked_give_up_radius_px", 128.0))
+	if dist > near:
+		return false
+	var gain := float(Config.get_value("player.blocked_give_up_progress_px", 8.0))
+	return prev - _goal_prev_min <= gain
+
+
 # ------------------------------------------------------------
 # 导航 / 寻路
 # ------------------------------------------------------------
@@ -1445,6 +1519,9 @@ func _clear_path_cache() -> void:
 	_path_cell = Vector2i(-9999, -9999)
 	_stall_frames = 0
 	_stall_repaths = 0
+	_goal_win_min = INF
+	_goal_prev_min = INF
+	_goal_win_frames = 0
 
 
 func _cell_of(pos: Vector2) -> Vector2i:

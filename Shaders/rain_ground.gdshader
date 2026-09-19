@@ -15,8 +15,13 @@ shader_type canvas_item;
 //   ③ 波纹合成 —— 波纹视口纹理按覆盖度门控提亮（唯一保留的水反馈）
 //
 // 宿主是覆盖全图的 ColorRect（尺寸 = 地图格数 × tile_px，位置 = 地图原点）。
-// 选 ColorRect 而不是 Sprite2D：VERTEX 天然就是像素坐标、visibility_rect 自动按
-// size 算；1×1 纹理的 Sprite2D 会被默认 visibility_rect 整层裁成"什么都不显示"。
+// 选 ColorRect 而不是 Sprite2D：visibility_rect 自动按 size 算；1×1 纹理的 Sprite2D
+// 会被默认 visibility_rect 整层裁成"什么都不显示"。
+//
+// 格坐标一律由 **UV** 推出，不用 VERTEX：宿主矩形按定义就是整张地图，故 UV 的
+// 0..1 精确等于掩码的 0..mask_size，与画布变换和 VERTEX 在各宿主下的语义无关。
+// 这层必须与地形严格同源对齐——一旦错位，就成"一层独立的水膜盖在地图上"，
+// 镜头一动就像在飘（用户 2026-09-19 报的现象）。
 //
 // 性能铁律：屏幕采样与波纹采样都在 `m < 0.02 → discard` **之后** —— 本层覆盖全图
 // 8192×16384，顺序错了就是全图每像素一次屏幕读回。discard 之前只剩域扭曲那 2 次
@@ -28,9 +33,7 @@ shader_type canvas_item;
 // R 通道 = 该格湿度（连续 0..1，场外为 0）。尺寸 = 地图格数，与逻辑查询用的
 // _wet_cells 同源，保证"看着是湿地"和"踩上去出波纹"不漂移。
 uniform sampler2D wet_mask : filter_linear;
-uniform vec2 mask_size = vec2(128.0, 256.0);    // 地图格数
-uniform float tile_px = 64.0;                   // 一格多少世界像素
-uniform vec2 world_origin = vec2(0.0, 0.0);     // 宿主全局位置（补偿父级偏移）
+uniform vec2 mask_size = vec2(128.0, 256.0);    // 地图格数 = 掩码尺寸
 
 uniform float darkness = 0.12;          // 湿地压暗幅度（0..1）
 uniform vec4 tint_color : source_color = vec4(0.62, 0.76, 0.86, 1.0);
@@ -105,12 +108,8 @@ float wet_at(vec2 cuv) {
 }
 
 void fragment() {
-	// 世界像素 → 连续格坐标。宿主无旋转/缩放，故 VERTEX + 宿主原点 == 世界坐标。
-	vec2 cell = (VERTEX + world_origin) / tile_px;
-	vec2 cuv = cell / mask_size;
-	if (cuv.x < 0.0 || cuv.x > 1.0 || cuv.y < 0.0 || cuv.y > 1.0) {
-		discard;
-	}
+	// 宿主矩形 ≡ 地图矩形，故 UV 直接就是归一化格坐标；乘 mask_size 得连续格坐标。
+	vec2 cell = UV * mask_size;
 
 	// ① 连续湿度场。掩码已经是 CPU 模糊过的软场，但仍按格存储 → 直接用 linear 插值
 	//    会得到沿格轴线的直边界。用静态低频噪声把采样点最多挪 edge_warp 格，整条
@@ -118,8 +117,7 @@ void fragment() {
 	//    静态（不含 TIME）是有意的：干湿边界应当固定，会动的只有反光斑驳。
 	vec2 warp_uv = (vec2(vnoise(cell * edge_warp_scale),
 			vnoise(cell * edge_warp_scale + vec2(31.7, 11.3))) - 0.5) * (2.0 * edge_warp / mask_size);
-	// clamp 防扭曲把地图最外圈的采样点推出界外被 repeat 回绕到对侧。
-	float m = wet_at(cuv + warp_uv);
+	float m = wet_at(UV + warp_uv);
 
 	// ② 干地整片 discard（荒原/沼泽/室内不留这一层）。
 	if (m < 0.02) {

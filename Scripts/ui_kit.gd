@@ -337,11 +337,11 @@ static func small_button(text: String, width: int = 0, size: int = FS_BODY) -> B
 
 
 ## 主菜单用的大按钮：左对齐、固定高度，视觉上更整齐
-static func menu_button(text: String, hint: String = "") -> Button:
+## 悬停不弹提示：用户 2026-09-19 定，介绍文字已从菜单里撤掉
+static func menu_button(text: String) -> Button:
 	var b := button(text, 0, 20)
 	b.custom_minimum_size = Vector2(360, 60)
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	b.tooltip_text = hint
 	return b
 
 

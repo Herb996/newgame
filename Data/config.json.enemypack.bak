@@ -1,0 +1,3810 @@
+﻿{
+    "map": {
+        "width": 128,
+        "height": 128,
+        "tile_size": 64,
+        "noise_frequency": 0.03,
+        "noise_threshold": 0.25,
+        "biome_noise_frequency": 0.008,
+        "biome_border_frequency": 0.08,
+        "biome_border_jitter": 0.06,
+        "biome_spread": 1.35,
+        "biome_edge_blend": 0.45,
+        "biome_smooth_iterations": 3,
+        "biome_remove_islands": true,
+        "biome_min_region_cells": 40,
+        "biome_weights": {
+            "0": 3.4,
+            "1": 1.05,
+            "2": 1.25,
+            "3": 0.95
+        },
+        "biomes": [
+            {
+                "id": 0,
+                "name": "草地",
+                "speed": 1.0,
+                "floor": [
+                    0.3,
+                    0.36,
+                    0.18
+                ],
+                "wall": [
+                    0.5,
+                    0.46,
+                    0.34
+                ],
+                "tint": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "tree": 0.015,
+                "rock": 0.006,
+                "debris": 0.012,
+                "tileset": "tilemap_color1.png",
+                "bush": 0.03,
+                "pebble": 0.005
+            },
+            {
+                "id": 1,
+                "name": "荒原",
+                "speed": 1.0,
+                "floor": [
+                    0.33,
+                    0.27,
+                    0.18
+                ],
+                "wall": [
+                    0.52,
+                    0.37,
+                    0.2
+                ],
+                "tint": [
+                    1.02,
+                    0.98,
+                    0.94
+                ],
+                "tree": 0.008,
+                "rock": 0.05,
+                "debris": 0.045,
+                "tileset": "tilemap_color4.png",
+                "bush": 0.008,
+                "pebble": 0.03
+            },
+            {
+                "id": 2,
+                "name": "森林",
+                "speed": 1.0,
+                "floor": [
+                    0.2,
+                    0.28,
+                    0.15
+                ],
+                "wall": [
+                    0.42,
+                    0.3,
+                    0.17
+                ],
+                "tint": [
+                    0.94,
+                    1.0,
+                    0.96
+                ],
+                "tree": 0.08,
+                "rock": 0.006,
+                "debris": 0.028,
+                "tileset": "tilemap_color3.png",
+                "bush": 0.06,
+                "pebble": 0.006
+            },
+            {
+                "id": 3,
+                "name": "沼泽",
+                "speed": 0.62,
+                "floor": [
+                    0.82,
+                    0.86,
+                    0.9
+                ],
+                "wall": [
+                    0.72,
+                    0.76,
+                    0.8
+                ],
+                "tint": [
+                    1.35,
+                    0.82,
+                    0.42
+                ],
+                "tree": 0.025,
+                "rock": 0.012,
+                "debris": 0.012,
+                "tileset": "tilemap_color5.png",
+                "bush": 0.05,
+                "pebble": 0.04
+            }
+        ],
+        "resource_clusters": {
+            "tree": {
+                "count": 18,
+                "weight": {
+                    "0": 3,
+                    "1": 1,
+                    "2": 6,
+                    "3": 0
+                }
+            },
+            "rock": {
+                "count": 12,
+                "weight": {
+                    "0": 2,
+                    "1": 6,
+                    "2": 2,
+                    "3": 0
+                }
+            },
+            "iron": {
+                "count": 6,
+                "weight": {
+                    "0": 1,
+                    "1": 8,
+                    "2": 1,
+                    "3": 0
+                }
+            },
+            "oil": {
+                "count": 5,
+                "weight": {
+                    "0": 1,
+                    "1": 1,
+                    "2": 1,
+                    "3": 0
+                }
+            }
+        },
+        "cluster_noise_frequency": 0.05,
+        "cluster_threshold": 0.5,
+        "min_reachable_ratio": 0.3,
+        "max_regen_attempts": 10,
+        "river": {
+            "slow": 0.72
+        },
+        "crack": {
+            "enabled": false,
+            "frequency": 0.028,
+            "width_cells": 0.75,
+            "jitter": 0.006,
+            "min_dist_from_spawn_cells": 3,
+            "orientation": [
+                [
+                    0.55,
+                    -0.18,
+                    0.18,
+                    1.0
+                ],
+                [
+                    1.0,
+                    0.18,
+                    -0.18,
+                    0.55
+                ]
+            ],
+            "biome_scale": [
+                0.9,
+                1.6,
+                0.55,
+                1.0
+            ]
+        },
+        "force_seed": 20260915,
+        "grade": {
+            "enabled": false,
+            "contrast": 1.12,
+            "brightness": 0.0,
+            "saturation": 0.92
+        },
+        "macro_light": {
+            "enabled": true,
+            "frequency": 0.013,
+            "strength": 0.1
+        },
+        "decor": {
+            "noise_frequency": 0.09,
+            "veg_contrast": 0.85,
+            "density": 1.05,
+            "clear_spawn_radius_cells": 3,
+            "shadow": true
+        },
+        "decor_collision": {
+            "enabled": true
+        }
+    },
+    "map3d": {
+        "model_height": [
+            4.0,
+            1.2,
+            0.55
+        ],
+        "model_footprint": [
+            1.5,
+            1.35,
+            1.6
+        ]
+    },
+    "player": {
+        "_comment": "vision_radius_cells = **观察视野**（单位：格，实际像素 = 该值 × map.tile_size）。自动战斗下它是『能看见多远』，与武器的攻击距离是两个独立属性；有效攻击距离 = min(攻击距离, 观察视野)，设计上观察视野应大于攻击距离（先发现、再等目标进入射程）。详见 combat.auto_attack 段。",
+        "speed": 640.0,
+        "vision_radius_cells": 10,
+        "select_radius_px": 64.0,
+        "path_arrive_threshold_px": 24.0,
+        "selected_color": "#FFC14D",
+        "sprite_set": "sprites_lancer",
+        "weapon": "sword",
+        "sprite_scale": 0.6,
+        "sprite_offset_y": -38.0,
+        "sprite_pixel_unit": 10.0
+    },
+    "characters": {
+        "_comment": "出发大门的选人表（鼠标点大门弹面板，**可多选**组成小队，点「出击」才进局）。weapon 指向 combat.weapons 的 id —— 贴图集跟着武器走（spear → sprites_lancer 8 向枪兵；sword → sprites_ts 战士；bow → 锁 sprites_archer 弓兵），所以角色 = 选武器/打法。default 是无人选择路径（命令行/无头回归/auto_enter_run）的兜底单人；选择名单只存会话内存不落盘。进图后 RTS 点选指挥：点角色选中，左键点地移动、空格闪避，**攻击全自动**（敌人进入『观察视野 ∩ 攻击距离』即自动起手，够不着不追），未选中的成员同样自动战斗；全员站入撤离圈才可撤离，全队倒下才算失败。新增角色往 list 里加即可，面板自动多一行。**强弩（sniper）已于 2026-09-17 从名单移除**（AI 立绘风格不统一、与另外三人割裂，用户定）；武器/贴图/探针/代码全部保留，加回来只需在 list 里插一条。command_set = 局内菜单栏里这个单位的指令集 id（见顶层 menu_bar.command_sets）—— 换单位就换整套指令面板。",
+        "default": "spearman",
+        "list": [
+            {
+                "id": "spearman",
+                "name": "枪手",
+                "desc": "近战 · 长枪突刺 射程 180px · 伤害 26 · 噪音中",
+                "weapon": "spear",
+                "command_set": "combat"
+            },
+            {
+                "id": "archer",
+                "name": "弓兵",
+                "desc": "远程 · 弓箭弹道 射程 640px · 伤害 20 · 噪音小",
+                "weapon": "bow",
+                "command_set": "combat"
+            },
+            {
+                "id": "swordsman",
+                "name": "剑士",
+                "desc": "近战 · 扇形 200° 最多 3 目标 · 伤害 25 · 噪音大",
+                "weapon": "sword",
+                "command_set": "combat"
+            },
+            {
+                "id": "monk",
+                "name": "僧侣",
+                "desc": "近战 · 法杖横扫 射程 140px · 伤害 18 · 噪音最小",
+                "weapon": "staff",
+                "command_set": "combat"
+            }
+        ]
+    },
+    "progression": {
+        "_comment": "角色等级（2026-09-17 用户定）：最多 9 级、初始 0 级、升级难（要开多局才满）、**死亡永久** —— 单位阵亡即从名册移除，等级与经验一并消失（复活功能以后再加）。视觉 = 方案三：**配色分档**（一眼看档次）+ **头顶数字**（精确等级）。体色一旦承载等级，选中框/小地图点/面板底色必须恒定为阵营蓝当锚。",
+        "max_level": 9,
+        "xp": {
+            "_comment": "升级难度：升到下一级所需经验 = round(base * growth^当前等级)。per_extraction = 撤离成功时每个存活单位拿到的经验；per_kill = 每个击杀的经验（0 = 关掉）。现数值（base 100 × growth 1.3）的升级线约 100/130/169/220/286/371/483/627/816，累计约 3200 —— 单局撤离拿 100，即**约 32 局**满级；刻意做成要多局、但有尽头。待调。",
+            "curve": {
+                "base": 100.0,
+                "growth": 1.3
+            },
+            "per_extraction": 100.0,
+            "per_kill": 0.0
+        },
+        "tiers": [
+            {
+                "max_level": 2,
+                "id": "blue",
+                "name": "新兵"
+            },
+            {
+                "max_level": 5,
+                "id": "purple",
+                "name": "老兵"
+            },
+            {
+                "max_level": 8,
+                "id": "black",
+                "name": "精锐"
+            },
+            {
+                "max_level": 9,
+                "id": "gold",
+                "name": "传奇"
+            }
+        ],
+        "sprite_sets": {
+            "_comment": "档位配色 → 精灵集（按武器查）。gold 档用素材包的 Yellow（金甲）。**红色永远留给敌人**，玩家档位不许占用红色系。新增武器时必须**四档都补一行** —— 漏一档会让该档位的角色查不到映射、回落到 default 外观（表现为「升到某个等级换了个兵种」）。staff（僧侣）2026-09-18 加入。",
+            "blue": {
+                "spear": "sprites_lancer",
+                "bow": "sprites_archer",
+                "sword": "sprites_ts",
+                "staff": "sprites_monk"
+            },
+            "purple": {
+                "spear": "sprites_lancer_purple",
+                "bow": "sprites_archer_purple",
+                "sword": "sprites_ts_purple",
+                "staff": "sprites_monk_purple"
+            },
+            "black": {
+                "spear": "sprites_lancer_black",
+                "bow": "sprites_archer_black",
+                "sword": "sprites_ts_black",
+                "staff": "sprites_monk_black"
+            },
+            "gold": {
+                "spear": "sprites_lancer_gold",
+                "bow": "sprites_archer_gold",
+                "sword": "sprites_ts_gold",
+                "staff": "sprites_monk_gold"
+            }
+        },
+        "badge": {
+            "_comment": "等级显示 = 一个绕角色漂移的小光球（2026-09-18 取代旧的「圈 + 数字」—— 黑底白字压在像素小人头上像工牌，用户评价太违和）。平时只有球（颜色随档位），每隔几秒闪一次；闪的那 1 秒球胀大、球心亮出卡通数字。UI 层 _draw 自绘，不烘进贴图（9 级 x 3 角色 = 27 套帧）。",
+            "enabled": true,
+            "orb": {
+                "_comment": "缕绕角色飞的**淡光**（2026-09-18 三次改版）。前两版都被判丑，根因同一个：把它**画成了实体**——先是「暗色棋子」，后是「卡通糖果球」（细描边定形 + 球冠亮面 + 底部薄影），越画得完整越像一颗真球挂在人身上。光不该有边界。现在删掉一切轮廓，只留几层同心柔光从内到外化开（`glow.layers`），颜色朝白推淡，整体压在半透明。四条行为（用户原话：时隐时现 / 时快时慢 / 颜色尽量淡 / 在角色四周飞）分别在 pulse / speed_sway / glow / center_offset_y+orbit_y_scale 四组参数里。radius_px 是**屏幕像素**（screen_fixed 按 1/zoom 换算）→ 拉远拉近一样大一样清楚。",
+                "center_offset_y": -34.0,
+                "radius_px": 11.0,
+                "screen_fixed": true,
+                "orbit_radius_px": [
+                    24.0,
+                    36.0
+                ],
+                "orbit_y_scale": 0.85,
+                "spin_speed": 1.2,
+                "speed_sway": 0.5,
+                "speed_sway_hz": 0.13,
+                "speed_sway2": 0.2,
+                "speed_sway_hz2": 0.31,
+                "wobble_px": 3.0,
+                "_speed_comment": "「时快时慢」：ω(t) = spin_speed + speed_sway·2π·speed_sway_hz·cos(2π·hz·t) + speed_sway2·2π·speed_sway_hz2·cos(2π·hz2·t)。⚠ **两条 sway 项之和必须 < spin_speed**，否则 ω 会变负——光点原地掉头，看着像 bug 不像飘。当前 0.41 + 0.39 = 0.80 < 1.20 ✓（ω ∈ [0.40, 2.00]，快慢差 5 倍）。两条频率取不整除（0.13 / 0.31）→ 快慢节奏本身也不规律。",
+                "glow": {
+                    "_comment": "淡光的画法。layers = 「从外到内」的同心光斑层，每层 [半径比例, 不透明度比例]：外层大而极淡（当光晕）、内层小而亮（当光核），**没有任何描边**。不变量：ratio 递减、alpha 递增（探针守这条，写反了会变成一圈实心靶子）。ratio 允许 > 1（光晕比光核大）。内层颜色自动朝白推 (1-ratio)×core_whiten → 光核偏白、光晕偏档位色。⚠ 每层是**软边光斑**（运行时生成的径向渐变贴图，见 Scripts/unit_level_badge.gd 的 `_ensure_glow_tex`），不是实心圆 —— 实心圆叠起来能数出一圈圈同心环，放大看就是个靶子（首版实拍验证后改掉的）。falloff 是这张贴图的三次方级以下的衰减指数：越大 → 中心越集中、边缘散得越快（1.5 左右最像光，>4 会缩成一粒硬点）。pulse_seconds = 「时隐时现」的两条周期（两周期不整除 → 明暗节奏不规律，不是呼吸灯）；clamp 后两端都有平台，即**真的会完全隐没、也真的会完全显现**。pulse_power > 1 → 暗的时间更长、亮的时刻更短促。max_alpha 是整体不透明度天花板（<1 才有「虚」的质感）。min_scale = 最暗时缩到多小（亮时饱满、暗时收缩，像凑近又退远）。",
+                    "tint_white": 0.55,
+                    "max_alpha": 0.9,
+                    "core_whiten": 0.5,
+                    "falloff": 1.7,
+                    "layers": [
+                        [
+                            1.3,
+                            0.14
+                        ],
+                        [
+                            0.95,
+                            0.24
+                        ],
+                        [
+                            0.62,
+                            0.44
+                        ],
+                        [
+                            0.34,
+                            1.0
+                        ]
+                    ],
+                    "pulse_seconds": [
+                        3.4,
+                        2.1
+                    ],
+                    "pulse_power": 1.15,
+                    "min_scale": 0.72
+                }
+            },
+            "flash": {
+                "_comment": "「闪一下报等级」的节奏：间隔 interval 秒随机闪一次（first_delay = 进场后第一次，别让玩家等太久才明白这光点干嘛的）。rise 胀大 / hold 保持 / fade 淡出。闪的时候**可见度被强制拉满**（orb.glow 的时隐时现会被顶掉）—— 否则光点正好处在「隐」的时刻，闪了也白闪。on_select = 点选该角色立刻闪一次（想知道就能知道）—— 这是「不常驻数字」的补偿手段。scale 比球时代大（2.0）：底球半径小了，不多胀一点数字搁不下。",
+                "interval": [
+                    5.0,
+                    9.0
+                ],
+                "first_delay": 1.5,
+                "scale": 2.0,
+                "rise": 0.15,
+                "hold": 0.7,
+                "fade": 0.35,
+                "text_size": 14,
+                "text_outline_color": "#2B2A3A",
+                "on_select": true,
+                "on_level_up": true
+            },
+            "far_fade": {
+                "_comment": "视野拉远（zoom 变小）时淡出，避免看全图时一堆光球糊成一片。start_zoom 开始淡、end_zoom 完全隐藏。",
+                "start_zoom": 0.95,
+                "end_zoom": 0.7
+            },
+            "noise_link": {
+                "_comment": "光球跟着**角色自身噪音**（noise.self —— 菜单右下第 1 行，**不是**世界噪音）变快：越吵 = 绕得越快、明灭越急、报等级的闪也越频繁（2026-09-18 用户定）。做法是给整条时间轴乘一个倍数（`_t += delta × speed`），而不是分别去改每条曲线各自的频率 —— 后者会让摆动相位 / 明灭相位 / 抖动各走各的，加速那一瞬光点会「抖一下」；乘同一个 `_t` 则所有东西同步加速且**相位连续**，看不出是被调快了，只会觉得它更躁动。reference = 自身噪音到多少算 100%（按这个取值：脚步 22 → 一档都不到，剑击 120 → 约 1.7 倍，强弩 240 → 顶格）。curve > 1 → 安静时几乎不变、吵起来才明显提速（否则光点会被呼吸般的脚步声带着一跳一跳）。boost_flash = 自动闪烁的倒计时也乘同一倍数。⚠ `speed_sway` 那条「两条 sway 之和 < spin_speed」的约束是按 1 倍速写的，但整体等比放大不会让 ω 越过零点，所以加速后依然不会掉头 —— 探针 K 段在 3 倍速下也验了一遍。",
+                "enabled": true,
+                "reference": 240.0,
+                "max_speed_multiplier": 3.0,
+                "curve": 1.4,
+                "boost_flash": true
+            },
+            "colors": {
+                "_comment": "档位球色（2026-09-18 整体提亮）。旧值 blue #378ADD / purple #7F77DD / black #5F5E5A / gold #EF9F27 明度都偏低，压到 18px 屏幕上显脏；精锐档那颗 #5F5E5A 更是「太深」的最大来源。精锐改**银灰** —— 与 6–8 级角色的 Black 阵营甲同属黑白灰一族（银就是黑甲的提亮版），档位语义不丢。出击面板色块读的是同一份配置，会一起变。",
+                "blue": "#4FA8F0",
+                "purple": "#A98CFF",
+                "black": "#C9D2E0",
+                "gold": "#FFC53D"
+            }
+        },
+        "roster": {
+            "_comment": "名册：跨局持久的**单位实例**（死亡永久，所以等级挂在具体的人身上，而不是兵种上）。starting = 首次游玩白送的 0 级新兵；recruit_free = 名册空了是否免费补招（不给时就只能等复活功能）。",
+            "starting": [
+                "spearman",
+                "archer",
+                "swordsman",
+                "monk"
+            ],
+            "recruit_free": true,
+            "max_size": 8
+        },
+        "traits": {
+            "_comment": "升级特性（2026-09-18 用户定）：每次升级**随机获得一个特性 +1 层**，收益按层累计（id 即属性键，层数 × per_stack）。等级越高攒的层越多 = 收益越大。**per_stack 一律是整数「单位」**（速度 +5、攻击 +7、攻击距离 +4 这种），不写小数。unit=flat 是把 per_stack 当点数直接相加（移速 px/s、气血点、视野/攻击距离/弹速 px）；unit=pct 用在攻击频率上，per_stack = 每层加的**整数百分点**（5 = 每层 +5%），前摇/判定/后摇 除以 (1 + 层数×5/100)，层越多打得越快。defense 是**入伤减免的点数**（take_damage 里先扣再算，扣到 0 就不掉血）。8 条一视同仁被抽中（均匀随机、无权重）。",
+            "list": [
+                {
+                    "id": "attack",
+                    "name": "攻击",
+                    "unit": "flat",
+                    "per_stack": 7
+                },
+                {
+                    "id": "defense",
+                    "name": "防御",
+                    "unit": "flat",
+                    "per_stack": 5
+                },
+                {
+                    "id": "hp",
+                    "name": "气血",
+                    "unit": "flat",
+                    "per_stack": 5
+                },
+                {
+                    "id": "move_speed",
+                    "name": "移速",
+                    "unit": "flat",
+                    "per_stack": 5
+                },
+                {
+                    "id": "vision",
+                    "name": "视野距离",
+                    "unit": "flat",
+                    "per_stack": 5
+                },
+                {
+                    "id": "attack_range",
+                    "name": "攻击距离",
+                    "unit": "flat",
+                    "per_stack": 4
+                },
+                {
+                    "id": "attack_speed",
+                    "name": "攻击频率",
+                    "unit": "pct",
+                    "per_stack": 5
+                },
+                {
+                    "id": "projectile_speed",
+                    "name": "投射体速度",
+                    "unit": "flat",
+                    "per_stack": 5
+                }
+            ]
+        }
+    },
+    "sprites": {
+        "view": {
+            "sprite_scale": 0.5,
+            "sprite_offset_y": -24.0,
+            "sprite_pixel_unit": 2.0
+        },
+        "fps": {
+            "idle": 3,
+            "walk": 10,
+            "attack": 14,
+            "dodge": 14,
+            "hit": 16,
+            "dead": 8
+        },
+        "idle": {
+            "down": [
+                "res://Assets/Art/Sprites/Player/player_idle_down_00.png",
+                "res://Assets/Art/Sprites/Player/player_idle_down_01.png"
+            ],
+            "up": [
+                "res://Assets/Art/Sprites/Player/player_idle_up_00.png",
+                "res://Assets/Art/Sprites/Player/player_idle_up_01.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Player/player_idle_left_00.png",
+                "res://Assets/Art/Sprites/Player/player_idle_left_01.png"
+            ],
+            "right": [
+                "res://Assets/Art/Sprites/Player/player_idle_right_00.png",
+                "res://Assets/Art/Sprites/Player/player_idle_right_01.png"
+            ]
+        },
+        "walk": {
+            "down": [
+                "res://Assets/Art/Sprites/Player/player_walk_down_00.png",
+                "res://Assets/Art/Sprites/Player/player_walk_down_01.png",
+                "res://Assets/Art/Sprites/Player/player_walk_down_02.png",
+                "res://Assets/Art/Sprites/Player/player_walk_down_03.png"
+            ],
+            "up": [
+                "res://Assets/Art/Sprites/Player/player_walk_up_00.png",
+                "res://Assets/Art/Sprites/Player/player_walk_up_01.png",
+                "res://Assets/Art/Sprites/Player/player_walk_up_02.png",
+                "res://Assets/Art/Sprites/Player/player_walk_up_03.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Player/player_walk_left_00.png",
+                "res://Assets/Art/Sprites/Player/player_walk_left_01.png",
+                "res://Assets/Art/Sprites/Player/player_walk_left_02.png",
+                "res://Assets/Art/Sprites/Player/player_walk_left_03.png"
+            ],
+            "right": [
+                "res://Assets/Art/Sprites/Player/player_walk_right_00.png",
+                "res://Assets/Art/Sprites/Player/player_walk_right_01.png",
+                "res://Assets/Art/Sprites/Player/player_walk_right_02.png",
+                "res://Assets/Art/Sprites/Player/player_walk_right_03.png"
+            ]
+        }
+    },
+    "player3d": {
+        "world_height": 5.2,
+        "shaded": false,
+        "brightness": 1.06,
+        "shadow": true,
+        "shadow_size": 0.86,
+        "shadow_alpha": 0.34,
+        "ring_radius": 0.34,
+        "ring_color": "#4fc3f7",
+        "anchor_offset_px": 40,
+        "debug_marker": false,
+        "sprite_set": "ts",
+        "filter": "linear",
+        "alpha_cut": false
+    },
+    "camera": {
+        "pan_speed": 1600.0,
+        "return_key": 70,
+        "_comment_zoom": "2D 滚轮缩放（本项目唯一使用的相机）。单位是 Camera2D 的「放大倍数」：越大越近。",
+        "zoom_min": 0.35,
+        "zoom_max": 3.0,
+        "zoom_step": 0.12,
+        "zoom_smooth": 14.0,
+        "zoom_at_cursor": true,
+        "zoom_invert": false,
+        "zoom_fit_bounds": true,
+        "zoom_hud": true,
+        "_comment_edge": "边缘滚屏：鼠标贴到窗口边就让画面往那边滚（RTS 手感）。margin 单位是逻辑像素（开画面缩放时视口恒为 1920×1080，24px ≈ 短边 2.2%）；speed_mult 是相对 pan_speed 的倍率；ignore_ui=true 时鼠标停在可交互控件（按钮/面板）上不滚。窗口失去焦点一律不滚。",
+        "edge_pan_enabled": true,
+        "edge_pan_margin": 24.0,
+        "edge_pan_speed_mult": 1.0,
+        "edge_pan_ignore_ui": true
+    },
+    "camera3d": {
+        "size": 32.0,
+        "pan_speed": 26,
+        "zoom_min": 16.0,
+        "zoom_max": 150,
+        "zoom_step": 0.12,
+        "zoom_smooth": 14,
+        "zoom_at_cursor": true,
+        "zoom_invert": false,
+        "zoom_fit_bounds": true,
+        "zoom_hud": true,
+        "cam_distance": 120,
+        "pitch_deg": 45.5,
+        "base_size": 26.0
+    },
+    "enemy": {
+        "count": 100,
+        "min_distance_from_player_cells": 20,
+        "max_hp": 40,
+        "contact_damage": 10,
+        "contact_cooldown_seconds": 1.0,
+        "knockback_px": 32.0,
+        "speed": 360.0,
+        "chase_speed_multiplier": 1.35,
+        "hit_flash_seconds": 0.22,
+        "hit_knockback_px": 14.0,
+        "hit_squash_amount": 0.18,
+        "hit_stun_seconds": 0.0,
+        "death_fade_seconds": 0.45,
+        "vision_cells": 10,
+        "vision_blocked_by_walls": true,
+        "los_step_cells": 0.35,
+        "lose_sight_seconds": 3.0,
+        "ai_active_radius_cells": 32,
+        "patrol_radius_cells": 6,
+        "patrol_idle_seconds": 1.5,
+        "repath_interval_seconds": 0.4,
+        "ai": {
+            "_comment": "敌人 AI 的**全局默认值**，兵种可在 enemy_types.types[*].ai 里按键覆盖（劫掠者就覆盖了全部三项，见 §5.5）。没写 ai 段的兵种 = 完全按这里走。",
+            "_note_roam": "roam.mode 决定「去哪游荡」：home_radius（默认）= 只在出生点周围 patrol_radius_cells 格的方形范围里随机选点 —— 这就是用户说的『其他怪只在一个固定的范围内移动』；whole_map = 在整张地图上随机挑一个可达点走过去（劫掠者『满地图随机游走』）。两种模式都只在**没有噪音、没挨打**时生效：一旦听到动静或被攻击，立刻转调查/追击去追声源（见 noise.sources.hurt）。",
+            "_note_pack": "pack = 同兵种结伙：两只同类靠近到 join_radius_px 内，后来者加入先到者的群，之后**跟着群主一起移动**（群主铺目标，成员跟队形）。max_members 是**每群上限**（用户 2026-09-17 定：『上限先做到 5 个』），装满了就不再收人；群主死亡时由同群下一个活着的成员自动接任。",
+            "_note_sens": "noise_sensitivity = 这个兵种的**耳朵倍率**：>1 听得更远也更清（等效听力半径 ×倍率、同样距离听到的强度也更高）。劫掠者『对声音更敏感』就是它。",
+            "roam": {
+                "mode": "home_radius",
+                "patrol_radius_cells": 6.0,
+                "min_target_distance_px": 320.0,
+                "max_target_distance_px": 0.0,
+                "sample_attempts": 24
+            },
+            "noise_sensitivity": 1.0,
+            "pack": {
+                "enabled": false,
+                "max_members": 5,
+                "join_radius_px": 160.0,
+                "follow_distance_px": 48.0,
+                "scan_interval_seconds": 1.0,
+                "repath_interval_seconds": 0.4
+            }
+        },
+        "hp_bar": {
+            "_comment": "敌人头顶血条（2026-09-17 新增）。项目此前没有敌人血条（血量只出现在 HUD 文字与菜单栏的目标信息里），是为了弓手「幻影分身」的「本体和分身血条同步」需求补的通用件（Scripts/enemy_hp_bar.gd），所有敌人都共用。显示规则：满血且没挨过打 → 不画（零绘制开销）；挨一次伤害 → 显示 show_seconds 秒后自动隐去。",
+            "_note_sync": "本体与分身的血条**颜色/尺寸/位置完全一致**是刻意的 —— 幻影分身靠「看不出哪个是真身」迷惑玩家，谁都不许按 is_phantom 换色。",
+            "enabled": true,
+            "width_px": 28.0,
+            "height_px": 4.0,
+            "offset_y": -68.0,
+            "show_seconds": 3.0,
+            "bg_color": "#0000008c",
+            "color": "#e04a3c",
+            "low_color": "#ffd54f"
+        },
+        "drop": {
+            "chance": 1.0,
+            "amount_min": 2,
+            "amount_max": 6,
+            "weights": {
+                "wood": 3,
+                "stone": 3,
+                "iron": 2,
+                "food": 3,
+                "gold": 1,
+                "oil": 1
+            }
+        }
+    },
+    "noise": {
+        "hear_radius_cells": 16,
+        "min_notice": 4,
+        "wall_attenuation": 0.5,
+        "decay_per_second": 10,
+        "max_alertness": 150,
+        "footstep_interval_seconds": 0.4,
+        "thresholds": {
+            "suspicious": 15,
+            "investigate": 30,
+            "combat": 70
+        },
+        "sources": {
+            "_note_hurt": "hurt = **被玩家打中时**该敌人自己涨的警觉度（2026-09-17 新增）。攻击者位置由调用方传进来（近战=玩家位置、箭=出膛点、强弩=玩家位置），敌人据此转「调查」走向攻击者 —— 用户定的规则：「其他怪只在一个固定的范围内移动，受到攻击或者噪音，再移动」。写 0 = 关掉这条反应。",
+            "walk": 22,
+            "dodge": 40,
+            "attack": 120,
+            "shout": 160,
+            "sniper_shot": 240,
+            "hurt": 100
+        },
+        "ring_duration_seconds": 0.7,
+        "ring_color": "#ffd54f",
+        "ring_alpha": 0.35,
+        "ring_min_intensity": 35,
+        "ring_min_interval_seconds": 0.15,
+        "self": {
+            "_comment": "**角色自身噪音**（菜单右下第 1 行，等级光球读的就是它）。**每个角色一份**，存在 player.self_noise 里；菜单栏显示全队**最大值**（『我此刻有多吵』= 最吵的那个人）。线性衰减（每秒固定掉这么多点），所以小动静（脚步 22）几秒就归零、大动静（强弩 240）要三秒左右 —— 「自身噪音降得快」。入门落差：attack 120 ≈ 1.3 秒衰减完。max 是硬上限，同时也是自身噪音参与 link 换算的分母。",
+            "decay_per_second": 90,
+            "max": 300
+        },
+        "world": {
+            "_comment": "**世界累计噪音**（菜单右下第 2 行，全局一份）。读法：把地图想象成一个紧张度水位 —— 谁在闹都会涨，不闹了才慢慢退。用**比例**衰减（每秒掉自身 ×ratio）而不是固定点数：固定点数会让系统变成『低于阈值就归零、高于就爆表』的开关，比例衰减则天然有稳态、且退场时先是快、尾巴拖得长（时间常数 1/ratio ≈ 17 秒）＝「世界噪音降得慢」。reference 是菜单条形归一参考（一次剑击 120、强弩一发 240；2000 ≈ 十来次挥击的持续暴露量），max 是硬上限。",
+            "decay_ratio_per_second": 0.06,
+            "max": 4000,
+            "reference": 2000
+        },
+        "link": {
+            "_comment": "两条噪音的**互相喂养**（用户原话：『自身噪音会累加世界噪音，世界噪音增加，也会让自身噪音加的更快』）。self_to_world_per_second = 自身噪音**满格**时每秒往世界噪音里灌的点数（按比例：实际灌入 = 360 × self/self.max）；world_to_self_gain = 世界噪音**达到 reference** 时，新发声额外增长的倍率加成（0 → 无耦合，1.2 → 最吵时同样的动作涨 2.2 倍）。⚠ 这是**正反馈**：两者都有 hard cap（self.max / world.max），所以不会发散，但把 gain 调大会让局面一旦吵起来就再也压不下去（谁 explain 都想走的那种联动），调前先想清楚。",
+            "self_to_world_per_second": 360,
+            "world_to_self_gain": 1.2
+        },
+        "display": {
+            "_comment": "菜单右下的读数接线：第 1 行 = 自身噪音（全队最大值，见 noise.self），第 2 行 = 世界噪音（见 noise.world）。**只统计小队自己发出的声音**（emit 的 from_player）—— 敌人呼喊不计入，否则会被误读成『是我在吵』。levels 决定第 1 行的档位名与配色（从高往低匹配 min）。",
+            "alert_watch_interval_seconds": 0.25,
+            "levels": [
+                {
+                    "name": "安静",
+                    "min": 0,
+                    "color": "#7bc86c"
+                },
+                {
+                    "name": "轻响",
+                    "min": 45,
+                    "color": "#d8c34a"
+                },
+                {
+                    "name": "吵闹",
+                    "min": 120,
+                    "color": "#e08a3c"
+                },
+                {
+                    "name": "震耳",
+                    "min": 200,
+                    "color": "#d8452f"
+                }
+            ]
+        }
+    },
+    "combat": {
+        "weapons": {
+            "_comment": "武器表。kind = melee 走原来的扇形 Hitbox；kind = ranged 在判定帧发射弹道（见 Scripts/combat/projectile.gd）。sprite_set = \"\" 表示『跟随 player.sprite_set』；近战 sword/spear 已各自锁 sprites_ts / sprites_lancer，弓必须锁 sprites_archer，因为拉弓动作只存在于弓手素材。四项 timing 与 damage/range/arc/max_targets 都是**按武器**覆盖 combat.attack 的同名键；缺键就回落到 combat.attack，所以老行为不变。noise 覆盖 noise.sources.attack（弓比剑安静，潜行时是可利用的差异）。",
+            "sword": {
+                "name": "剑",
+                "kind": "melee",
+                "sprite_set": "sprites_ts",
+                "damage": 25,
+                "range_px": 120.0,
+                "arc_degrees": 200,
+                "max_targets": 3,
+                "windup_seconds": 0.12,
+                "active_seconds": 0.08,
+                "recovery_seconds": 0.2,
+                "noise": 120
+            },
+            "spear": {
+                "name": "长枪",
+                "kind": "melee",
+                "sprite_set": "sprites_lancer",
+                "damage": 26,
+                "range_px": 180.0,
+                "arc_degrees": 120,
+                "max_targets": 2,
+                "windup_seconds": 0.15,
+                "active_seconds": 0.08,
+                "recovery_seconds": 0.25,
+                "noise": 110
+            },
+            "staff": {
+                "_comment": "法杖（2026-09-18 随「僧侣」加入）。**kind 复用现成的 melee**（扇形 Hitbox），一行 combat 代码都不改 —— 这轮的边界就是「只加外观、能选能打」，治疗机制留作后续任务。数值定位刻意做成**低伤低噪的中距近战**：伤害 18（低于剑 25 / 枪 26）、射程 140（夹在剑 120 与枪 180 之间）、扇形 140° 打 2 个，噪音 60 是四把武器里最小的（比弓的 70 还安静）—— 施法声本就不该像刀剑碰撞那么响，也给日后「奶妈不该引怪」留出空间。三段时间（0.2/0.1/0.35 = 0.65s）刻意放慢，去贴 Heal 动画那 11 帧的施法韵律（14fps ≈ 0.79s，动画略长于判定，末帧停留等待 recovery）。",
+                "name": "法杖",
+                "kind": "melee",
+                "sprite_set": "sprites_monk",
+                "damage": 18,
+                "range_px": 140.0,
+                "arc_degrees": 140,
+                "max_targets": 2,
+                "windup_seconds": 0.2,
+                "active_seconds": 0.1,
+                "recovery_seconds": 0.35,
+                "noise": 60
+            },
+            "bow": {
+                "name": "弓",
+                "kind": "ranged",
+                "sprite_set": "sprites_archer",
+                "damage": 20,
+                "range_px": 0.0,
+                "arc_degrees": 0,
+                "max_targets": 1,
+                "windup_seconds": 0.3,
+                "active_seconds": 0.06,
+                "recovery_seconds": 0.18,
+                "noise": 70,
+                "projectile": {
+                    "_comment": "箭矢：直线飞行，撞墙/超射程/命中即消失。hit_radius_px 是判定半径（点到飞行线段的最近距离，天然防穿透）。Arrow.png 实测 43x12、在 64x64 画布里居中（中心偏移 -0.5,0），所以按速度角旋转时不用额外补偿。",
+                    "texture": "res://Assets/Art/Sprites/Projectiles/arrow.png",
+                    "speed": 900.0,
+                    "max_distance_px": 640.0,
+                    "hit_radius_px": 16.0,
+                    "scale": 1.0,
+                    "muzzle_offset_px": 22.0,
+                    "max_targets": 1
+                }
+            },
+            "sniper": {
+                "name": "强弩",
+                "kind": "hitscan",
+                "sprite_set": "sprites_crossbowman",
+                "damage": 90,
+                "range_px": 0.0,
+                "arc_degrees": 0,
+                "max_targets": 2,
+                "windup_seconds": 0.55,
+                "active_seconds": 0.04,
+                "recovery_seconds": 0.9,
+                "noise": 240,
+                "hitscan": {
+                    "_comment": "强弩速射：判定帧瞬间沿瞄准线结算（不做飞行弹道，弩箭就该是即中）。first_wall_point 按半格采样找第一个墙点截断射程；targets_on_segment 按沿线先后排序取前 pierce 个（穿透）。muzzle 沿 facing 偏移，与挂点箭尖大致对齐。",
+                    "max_distance_px": 900.0,
+                    "hit_radius_px": 18.0,
+                    "pierce": 2,
+                    "muzzle_offset_px": 34.0,
+                    "tracer_width": 2.5,
+                    "tracer_color": "#ffd873",
+                    "tracer_fade_seconds": 0.18,
+                    "impact_radius": 26.0,
+                    "impact_color": "#ff9a3d"
+                }
+            }
+        },
+        "auto_attack": {
+            "_comment": "2026-09-17 起战斗全自动：角色有两个独立属性 —— 观察视野（player.vision_radius_cells × 格宽）与攻击距离（近战 range_px / 远程 projectile.max_distance_px / 瞬狙 hitscan.max_distance_px）。自动索敌只在『视野内 ∩ 有效攻击距离内』选最近敌人，够不着的不追、不打（角色原地不动）。有效攻击距离 = min(攻击距离, 观察视野)，所以无论怎么配数值都不会打到看不见的目标；设计上观察视野预期大于攻击距离。enabled=false 可整套关掉回到纯手动移动。",
+            "enabled": true,
+            "scan_interval_seconds": 0.15
+        },
+        "input": {
+            "_comment": "2026-09-17 起没有手动攻击键/攻击鼠标键（战斗全自动），只保留冲刺键；buffer_seconds 仍服务于冲刺等缓冲输入。",
+            "buffer_seconds": 0.25,
+            "dodge_key": 32
+        },
+        "player": {
+            "_comment": "hitstun_seconds=挨一发后定住多久；invincible_after_hit_seconds=受击后的无敌帧；knockback_speed=击退初速（像素/秒，硬直内线性衰减到 0）。dodge_cancel_*：硬直满 dodge_cancel_after_seconds 后允许用冲刺键取消（手感优先，代价是硬直的惩罚变弱；关掉=老行为，硬直期间完全不吃输入）。hit_direction_*：受击方向指示（实现在 hit_direction_indicator.gd），在**挨打那名角色的屏幕位置**朝攻击者画一道红楔，fade_seconds 内淡掉；radius_px=楔的中线到该角色屏幕位置的距离、band_px=环带厚度（都是视口像素，视口固定 960x540，改窗口大小不影响），arc_degrees=张角，peak_alpha=峰值不透明度，max_marks=同屏最多记几个方向（小队多人同时挨打）。segments=楛的细分段数（越大越圆，12 已看不出折角）。",
+            "max_hp": 100,
+            "hitstun_seconds": 0.25,
+            "invincible_after_hit_seconds": 0.4,
+            "knockback_speed": 560.0,
+            "dodge_cancel_enabled": true,
+            "dodge_cancel_after_seconds": 0.08,
+            "hit_direction_enabled": true,
+            "hit_direction_radius_px": 150.0,
+            "hit_direction_band_px": 46.0,
+            "hit_direction_arc_degrees": 46.0,
+            "hit_direction_fade_seconds": 0.7,
+            "hit_direction_peak_alpha": 0.85,
+            "hit_direction_color": "#ff5a4a",
+            "hit_direction_max_marks": 4,
+            "hit_direction_segments": 12
+        },
+        "hit_stop": {
+            "_comment": "命中微冻（hitstop）：命中那一瞬把 Engine.time_scale 压到 time_scale，停 seconds 秒后再弹回。这是打击感的第一个来源——没有它，白闪/挤压做得再花也『打不动人』。cooldown_seconds 之内不叠加：连发武器会把画面钉住。挨打比打人停得久一点（on_receive_damage），因为『我被打中』要更贵。注意 Engine.time_scale 只被这一处占用；debug.time_scale 是局内倒计时的独立乘数，两者别混。",
+            "enabled": true,
+            "cooldown_seconds": 0.1,
+            "on_deal_damage": {
+                "seconds": 0.045,
+                "time_scale": 0.06
+            },
+            "on_receive_damage": {
+                "seconds": 0.075,
+                "time_scale": 0.05
+            }
+        },
+        "attack": {
+            "windup_seconds": 0.12,
+            "active_seconds": 0.08,
+            "recovery_seconds": 0.2,
+            "cancel_window_seconds": 0.08,
+            "damage": 25,
+            "range_px": 120.0,
+            "arc_degrees": 200,
+            "max_targets": 3
+        },
+        "dodge": {
+            "duration_seconds": 0.22,
+            "speed_multiplier": 3.0,
+            "invincible": true,
+            "cooldown_seconds": 0.8
+        },
+        "separation": {
+            "_comment": "碰撞方案 A（用户 2026-09-19 定）：敌人/动物仍是 Area2D 传感器、follow_path() 照旧直接写坐标，只在每物理帧收尾加一层圆-圆互推（实现在 unit_separation.gd，由 main.gd 每局挂进 game_root）。这是**软阻挡**：能消掉「一队人叠成一个点」，但窄门口仍会挤过去 —— 要门口真堵住得换 CharacterBody2D 或网格占位。radius_px 必须 ≤ map.tile_size（当前 64）的一半：分离层按地图格分桶、只查 3x3 邻格，圆再大就漏配对（探针会按这条实算卡住）。strength=一次推开重叠量的比例（1=一帧就完全分开，会抖；越小越软）；max_push_px_per_frame=单帧位移上限，防止一帧瞬移穿墙；clamp_to_walkable=把推出来的落点夹回可走格（只管中心格，与 animal.gd::_can_stand 同规则）；player_is_wall=玩家当不可动的墙：单位独自承担整份重叠，玩家本身绝不被人群推着走（它是 CharacterBody2D，有自己的 move_and_slide）。",
+            "enabled": true,
+            "strength": 0.55,
+            "max_push_px_per_frame": 8.0,
+            "clamp_to_walkable": true,
+            "player_is_wall": true,
+            "radius_px": {
+                "enemies": 22.0,
+                "animals": 18.0,
+                "player": 20.0
+            }
+        }
+    },
+    "loot": {
+        "density": 0.05,
+        "amount_per_node": 10,
+        "pickup_radius_px": 80.0,
+        "pickup_retry_seconds": 0.5,
+        "icon_px": 44,
+        "ring_radius_px": 26
+    },
+    "storage": {
+        "max_slots": 20,
+        "stack_limit": 1000
+    },
+    "session": {
+        "time_limit_seconds": 3600,
+        "extraction_hold_seconds": 3
+    },
+    "survival": {
+        "_comment": "局内每分钟物资消耗。supplies = 消耗表（2026-09-18 从「只有食物一个键」改成结构化列表，为的是以后加一种物资只加一行、不改代码）：per_meal = 每 meal_interval_seconds 扣几份；shortage_debuff = **短缺时**扣的属性点数，正数表示扣这么多，键名复用 progression.traits 的属性 id（attack 点 / defense 点 / move_speed px每秒 / vision px / attack_range px / attack_speed 百分点 / projectile_speed px每秒）。**补上物资立刻全额还原**，扣减不进存档；hp 故意不支持——中途缩上限会牵动已有血量与血条语义。短缺**不致死**：饥饿仍按 starvation_interval_seconds 掉 starvation_damage 血，但血量封在 starvation_hp_floor 之上，最后一滴只能由敌人补刀。",
+        "meal_interval_seconds": 60,
+        "supplies": [
+            {
+                "_comment": "口粮。饿肚子掉的是**输出和腿速**（攻击 -7 = 正好一层攻击特性；移速 -10 px/s 相对出厂 player.speed 640 只有 1.6%，是「脚步发沉」的手感而非硬惩罚）—— 打不动、跑不快，但死不了人。",
+                "id": "food",
+                "per_meal": 1,
+                "shortage_debuff": {
+                    "attack": 7,
+                    "move_speed": 10
+                }
+            }
+        ],
+        "starvation_damage": 5,
+        "starvation_interval_seconds": 30,
+        "starvation_hp_floor": 1,
+        "heal_per_food": 25,
+        "eat_cooldown_seconds": 1.0,
+        "eat_key": 72
+    },
+    "extraction": {
+        "count": 3,
+        "spawn_at_minutes": 30,
+        "close_one_at_minutes": [
+            45,
+            55
+        ],
+        "min_distance_from_spawn_cells": 24,
+        "min_distance_between_points_cells": 28,
+        "trigger_radius": 96.0,
+        "minimap": {
+            "duration_seconds": 60,
+            "warn_before_close_seconds": 60,
+            "size_px": 220
+        }
+    },
+    "base": {
+        "map_size": 64,
+        "fit_camera_on_enter": true,
+        "building_cells": 4,
+        "floor_3d": "wall_plate.png",
+        "floor_uv_scale": 0.22,
+        "wall_height": 1.8,
+        "interact_radius_cells": 4.5,
+        "player_spawn_cell": [
+            32,
+            32
+        ],
+        "buildings": [
+            {
+                "_comment": "基地建筑表（2026-09-18 全量换上 Tiny Swords Blue Buildings 素材，8 栋齐）。**建筑渲染全自动**：Building.gd 按贴图尺寸等比缩放到 4×4 格框（屋顶可向上探出 1.4 倍）、脚底对齐占地底边，贴图缺失时保底一块 id 配色方块不消失。cell = 占地**左上角**格、占 4×4；玩家重摆过的位置存在 Meta.base_layout 优先于这里的 cell（新增 id 不在存档里 → 直接用配置值）。hint 为空 = 纯装饰（点击只 push_warning 不会崩，main 的 match 有 default 分支）。",
+                "id": "warehouse",
+                "name": "仓库",
+                "cell": [
+                    10,
+                    30
+                ],
+                "hint": "按 E 查看仓库",
+                "h3d": 2.6,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_house1.png"
+            },
+            {
+                "id": "statue",
+                "name": "修道院",
+                "cell": [
+                    38,
+                    30
+                ],
+                "hint": "按 E 进行升级",
+                "h3d": 3.4,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_monastery.png"
+            },
+            {
+                "id": "gate",
+                "name": "出发大门",
+                "cell": [
+                    24,
+                    30
+                ],
+                "hint": "按 E 选择角色出发",
+                "h3d": 2.2,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_castle.png"
+            },
+            {
+                "id": "archery",
+                "name": "箭术场",
+                "cell": [
+                    38,
+                    16
+                ],
+                "hint": "",
+                "h3d": 2.6,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_archery.png"
+            },
+            {
+                "id": "barracks",
+                "name": "兵营",
+                "cell": [
+                    52,
+                    16
+                ],
+                "hint": "",
+                "h3d": 2.6,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_barracks.png"
+            },
+            {
+                "id": "tower",
+                "name": "瞭望塔",
+                "cell": [
+                    52,
+                    30
+                ],
+                "hint": "",
+                "h3d": 3.2,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_tower.png"
+            },
+            {
+                "id": "house2",
+                "name": "民居",
+                "cell": [
+                    10,
+                    44
+                ],
+                "hint": "",
+                "h3d": 2.0,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_house2.png"
+            },
+            {
+                "id": "house3",
+                "name": "民居",
+                "cell": [
+                    24,
+                    44
+                ],
+                "hint": "",
+                "h3d": 2.0,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_house3.png"
+            },
+            {
+                "id": "farm",
+                "name": "谷仓",
+                "cell": [
+                    10,
+                    16
+                ],
+                "hint": "",
+                "h3d": 2.6,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_farm.png"
+            },
+            {
+                "id": "quarry",
+                "name": "采石场",
+                "cell": [
+                    38,
+                    44
+                ],
+                "hint": "",
+                "h3d": 2.6,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_quarry.png"
+            },
+            {
+                "id": "portal",
+                "name": "传送门",
+                "cell": [
+                    24,
+                    16
+                ],
+                "hint": "",
+                "h3d": 3.4,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_portal.png"
+            },
+            {
+                "id": "catapult",
+                "name": "弩车",
+                "cell": [
+                    52,
+                    44
+                ],
+                "hint": "",
+                "h3d": 1.6,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_catapult.png"
+            }
+        ]
+    },
+    "resources": {
+        "wood": {
+            "name": "木头",
+            "rarity": "common",
+            "value": 1,
+            "color": "#8a6a3f",
+            "per_node": 20,
+            "harvest_time_seconds": 2.5,
+            "sprite": "res://Assets/Art/Sprites/Items/item_wood.png"
+        },
+        "stone": {
+            "name": "石头",
+            "rarity": "common",
+            "value": 1,
+            "color": "#9a9aa0",
+            "per_node": 20,
+            "harvest_time_seconds": 2.5,
+            "sprite": "res://Assets/Art/Sprites/Items/item_stone.png"
+        },
+        "iron": {
+            "name": "铁",
+            "rarity": "common",
+            "value": 2,
+            "color": "#bfc8d4",
+            "per_node": 30,
+            "harvest_time_seconds": 4.0,
+            "sprite": "res://Assets/Art/Sprites/Items/item_iron.png"
+        },
+        "gold": {
+            "name": "金币",
+            "rarity": "rare",
+            "value": 10,
+            "color": "#d9b13b",
+            "per_node": 15,
+            "harvest_time_seconds": 5.0,
+            "sprite": "res://Assets/Art/Sprites/Items/item_gold.png"
+        },
+        "oil": {
+            "name": "石油",
+            "rarity": "rare",
+            "value": 8,
+            "color": "#2a2a30",
+            "per_node": 40,
+            "harvest_time_seconds": 6.0,
+            "sprite": "res://Assets/Art/Sprites/Items/item_oil.png"
+        },
+        "food": {
+            "name": "食物",
+            "rarity": "common",
+            "value": 1,
+            "color": "#5da04e",
+            "per_node": 10,
+            "harvest_time_seconds": 3.0,
+            "sprite": "res://Assets/Art/Sprites/Items/item_food.png"
+        }
+    },
+    "meta_progression": {
+        "survival": {
+            "max_hp": {
+                "name": "生命上限",
+                "format": "int",
+                "base": 100,
+                "per_level": 10,
+                "max_level": 5,
+                "cost": {
+                    "iron": 30
+                }
+            },
+            "backpack_capacity": {
+                "name": "背包容量",
+                "format": "int",
+                "base": 10,
+                "per_level": 2,
+                "max_level": 5,
+                "cost": {
+                    "wood": 25,
+                    "gold": 1
+                }
+            },
+            "extraction_speed": {
+                "name": "撤离速度",
+                "format": "percent",
+                "base": 1.0,
+                "per_level": 0.05,
+                "max_level": 5,
+                "cost": {
+                    "wood": 20,
+                    "gold": 1
+                }
+            },
+            "warehouse_capacity": {
+                "name": "仓库容量",
+                "format": "int",
+                "base": 20,
+                "per_level": 5,
+                "max_level": 5,
+                "cost": {
+                    "stone": 40,
+                    "gold": 2
+                }
+            }
+        },
+        "acquisition": {
+            "resource_find_chance": {
+                "name": "资源发现率",
+                "format": "percent",
+                "base": 0.5,
+                "per_level": 0.03,
+                "max_level": 5,
+                "cost": {
+                    "stone": 25,
+                    "gold": 1
+                }
+            },
+            "rare_resource_chance": {
+                "name": "稀有资源率",
+                "format": "percent",
+                "base": 0.05,
+                "per_level": 0.01,
+                "max_level": 5,
+                "cost": {
+                    "oil": 30,
+                    "gold": 2
+                }
+            }
+        }
+    },
+    "fog": {
+        "feather_cells": 2.0
+    },
+    "fog3d": {
+        "enabled": true,
+        "height": 0.06,
+        "reveal_soft_cells": 2.2,
+        "soft_lo": 0.22,
+        "soft_hi": 0.68,
+        "color": "#040405"
+    },
+    "menu_bar": {
+        "_comment": "局内底部菜单栏（占屏高 height_ratio，即最下面 1/5），三槽：**左**=小地图（常驻，开局就有；地形/资源/撤离点/小队都画在上面，点它能给选中单位下令移动）、**中**=当前选中单位的指令面板（显示哪些按钮由 characters.list[].command_set 查 command_sets 决定，所以换单位就换一整套指令）、**右**=噪音显示（当前噪音 + 本局累积噪音 + 被惊动的敌人数）。只在局内显示，基地自动隐藏。整条栏是 mouse_filter=STOP 的控件 —— 压在它上面的鼠标不会误给世界下移动令，代价是**贴底那一边的边缘滚屏在栏区域内失效**（左右上三边与 WASD 照常）。",
+        "enabled": true,
+        "height_ratio": 0.2,
+        "min_height_px": 160,
+        "max_height_px": 320,
+        "padding_px": 8,
+        "noise_slot_px": 300,
+        "patrol_wait_seconds": 0.6,
+        "designate_pick_radius_px": 96.0,
+        "default_command_set": "combat",
+        "command_sets": {
+            "_comment": "指令集：id -> 按钮 id 列表。按钮本身长什么样、点了干什么写在 menu_bar.gd 的 _button_defs()，这里只决定「这个单位显示哪几个」。当前 4 名角色都是战斗单位，共用 combat。将来加工程/采集/医疗单位时，在 characters.list 里把它的 command_set 指到新集合（并在 _button_defs 里补按钮）即可，不需要改菜单栏布局代码。",
+            "combat": [
+                "auto_attack",
+                "stance_nearest",
+                "stance_strongest",
+                "attack_designated",
+                "patrol",
+                "cancel"
+            ]
+        },
+        "minimap": {
+            "_comment": "小地图槽 = 正方形，边长随栏高自适应（栏高 - 2×内边距）。资源点（树→木、石→石、矿脉）在地图生成后**一次性烘焙进底图**，运行时不再逐点重画。小队/撤离点是每帧实时画的（会动）。",
+            "show_resources": true,
+            "resource_colors": {
+                "wood": "#7a4a22",
+                "stone": "#8f979e",
+                "iron": "#7b8fa8",
+                "gold": "#d8b437",
+                "oil": "#6f45c8",
+                "food": "#66b85c"
+            }
+        }
+    },
+    "menu": {
+        "_comment": "开始菜单。game_scene = 新建/历史存档后进入的场景，**本项目只做 2D 线**，所以固定指 res://Scenes/Main.tscn（3D 场景不在计划内，保留只为随时 F6 回看）；save_slots = 存档槽位数（user://saves/slot_NN.json）。",
+        "title": "王国废墟：拾荒撤离",
+        "subtitle": "SteamPunk Extraction",
+        "version_label": "开发版 · Tiny Swords 2D 线",
+        "game_scene": "res://Scenes/Main.tscn",
+        "save_slots": 6,
+        "enter_base_from_menu": true,
+        "hint": "ESC 返回上一级 · 设置改动即时保存到 user://settings.json"
+    },
+    "language": {
+        "_comment": "界面语言：中文是源语言（代码原文），en 走 Data/language/translations.csv；ready=false 的项在下拉里标「 (not wired)」。切换写入 user://settings.json 的 language.current，确认应用时 TranslationServer.set_locale。",
+        "current": "zh_CN",
+        "available": [
+            {
+                "code": "zh_CN",
+                "name": "简体中文",
+                "ready": true
+            },
+            {
+                "code": "zh_TW",
+                "name": "繁體中文",
+                "ready": false
+            },
+            {
+                "code": "en",
+                "name": "English",
+                "ready": true
+            },
+            {
+                "code": "ja",
+                "name": "日本語",
+                "ready": false
+            }
+        ]
+    },
+    "audio": {
+        "_comment": "音量 0~1，作用于对应 AudioBus。项目目前还没有音频资源，Music/SFX 总线也不存在——由设置面板在应用时按需创建，属于提前把线接好。",
+        "master": 1.0,
+        "music": 0.8,
+        "sfx": 0.9,
+        "mute": false
+    },
+    "display": {
+        "_comment": "只放「project.godot 里没有、又必须让玩家改」的项。window_mode: windowed/fullscreen/borderless；vsync: disabled/enabled/adaptive；stretch_mode: disabled/canvas_items/viewport（2D 缩放策略，disabled=1:1 不缩放，与 project.godot 的默认一致）；stretch_aspect: ignore/keep/keep_width/keep_height/expand。相机/迷雾/染色不在这里——它们本来就是 config 的 camera.* / fog3d.enabled / map.grade.* / map.macro_light.*，设置面板直接写那些键，避免两处真相。",
+        "window_mode": "windowed",
+        "resolution": [
+            1920,
+            1080
+        ],
+        "vsync": "enabled",
+        "max_fps": 0,
+        "stretch_mode": "disabled",
+        "stretch_aspect": "keep"
+    },
+    "debug": {
+        "walk_seek_wet": false,
+        "force_player_hit": false,
+        "force_player_hit_offset": [
+            260,
+            -150
+        ],
+        "smoke_test": false,
+        "flow_test": true,
+        "auto_enter_run": true,
+        "main3d_start": "base",
+        "time_scale": 20.0,
+        "log_state_transitions": false,
+        "map_preview": "",
+        "map_preview_cells": 128,
+        "main3d_capture": "",
+        "main3d_capture_delay": 3.0,
+        "main3d_capture_frames": 4,
+        "map_preview_scale": 0.125
+    },
+    "nav": {
+        "snap_radius_cells": 3,
+        "unstick_radius_cells": 4
+    },
+    "sprites_hd": {
+        "fps": {
+            "idle": 3,
+            "walk": 10,
+            "attack": 14,
+            "dodge": 14,
+            "hit": 16,
+            "dead": 8
+        },
+        "idle": {
+            "down": [
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_down_00.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_down_01.png"
+            ],
+            "up": [
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_up_00.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_up_01.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_left_00.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_left_01.png"
+            ],
+            "right": [
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_right_00.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_idle_right_01.png"
+            ]
+        },
+        "walk": {
+            "down": [
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_down_00.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_down_01.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_down_02.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_down_03.png"
+            ],
+            "up": [
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_up_00.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_up_01.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_up_02.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_up_03.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_left_00.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_left_01.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_left_02.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_left_03.png"
+            ],
+            "right": [
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_right_00.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_right_01.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_right_02.png",
+                "res://Assets/Art/Sprites/PlayerHD/player_hd_walk_right_03.png"
+            ]
+        }
+    },
+    "sprites_ts": {
+        "_comment": "Tiny Swords Warrior（Blue 阵营）。官方单位是正面朝向的单向序列帧，四个方向共用同一套帧（素材本身就是正视视角，左右翻转反而别扭）。数组形式 = 四向共用，见 player_animator.gd 的 parse_spec。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -41.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 12,
+            "attack": 12,
+            "dodge": 16,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/blue_warrior/idle_00.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/idle_01.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/idle_02.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/idle_03.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/idle_04.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/idle_05.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/idle_06.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/idle_07.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/blue_warrior/run_00.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/run_01.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/run_02.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/run_03.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/run_04.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/run_05.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/blue_warrior/attack1_00.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/attack1_01.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/attack1_02.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/attack1_03.png"
+        ],
+        "dodge": [
+            "res://Assets/Art/Sprites/Units/blue_warrior/attack2_00.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/attack2_01.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/attack2_02.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/attack2_03.png"
+        ],
+        "hit": [
+            "res://Assets/Art/Sprites/Units/blue_warrior/guard_00.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/guard_01.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/guard_02.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/guard_03.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/guard_04.png",
+            "res://Assets/Art/Sprites/Units/blue_warrior/guard_05.png"
+        ],
+        "dead": []
+    },
+    "sprites_ts_purple": {
+        "_comment": "等级档位配色：purple 档（素材包 Purple Units/Warrior）。与 sprites_ts 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -41.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 12,
+            "attack": 12,
+            "dodge": 16,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/purple_warrior/idle_00.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/idle_01.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/idle_02.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/idle_03.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/idle_04.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/idle_05.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/idle_06.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/idle_07.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/purple_warrior/run_00.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/run_01.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/run_02.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/run_03.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/run_04.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/run_05.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/purple_warrior/attack1_00.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/attack1_01.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/attack1_02.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/attack1_03.png"
+        ],
+        "dodge": [
+            "res://Assets/Art/Sprites/Units/purple_warrior/attack2_00.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/attack2_01.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/attack2_02.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/attack2_03.png"
+        ],
+        "hit": [
+            "res://Assets/Art/Sprites/Units/purple_warrior/guard_00.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/guard_01.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/guard_02.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/guard_03.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/guard_04.png",
+            "res://Assets/Art/Sprites/Units/purple_warrior/guard_05.png"
+        ],
+        "dead": []
+    },
+    "sprites_ts_black": {
+        "_comment": "等级档位配色：black 档（素材包 Black Units/Warrior）。与 sprites_ts 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -41.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 12,
+            "attack": 12,
+            "dodge": 16,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/black_warrior/idle_00.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/idle_01.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/idle_02.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/idle_03.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/idle_04.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/idle_05.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/idle_06.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/idle_07.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/black_warrior/run_00.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/run_01.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/run_02.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/run_03.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/run_04.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/run_05.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/black_warrior/attack1_00.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/attack1_01.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/attack1_02.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/attack1_03.png"
+        ],
+        "dodge": [
+            "res://Assets/Art/Sprites/Units/black_warrior/attack2_00.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/attack2_01.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/attack2_02.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/attack2_03.png"
+        ],
+        "hit": [
+            "res://Assets/Art/Sprites/Units/black_warrior/guard_00.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/guard_01.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/guard_02.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/guard_03.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/guard_04.png",
+            "res://Assets/Art/Sprites/Units/black_warrior/guard_05.png"
+        ],
+        "dead": []
+    },
+    "sprites_ts_gold": {
+        "_comment": "等级档位配色：gold 档（素材包 Yellow Units/Warrior）。与 sprites_ts 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -41.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 12,
+            "attack": 12,
+            "dodge": 16,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/yellow_warrior/idle_00.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/idle_01.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/idle_02.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/idle_03.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/idle_04.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/idle_05.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/idle_06.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/idle_07.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/yellow_warrior/run_00.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/run_01.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/run_02.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/run_03.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/run_04.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/run_05.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/yellow_warrior/attack1_00.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/attack1_01.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/attack1_02.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/attack1_03.png"
+        ],
+        "dodge": [
+            "res://Assets/Art/Sprites/Units/yellow_warrior/attack2_00.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/attack2_01.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/attack2_02.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/attack2_03.png"
+        ],
+        "hit": [
+            "res://Assets/Art/Sprites/Units/yellow_warrior/guard_00.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/guard_01.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/guard_02.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/guard_03.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/guard_04.png",
+            "res://Assets/Art/Sprites/Units/yellow_warrior/guard_05.png"
+        ],
+        "dead": []
+    },
+    "sprites_crossbowman": {
+        "_comment": "强弩专用完整角色帧 v2（2026-09-17）：Tiny Swords Archer 分层源（Archer.aseprite）去掉武器层 {Bow / Bow (Front) / Arrow} 后的盔甲身体 + 弩直接烘进手里——画风与枪手/剑士一致（同套盔甲头盔），替代 v1 的 Pawn 兜帽身体（兜帽平民造型与骑士阵营割裂、且实显身高只有 43px 约为枪手一半）。烘焙脚本在会话工作区 _bake_xbowman_v2.py：每帧按姿态表定位（f0-9 托持 / f10-14 举弩瞄准 / f15-17 收回），4x 超采样。帧来源 aseprite 帧 0-5=Idle 6-9=Run 10-17=Shoot（与官方 PNG 横版图零差异，朝向一致）。画布 192x192，脚底实测 136，故 sprite_offset_y=-40、sprite_scale=0.6、unit=10（与弓兵/枪手一致）。要优化贴图直接改 Assets/Art/Sprites/Units/blue_crossbowman/ 下的 PNG。单向素材，四向共用同一套帧；dodge/hit/dead 走程序化。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -40.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 10,
+            "attack": 15,
+            "dodge": 16,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/idle_00.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/idle_01.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/idle_02.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/idle_03.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/idle_04.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/idle_05.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/run_00.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/run_01.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/run_02.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/run_03.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/shoot_00.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/shoot_01.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/shoot_02.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/shoot_03.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/shoot_04.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/shoot_05.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/shoot_06.png",
+            "res://Assets/Art/Sprites/Units/blue_crossbowman/shoot_07.png"
+        ]
+    },
+    "sprites_pawn": {
+        "_comment": "强弩专用身体：复用 Tiny Swords Pawn（脚夫，徒手、无长枪——蓝方唯一『不自带武器』的身体素材，由 red_pawn 整体色相旋转成蓝方配色生成，工具脚本见会话工作区 _make_blue_pawn.py）。这样强弩身上没有底图长枪，只靠 combat.weapons.sniper.rifle 挂点把弩『拿在手里』。Pawn 是单向素材（正视视角），四向共用同一套帧（数组形式），与 sprites_ts 同限制。画布 192x192，脚底实测 135，故 sprite_offset_y=-(135-96)=-39、sprite_scale=0.6、sprite_pixel_unit=10（与战士/弓兵对齐保证体型一致）。dodge/hit/dead 无官方帧，走程序化。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -39.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 12,
+            "attack": 12,
+            "dodge": 16,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/blue_pawn/idle_00.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/idle_01.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/idle_02.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/idle_03.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/idle_04.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/idle_05.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/idle_06.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/idle_07.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/blue_pawn/run_00.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/run_01.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/run_02.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/run_03.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/run_04.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/run_05.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/blue_pawn/attack1_00.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/attack1_01.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/attack1_02.png",
+            "res://Assets/Art/Sprites/Units/blue_pawn/attack1_03.png"
+        ]
+    },
+    "sprites_archer": {
+        "_comment": "玩家 = Tiny Swords Archer（弓手，Blue 阵营）。**弓是免费包里唯一自带完整动作集又自带独立弹道图的武器**：Idle 6 帧 / Run 4 帧 / Shoot 8 帧（完整拉弓->放箭），另有 Arrow.png 作为独立弹道素材（见 combat.weapons.bow.projectile）。Archer 是**单向**素材（正视视角，弓箭画在右侧），所以 idle/walk/attack 三项都只给 default=原图 + left/down_left/up_left=水平镜像 —— 上下朝向分不出来，这点与 Warrior 同限制，与 Lancer 的 8 向不同。画布 192x192（与 Warrior 同格），三套动作的不透明包围盒下沿实测都是 136，故 sprite_offset_y = -(136 - 96) = -40、sprite_scale = 0.6、sprite_pixel_unit = 10（与枪手 sprites_lancer 对齐，保证小队三个角色体型一致）。hit / dodge / dead 留空：官方无受击/倒地帧，走代码里的程序化抖动/冲刺拉伸/死亡倾倒。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -40.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 10,
+            "attack": 15
+        },
+        "idle": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_00.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_01.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_02.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_03.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_04.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_05.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_05.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_05.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/idle_m_05.png"
+            ]
+        },
+        "walk": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/blue_archer/run_00.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/run_01.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/run_02.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/run_03.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/blue_archer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/run_m_03.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/blue_archer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/run_m_03.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/blue_archer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/run_m_03.png"
+            ]
+        },
+        "attack": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_00.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_01.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_02.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_03.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_04.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_05.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_06.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_07.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_03.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_04.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_05.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_06.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_07.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_03.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_04.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_05.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_06.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_07.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_03.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_04.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_05.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_06.png",
+                "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_07.png"
+            ]
+        },
+        "hit": [],
+        "dodge": [],
+        "dead": []
+    },
+    "sprites_archer_purple": {
+        "_comment": "等级档位配色：purple 档（素材包 Purple Units/Archer）。与 sprites_archer 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -40.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 10,
+            "attack": 15
+        },
+        "idle": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_00.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_01.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_02.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_03.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_04.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_05.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_05.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_05.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/idle_m_05.png"
+            ]
+        },
+        "walk": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/purple_archer/run_00.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/run_01.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/run_02.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/run_03.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/purple_archer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/run_m_03.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/purple_archer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/run_m_03.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/purple_archer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/run_m_03.png"
+            ]
+        },
+        "attack": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_00.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_01.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_02.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_03.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_04.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_05.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_06.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_07.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_03.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_04.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_05.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_06.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_07.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_03.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_04.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_05.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_06.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_07.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_03.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_04.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_05.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_06.png",
+                "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_07.png"
+            ]
+        },
+        "hit": [],
+        "dodge": [],
+        "dead": []
+    },
+    "sprites_archer_black": {
+        "_comment": "等级档位配色：black 档（素材包 Black Units/Archer）。与 sprites_archer 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -40.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 10,
+            "attack": 15
+        },
+        "idle": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/black_archer/idle_00.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_01.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_02.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_03.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_04.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_05.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_05.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_05.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/black_archer/idle_m_05.png"
+            ]
+        },
+        "walk": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/black_archer/run_00.png",
+                "res://Assets/Art/Sprites/Units/black_archer/run_01.png",
+                "res://Assets/Art/Sprites/Units/black_archer/run_02.png",
+                "res://Assets/Art/Sprites/Units/black_archer/run_03.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/black_archer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_archer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_archer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_archer/run_m_03.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/black_archer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_archer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_archer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_archer/run_m_03.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/black_archer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_archer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_archer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_archer/run_m_03.png"
+            ]
+        },
+        "attack": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_00.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_01.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_02.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_03.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_04.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_05.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_06.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_07.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_03.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_04.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_05.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_06.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_07.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_03.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_04.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_05.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_06.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_07.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_03.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_04.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_05.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_06.png",
+                "res://Assets/Art/Sprites/Units/black_archer/shoot_m_07.png"
+            ]
+        },
+        "hit": [],
+        "dodge": [],
+        "dead": []
+    },
+    "sprites_archer_gold": {
+        "_comment": "等级档位配色：gold 档（素材包 Yellow Units/Archer）。与 sprites_archer 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -40.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 10,
+            "attack": 15
+        },
+        "idle": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_05.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_05.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_05.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_05.png"
+            ]
+        },
+        "walk": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_03.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_m_03.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_m_03.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/run_m_03.png"
+            ]
+        },
+        "attack": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_05.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_06.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_07.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_05.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_06.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_07.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_05.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_06.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_07.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_05.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_06.png",
+                "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_07.png"
+            ]
+        },
+        "hit": [],
+        "dodge": [],
+        "dead": []
+    },
+    "sprites_lancer": {
+        "_comment": "玩家 = Tiny Swords Lancer（枪兵，Blue 阵营）。**免费包里唯一画出多方向的兵种**：Attack / Defence 各有 Down / DownRight / Right / UpRight / Up 五向，左半边由官方右半边水平镜像得到（不是程序化硬翻，是官方设计的一部分）。Idle / Run 官方只有单向（正视视角），所以这两项的 default 给原图、left 系给镜像 —— 若原图其实是侧视，左向行为就自动正确；若原图正面对称，镜像也无副作用。画布 320x320（Warrior 是 192x192，长枪需要更宽的格），故 player.sprite_scale=0.6、player.sprite_offset_y=-38（脚底 y=198，198-160=38）、sprite_pixel_unit=10（程序化位移在局部空间，会被 scale 缩小，所以按 1/0.6 补偿）。dodge / dead 故意留空：官方无倒地帧，走代码里的程序化冲刺拉伸与死亡倾倒效果更好。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -38.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 12,
+            "attack": 12,
+            "dodge": 16,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_05.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_06.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_07.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_08.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_09.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_10.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_11.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_05.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_06.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_07.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_08.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_09.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_10.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_11.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_05.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_06.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_07.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_08.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_09.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_10.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_11.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_05.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_06.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_07.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_08.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_09.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_10.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_11.png"
+            ]
+        },
+        "walk": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_05.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_05.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_05.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/run_m_05.png"
+            ]
+        },
+        "attack": {
+            "down": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_02.png"
+            ],
+            "up": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_02.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_left_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_left_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_left_02.png"
+            ],
+            "right": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_right_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_right_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_right_02.png"
+            ],
+            "down_right": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_right_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_right_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_right_02.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_left_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_left_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_left_02.png"
+            ],
+            "up_right": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_right_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_right_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_right_02.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_left_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_left_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_left_02.png"
+            ]
+        },
+        "hit": {
+            "down": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_05.png"
+            ],
+            "up": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_05.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_left_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_left_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_left_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_left_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_left_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_left_05.png"
+            ],
+            "right": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_right_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_right_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_right_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_right_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_right_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_right_05.png"
+            ],
+            "down_right": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_right_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_right_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_right_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_right_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_right_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_right_05.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_left_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_left_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_left_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_left_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_left_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_left_05.png"
+            ],
+            "up_right": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_right_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_right_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_right_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_right_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_right_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_right_05.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_left_00.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_left_01.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_left_02.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_left_03.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_left_04.png",
+                "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_left_05.png"
+            ]
+        },
+        "dodge": [],
+        "dead": []
+    },
+    "sprites_lancer_purple": {
+        "_comment": "等级档位配色：purple 档（素材包 Purple Units/Lancer）。与 sprites_lancer 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -38.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 12,
+            "attack": 12,
+            "dodge": 16,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_05.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_06.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_07.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_08.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_09.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_10.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_11.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_05.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_06.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_07.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_08.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_09.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_10.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_11.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_05.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_06.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_07.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_08.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_09.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_10.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_11.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_05.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_06.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_07.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_08.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_09.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_10.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_11.png"
+            ]
+        },
+        "walk": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_05.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_05.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_05.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/run_m_05.png"
+            ]
+        },
+        "attack": {
+            "down": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_02.png"
+            ],
+            "up": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_02.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_left_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_left_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_left_02.png"
+            ],
+            "right": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_right_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_right_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_right_02.png"
+            ],
+            "down_right": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_right_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_right_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_right_02.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_left_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_left_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_left_02.png"
+            ],
+            "up_right": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_right_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_right_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_right_02.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_left_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_left_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_left_02.png"
+            ]
+        },
+        "hit": {
+            "down": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_05.png"
+            ],
+            "up": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_05.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_left_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_left_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_left_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_left_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_left_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_left_05.png"
+            ],
+            "right": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_right_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_right_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_right_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_right_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_right_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_right_05.png"
+            ],
+            "down_right": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_right_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_right_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_right_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_right_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_right_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_right_05.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_left_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_left_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_left_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_left_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_left_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_left_05.png"
+            ],
+            "up_right": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_right_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_right_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_right_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_right_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_right_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_right_05.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_left_00.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_left_01.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_left_02.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_left_03.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_left_04.png",
+                "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_left_05.png"
+            ]
+        },
+        "dodge": [],
+        "dead": []
+    },
+    "sprites_lancer_black": {
+        "_comment": "等级档位配色：black 档（素材包 Black Units/Lancer）。与 sprites_lancer 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -38.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 12,
+            "attack": 12,
+            "dodge": 16,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_05.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_06.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_07.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_08.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_09.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_10.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_11.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_05.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_06.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_07.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_08.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_09.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_10.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_11.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_05.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_06.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_07.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_08.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_09.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_10.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_11.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_05.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_06.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_07.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_08.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_09.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_10.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/idle_m_11.png"
+            ]
+        },
+        "walk": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/black_lancer/run_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_05.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_05.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_05.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/run_m_05.png"
+            ]
+        },
+        "attack": {
+            "down": [
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_down_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_down_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_down_02.png"
+            ],
+            "up": [
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_up_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_up_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_up_02.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_left_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_left_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_left_02.png"
+            ],
+            "right": [
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_right_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_right_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_right_02.png"
+            ],
+            "down_right": [
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_down_right_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_down_right_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_down_right_02.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_down_left_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_down_left_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_down_left_02.png"
+            ],
+            "up_right": [
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_up_right_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_up_right_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_up_right_02.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_up_left_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_up_left_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/attack_up_left_02.png"
+            ]
+        },
+        "hit": {
+            "down": [
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_05.png"
+            ],
+            "up": [
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_05.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_left_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_left_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_left_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_left_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_left_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_left_05.png"
+            ],
+            "right": [
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_right_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_right_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_right_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_right_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_right_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_right_05.png"
+            ],
+            "down_right": [
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_right_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_right_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_right_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_right_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_right_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_right_05.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_left_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_left_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_left_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_left_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_left_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_down_left_05.png"
+            ],
+            "up_right": [
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_right_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_right_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_right_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_right_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_right_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_right_05.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_left_00.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_left_01.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_left_02.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_left_03.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_left_04.png",
+                "res://Assets/Art/Sprites/Units/black_lancer/guard_up_left_05.png"
+            ]
+        },
+        "dodge": [],
+        "dead": []
+    },
+    "sprites_lancer_gold": {
+        "_comment": "等级档位配色：gold 档（素材包 Yellow Units/Lancer）。与 sprites_lancer 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -38.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 12,
+            "attack": 12,
+            "dodge": 16,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_05.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_06.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_07.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_08.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_09.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_10.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_11.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_05.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_06.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_07.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_08.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_09.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_10.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_11.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_05.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_06.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_07.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_08.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_09.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_10.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_11.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_05.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_06.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_07.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_08.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_09.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_10.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_11.png"
+            ]
+        },
+        "walk": {
+            "default": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_05.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_05.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_05.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_05.png"
+            ]
+        },
+        "attack": {
+            "down": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_02.png"
+            ],
+            "up": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_02.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_left_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_left_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_left_02.png"
+            ],
+            "right": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_right_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_right_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_right_02.png"
+            ],
+            "down_right": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_right_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_right_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_right_02.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_left_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_left_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_left_02.png"
+            ],
+            "up_right": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_right_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_right_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_right_02.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_left_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_left_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_left_02.png"
+            ]
+        },
+        "hit": {
+            "down": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_05.png"
+            ],
+            "up": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_05.png"
+            ],
+            "left": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_left_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_left_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_left_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_left_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_left_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_left_05.png"
+            ],
+            "right": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_right_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_right_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_right_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_right_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_right_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_right_05.png"
+            ],
+            "down_right": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_right_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_right_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_right_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_right_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_right_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_right_05.png"
+            ],
+            "down_left": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_left_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_left_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_left_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_left_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_left_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_left_05.png"
+            ],
+            "up_right": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_right_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_right_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_right_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_right_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_right_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_right_05.png"
+            ],
+            "up_left": [
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_left_00.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_left_01.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_left_02.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_left_03.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_left_04.png",
+                "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_left_05.png"
+            ]
+        },
+        "dodge": [],
+        "dead": []
+    },
+    "sprites_monk": {
+        "_comment": "Tiny Swords Monk（僧侣，Blue 阵营）。2026-09-18 加入出击名单。\n            **Monk 是免费包里唯一没有 Attack 帧的单位** —— 官方只给了 Idle 6 帧 / Run 4 帧 / Heal 11 帧 / Heal_Effect 11 帧，\n            所以这套素材的「攻击动作」就是 Heal（施法）。先例早就存在：敌人邪术师 cultist 用的\n            `red_monk/attack1_00..10` 正是同一批 Heal 帧（见 enemy_types.cultist.attack），本段沿用这一约定 ——\n            材料-Heal 与 attack1 是**同一批像素的两份命名**（attack 用 attack1_*；将来做治疗时 heal_* 归治疗语义），\n            由 tools/slice_monk.py 一次切出。\n            Heal_Effect（`heal_fx_*`）是**纯特效层**，画在受术者身上而不是施法者身上，故不进任何动作序列。\n            单向素材（正视视角），四向共用同一套帧 → 数组形式（同 sprites_ts / sprites_pawn 的扁平写法）。\n            不透明包围盒下沿实测 134（比 Warrior/Archer 的 136 高 2px），故 sprite_offset_y = -(134 - 96) = -38；\n            sprite_scale 0.6 / sprite_pixel_unit 10 与另外三个角色一致，保证小队体型统一。\n            dodge / hit / dead 官方无帧 → 留空，走 player_animator 的程序化抖动/冲刺拉伸/死亡倾倒。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -38.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 10,
+            "attack": 14,
+            "dodge": 12,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/blue_monk/idle_00.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/idle_01.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/idle_02.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/idle_03.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/idle_04.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/idle_05.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/blue_monk/run_00.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/run_01.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/run_02.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/run_03.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_00.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_01.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_02.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_03.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_04.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_05.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_06.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_07.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_08.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_09.png",
+            "res://Assets/Art/Sprites/Units/blue_monk/attack1_10.png"
+        ],
+        "dodge": [],
+        "hit": [],
+        "dead": []
+    },
+    "sprites_monk_purple": {
+        "_comment": "Tiny Swords Monk（僧侣，Purple 阵营）。2026-09-18 加入出击名单。\n            **Monk 是免费包里唯一没有 Attack 帧的单位** —— 官方只给了 Idle 6 帧 / Run 4 帧 / Heal 11 帧 / Heal_Effect 11 帧，\n            所以这套素材的「攻击动作」就是 Heal（施法）。先例早就存在：敌人邪术师 cultist 用的\n            `red_monk/attack1_00..10` 正是同一批 Heal 帧（见 enemy_types.cultist.attack），本段沿用这一约定 ——\n            材料-Heal 与 attack1 是**同一批像素的两份命名**（attack 用 attack1_*；将来做治疗时 heal_* 归治疗语义），\n            由 tools/slice_monk.py 一次切出。\n            Heal_Effect（`heal_fx_*`）是**纯特效层**，画在受术者身上而不是施法者身上，故不进任何动作序列。\n            单向素材（正视视角），四向共用同一套帧 → 数组形式（同 sprites_ts / sprites_pawn 的扁平写法）。\n            不透明包围盒下沿实测 134（比 Warrior/Archer 的 136 高 2px），故 sprite_offset_y = -(134 - 96) = -38；\n            sprite_scale 0.6 / sprite_pixel_unit 10 与另外三个角色一致，保证小队体型统一。\n            dodge / hit / dead 官方无帧 → 留空，走 player_animator 的程序化抖动/冲刺拉伸/死亡倾倒。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -38.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 10,
+            "attack": 14,
+            "dodge": 12,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/purple_monk/idle_00.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/idle_01.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/idle_02.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/idle_03.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/idle_04.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/idle_05.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/purple_monk/run_00.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/run_01.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/run_02.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/run_03.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_00.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_01.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_02.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_03.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_04.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_05.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_06.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_07.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_08.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_09.png",
+            "res://Assets/Art/Sprites/Units/purple_monk/attack1_10.png"
+        ],
+        "dodge": [],
+        "hit": [],
+        "dead": []
+    },
+    "sprites_monk_black": {
+        "_comment": "Tiny Swords Monk（僧侣，Black 阵营）。2026-09-18 加入出击名单。\n            **Monk 是免费包里唯一没有 Attack 帧的单位** —— 官方只给了 Idle 6 帧 / Run 4 帧 / Heal 11 帧 / Heal_Effect 11 帧，\n            所以这套素材的「攻击动作」就是 Heal（施法）。先例早就存在：敌人邪术师 cultist 用的\n            `red_monk/attack1_00..10` 正是同一批 Heal 帧（见 enemy_types.cultist.attack），本段沿用这一约定 ——\n            材料-Heal 与 attack1 是**同一批像素的两份命名**（attack 用 attack1_*；将来做治疗时 heal_* 归治疗语义），\n            由 tools/slice_monk.py 一次切出。\n            Heal_Effect（`heal_fx_*`）是**纯特效层**，画在受术者身上而不是施法者身上，故不进任何动作序列。\n            单向素材（正视视角），四向共用同一套帧 → 数组形式（同 sprites_ts / sprites_pawn 的扁平写法）。\n            不透明包围盒下沿实测 134（比 Warrior/Archer 的 136 高 2px），故 sprite_offset_y = -(134 - 96) = -38；\n            sprite_scale 0.6 / sprite_pixel_unit 10 与另外三个角色一致，保证小队体型统一。\n            dodge / hit / dead 官方无帧 → 留空，走 player_animator 的程序化抖动/冲刺拉伸/死亡倾倒。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -38.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 10,
+            "attack": 14,
+            "dodge": 12,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/black_monk/idle_00.png",
+            "res://Assets/Art/Sprites/Units/black_monk/idle_01.png",
+            "res://Assets/Art/Sprites/Units/black_monk/idle_02.png",
+            "res://Assets/Art/Sprites/Units/black_monk/idle_03.png",
+            "res://Assets/Art/Sprites/Units/black_monk/idle_04.png",
+            "res://Assets/Art/Sprites/Units/black_monk/idle_05.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/black_monk/run_00.png",
+            "res://Assets/Art/Sprites/Units/black_monk/run_01.png",
+            "res://Assets/Art/Sprites/Units/black_monk/run_02.png",
+            "res://Assets/Art/Sprites/Units/black_monk/run_03.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_00.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_01.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_02.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_03.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_04.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_05.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_06.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_07.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_08.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_09.png",
+            "res://Assets/Art/Sprites/Units/black_monk/attack1_10.png"
+        ],
+        "dodge": [],
+        "hit": [],
+        "dead": []
+    },
+    "sprites_monk_gold": {
+        "_comment": "Tiny Swords Monk（僧侣，Yellow 阵营）。2026-09-18 加入出击名单。\n            **Monk 是免费包里唯一没有 Attack 帧的单位** —— 官方只给了 Idle 6 帧 / Run 4 帧 / Heal 11 帧 / Heal_Effect 11 帧，\n            所以这套素材的「攻击动作」就是 Heal（施法）。先例早就存在：敌人邪术师 cultist 用的\n            `red_monk/attack1_00..10` 正是同一批 Heal 帧（见 enemy_types.cultist.attack），本段沿用这一约定 ——\n            材料-Heal 与 attack1 是**同一批像素的两份命名**（attack 用 attack1_*；将来做治疗时 heal_* 归治疗语义），\n            由 tools/slice_monk.py 一次切出。\n            Heal_Effect（`heal_fx_*`）是**纯特效层**，画在受术者身上而不是施法者身上，故不进任何动作序列。\n            单向素材（正视视角），四向共用同一套帧 → 数组形式（同 sprites_ts / sprites_pawn 的扁平写法）。\n            不透明包围盒下沿实测 134（比 Warrior/Archer 的 136 高 2px），故 sprite_offset_y = -(134 - 96) = -38；\n            sprite_scale 0.6 / sprite_pixel_unit 10 与另外三个角色一致，保证小队体型统一。\n            dodge / hit / dead 官方无帧 → 留空，走 player_animator 的程序化抖动/冲刺拉伸/死亡倾倒。",
+        "view": {
+            "sprite_scale": 0.6,
+            "sprite_offset_y": -38.0,
+            "sprite_pixel_unit": 10.0
+        },
+        "fps": {
+            "idle": 8,
+            "walk": 10,
+            "attack": 14,
+            "dodge": 12,
+            "hit": 12,
+            "dead": 8
+        },
+        "idle": [
+            "res://Assets/Art/Sprites/Units/yellow_monk/idle_00.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/idle_01.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/idle_02.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/idle_03.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/idle_04.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/idle_05.png"
+        ],
+        "walk": [
+            "res://Assets/Art/Sprites/Units/yellow_monk/run_00.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/run_01.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/run_02.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/run_03.png"
+        ],
+        "attack": [
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_00.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_01.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_02.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_03.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_04.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_05.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_06.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_07.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_08.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_09.png",
+            "res://Assets/Art/Sprites/Units/yellow_monk/attack1_10.png"
+        ],
+        "dodge": [],
+        "hit": [],
+        "dead": []
+    },
+    "enemy_types": {
+        "_comment": "Tiny Swords 免费包没有「怪物」，但有 5 个阵营 × 4 个兵种的完整单位。这里挑 4 个敌方阵营单位当敌人：强度递进，贴图/动画各不相同。官方包**没有受击/死亡动画**，受击靠染色、死亡靠淡出（见 enemy.gd）。",
+        "scale": 1.0,
+        "offset_y": -40.0,
+        "pixel_unit": 6.0,
+        "types": [
+            {
+                "id": "brigand",
+                "name": "劫掠者",
+                "faction": "red",
+                "unit": "pawn",
+                "weight": 4,
+                "hp": 40,
+                "damage": 10,
+                "speed_mult": 1.0,
+                "ai": {
+                    "_comment": "劫掠者（用户 2026-09-17 定）：「他的机制就是满地图随机游走，并且遇到同类会一起移动，上限先做到 5 个吧……劫掠者对声音更敏感」。三项都覆盖了全局默认值（enemy.ai），详解见 docs/DESIGN.md §5.5。",
+                    "_note_roam": "whole_map = 满地图随机游走：每次选新目标都在**整张地图**上随机挑一个可走格（至少离当前位置 min_target_distance_px 远，避免原地小抖动），走过去、停一下、再挑下一个。active_radius_cells 是给它的休眠保护放宽（全局 32 格 = 512px 会把它圈在玩家附近；放到 48 格它才走得出去）。",
+                    "_note_pack": "成群：两只劫掠者靠近到 join_radius_px 内就结伙（后来者加入先到者的群），之后成员**跟着群主一起移动**；max_members = 5 是硬上限（用户定的），装满的群不再收人。群主负责选目标，成员只跟队形（follow_distance_px 之外才启程）。群主死了自动由同群下一个活着的成员接任。",
+                    "_note_sens": "noise_sensitivity 1.8 = 耳朵比普通敌人灵 1.8 倍（等效听力半径与同距离听到的强度都按这个倍率算，见 noise_system.gd::emit）。",
+                    "roam": {
+                        "mode": "whole_map",
+                        "active_radius_cells": 48.0,
+                        "min_target_distance_px": 400.0,
+                        "max_target_distance_px": 0.0,
+                        "sample_attempts": 24
+                    },
+                    "noise_sensitivity": 1.8,
+                    "pack": {
+                        "enabled": true,
+                        "max_members": 5,
+                        "join_radius_px": 176.0,
+                        "follow_distance_px": 48.0,
+                        "scan_interval_seconds": 1.0,
+                        "repath_interval_seconds": 0.4
+                    }
+                },
+                "offset_y": -39.0,
+                "fps": {
+                    "idle": 8,
+                    "walk": 10,
+                    "attack": 12
+                },
+                "idle": [
+                    "res://Assets/Art/Sprites/Units/red_pawn/idle_00.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/idle_01.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/idle_02.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/idle_03.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/idle_04.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/idle_05.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/idle_06.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/idle_07.png"
+                ],
+                "walk": [
+                    "res://Assets/Art/Sprites/Units/red_pawn/run_00.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/run_01.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/run_02.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/run_03.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/run_04.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/run_05.png"
+                ],
+                "attack": [
+                    "res://Assets/Art/Sprites/Units/red_pawn/attack1_00.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/attack1_01.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/attack1_02.png",
+                    "res://Assets/Art/Sprites/Units/red_pawn/attack1_03.png"
+                ]
+            },
+            {
+                "id": "raider",
+                "name": "弓手",
+                "faction": "red",
+                "unit": "archer",
+                "weight": 3,
+                "hp": 30,
+                "damage": 8,
+                "speed_mult": 1.15,
+                "offset_y": -40.0,
+                "traits": [
+                    {
+                        "_comment": "弓手的**特性池**：目前只有这一个，所以每只弓手都是「幻影分身」（必定分到）。写成池（而不是单数 trait）是为了将来加第二个特性时能按 weight 随机分配，代码一行都不用改。",
+                        "_note": "幻影分身（用户 2026-09-17 定，同日改规格）：「每个只随机召唤一到两个，召唤的分身只有本体20%的血量，分身不会再召唤分身，本体每隔5秒会再随机召唤1到2个，最多8个分身，分身越多，自身受到伤害越少」＋「这批角色（本体加召唤）按最低血条展示，不管攻击哪个，显示血条最低的，迷惑玩家」。实现：enemy.gd（_setup_phantom / display_hp_ratio / refresh_group_hp_bar / _check_phantom_swap / 本体按 resummon_interval_seconds 补召）+ enemy_system.gd::notify_phantom_summon（名额与上限把关）+ 血条 Scripts/enemy_hp_bar.gd。",
+                        "_note_blood": "分身有**自己的一份血**（= 本体 max_hp × hp_ratio_of_owner，默认 20%），出生满血、挨打扣自己的、打光就自己消失，**不**把伤害转嫁给本体（2026-09-17 从早先的「共享血池」改成独立血）。分身不会再召唤（否则指数繁殖）。",
+                        "_note_bar": "血条：本体 + 它的全部分身算**一组**，统一显示「组内最低血量 ÷ 本体 max_hp」—— 谁掉血都让整组一起变成那个最低值。分身天生只有本体 20% 的血 ⇒ 只要场上有分身，整组血条就一直是『残血』的样子，打哪个都是同一条、都像快死了（这就是迷惑玩家的核心）。见 enemy.gd::display_hp_ratio / refresh_group_hp_bar。**别按 is_phantom 给分身换血条颜色/尺寸**，会一秒破功。",
+                        "_note_swarm": "分身越多，本体越难打（用户原话「分身越多，自身受到伤害越少」）：damage_reduction.per_phantom × 场上活分身数，封顶 max_reduction，另有 1 点保底伤害（不会变成无敌）。想少挨减伤就先清分身。",
+                        "_note_swap": "本体每跨过一个 swap_hp_step_ratio(20%) 的血量台阶，就随机挑一具活分身**交换坐标**（双方的巡逻中心 _home 跟着挪，免得本体一步走回老窝露馅）。满血→80%/60%/40%/20% 各触发一次，最多 4 次。没分身可换时台阶被吞掉，不会攒着等分身出生后连闪。",
+                        "id": "phantom_double",
+                        "name": "幻影分身",
+                        "weight": 1,
+                        "count_min": 1,
+                        "count_max": 2,
+                        "max_phantoms_per_owner": 8,
+                        "hp_ratio_of_owner": 0.2,
+                        "resummon_interval_seconds": 5.0,
+                        "spawn_radius_px": 96.0,
+                        "spawn_interval_seconds": 0.15,
+                        "drop_from_splits": false,
+                        "swap_hp_step_ratio": 0.2,
+                        "damage_reduction": {
+                            "per_phantom": 0.075,
+                            "max_reduction": 0.6,
+                            "min_damage": 1
+                        }
+                    }
+                ],
+                "fps": {
+                    "idle": 6,
+                    "walk": 12,
+                    "attack": 14
+                },
+                "idle": [
+                    "res://Assets/Art/Sprites/Units/red_archer/idle_00.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/idle_01.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/idle_02.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/idle_03.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/idle_04.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/idle_05.png"
+                ],
+                "walk": [
+                    "res://Assets/Art/Sprites/Units/red_archer/run_00.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/run_01.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/run_02.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/run_03.png"
+                ],
+                "attack": [
+                    "res://Assets/Art/Sprites/Units/red_archer/attack1_00.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/attack1_01.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/attack1_02.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/attack1_03.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/attack1_04.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/attack1_05.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/attack1_06.png",
+                    "res://Assets/Art/Sprites/Units/red_archer/attack1_07.png"
+                ]
+            },
+            {
+                "id": "cultist",
+                "name": "邪术师",
+                "faction": "red",
+                "unit": "monk",
+                "weight": 2,
+                "hp": 55,
+                "damage": 14,
+                "speed_mult": 0.85,
+                "offset_y": -38.0,
+                "fps": {
+                    "idle": 6,
+                    "walk": 8,
+                    "attack": 14
+                },
+                "idle": [
+                    "res://Assets/Art/Sprites/Units/red_monk/idle_00.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/idle_01.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/idle_02.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/idle_03.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/idle_04.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/idle_05.png"
+                ],
+                "walk": [
+                    "res://Assets/Art/Sprites/Units/red_monk/run_00.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/run_01.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/run_02.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/run_03.png"
+                ],
+                "attack": [
+                    "res://Assets/Art/Sprites/Units/red_monk/attack1_00.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/attack1_01.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/attack1_02.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/attack1_03.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/attack1_04.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/attack1_05.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/attack1_06.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/attack1_07.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/attack1_08.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/attack1_09.png",
+                    "res://Assets/Art/Sprites/Units/red_monk/attack1_10.png"
+                ],
+                "traits": [
+                    {
+                        "_comment": "邪术师的**特性池**：目前只有这一个，所以每只邪术师都是「爆裂鼓手」（必定分到）。写成池（而不是单数 trait）是为了将来加第二个特性时能按 weight 随机分配，代码一行都不用改。",
+                        "_note": "爆裂鼓手（用户 2026-09-17 定）：① 放大玩家造成的噪音（见 noise_amplify，光环）；② 血量越低，受到的伤害越少（见 damage_reduction）。实现分别在 Scripts/noise_system.gd（发声时放大）与 Scripts/enemy.gd（受击时减伤）。",
+                        "id": "burst_drum",
+                        "name": "爆裂鼓手",
+                        "weight": 1,
+                        "noise_amplify": {
+                            "_note": "以**发声点**为中心、radius_px 为半径：半径内每个存活邪术师按距离线性加权贡献 per_enemy 的增幅（贴着 = 全量，到半径边缘 = 0），多个叠加。总倍率 = clamp(1 + Σ增幅, 1, enemy_traits.noise_amplify.max_multiplier)。只放大 from_player=true 的发声（小队自己弄出的动静）——敌人自己的呼喊不放大，否则会互相引爆。radius_px ≤ 0 = 关闭放大；想全图生效就把半径设得比地图大。",
+                            "radius_px": 480.0,
+                            "per_enemy": 0.5
+                        },
+                        "damage_reduction": {
+                            "_note": "血量越低受到的伤害越少：减伤比例 = max_reduction × (1 − hp/max_hp)^exponent。满血不减伤，残血最多减 max_reduction。实际伤害有 min_damage 点保底 —— 残血也会被打死，不会变成无敌。",
+                            "max_reduction": 0.6,
+                            "exponent": 1.0,
+                            "min_damage": 1
+                        }
+                    }
+                ]
+            },
+            {
+                "id": "marauder",
+                "name": "掠夺者",
+                "faction": "yellow",
+                "unit": "pawn",
+                "weight": 2,
+                "hp": 70,
+                "damage": 16,
+                "speed_mult": 1.0,
+                "offset_y": -39.0,
+                "traits": [
+                    {
+                        "_comment": "掠夺者的**特性池**：每个实例在生成时按 weight 随机分配其中一个，一个角色只有一种特性（用户 2026-09-17 定）；特性刷出来的孩子**继承父的特性**，所以分裂链一直裂、再生链一直再生。分配在 enemy.gd::pick_feature()，判定在 enemy_system.gd。",
+                        "_note": "死亡分裂：原始体死亡 → stages[0]；这一批的**最后一个**死亡时才轮到 stages[1]，以此类推，stages 用完就停。个体在死亡原地**一个一个**出来（spawn_interval_seconds = 相邻两个的间隔，不是一次性冒出来）。",
+                        "id": "death_split",
+                        "weight": 1,
+                        "stages": [
+                            {
+                                "_note": "原始死亡 → 出 2。**初始概率**随场上掠夺者总数缩放（人少拉高、人多压低，见 enemy_traits.population_scaling）：chance_base = 场上很多时的概率，chance_max = 场上很少时的上限（用户给的「最高 100」）。想连后面几代一起压，给 stage[1..3] 也加上这两个键即可（只写 chance 就是固定概率）。",
+                                "count": 2,
+                                "chance_base": 0.45,
+                                "chance_max": 1.0
+                            },
+                            {
+                                "_note": "那 2 个的最后一个死 → 90% 出 4",
+                                "count": 4,
+                                "chance": 0.9
+                            },
+                            {
+                                "_note": "那 4 个的最后一个死 → 80% 出 8",
+                                "count": 8,
+                                "chance": 0.8
+                            },
+                            {
+                                "_note": "那 8 个的最后一个死 → 70% 出 64（你没给这一代的概率，按 100/90/80 的递减规律填的，改这个数即可）",
+                                "count": 64,
+                                "chance": 0.7
+                            }
+                        ],
+                        "spawn_interval_seconds": 0.1,
+                        "scatter_px": 0.0,
+                        "drop_from_splits": true,
+                        "max_live_split_enemies": 0
+                    },
+                    {
+                        "_note": "死亡再生：与死亡分裂不同，**每一次死亡都独立判定**（不看「最后一个」、不逐代递进）——每个再生体死亡都按概率再刷 count 个，孩子继承本特性，所以会一直链下去，直到运气用完或撞上 max_live_split_enemies。逻辑在 enemy_system.gd::notify_death_regen()。",
+                        "id": "death_regen",
+                        "weight": 1,
+                        "count": 2,
+                        "_note_chance": "概率同样随场上掠夺者总数缩放：chance_base = 场上很多时，chance_max = 场上很少时的上限（用户给的「最高 50」）。它没有代次概念，所以每一次死亡判定都按这个概率。",
+                        "chance_base": 0.15,
+                        "chance_max": 0.5,
+                        "spawn_interval_seconds": 0.1,
+                        "scatter_px": 0.0,
+                        "drop_from_splits": true,
+                        "max_live_split_enemies": 0
+                    }
+                ],
+                "fps": {
+                    "idle": 8,
+                    "walk": 10,
+                    "attack": 12
+                },
+                "idle": [
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/idle_00.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/idle_01.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/idle_02.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/idle_03.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/idle_04.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/idle_05.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/idle_06.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/idle_07.png"
+                ],
+                "walk": [
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/run_00.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/run_01.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/run_02.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/run_03.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/run_04.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/run_05.png"
+                ],
+                "attack": [
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/attack1_00.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/attack1_01.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/attack1_02.png",
+                    "res://Assets/Art/Sprites/Units/yellow_pawn/attack1_03.png"
+                ]
+            }
+        ]
+    },
+    "animal_types": {
+        "_comment": "官方包里的羊（吃草/待机/走动三套动画）。做成中立生物：地图上游荡，玩家靠近就跑，被打死掉落食物。",
+        "scale": 1.0,
+        "offset_y": -20.0,
+        "pixel_unit": 4.0,
+        "types": [
+            {
+                "id": "sheep",
+                "name": "野羊",
+                "weight": 1,
+                "hp": 12,
+                "fps": {
+                    "idle": 6,
+                    "walk": 9,
+                    "graze": 5
+                },
+                "idle": [
+                    "res://Assets/Art/Sprites/Units/sheep/idle_00.png",
+                    "res://Assets/Art/Sprites/Units/sheep/idle_01.png",
+                    "res://Assets/Art/Sprites/Units/sheep/idle_02.png",
+                    "res://Assets/Art/Sprites/Units/sheep/idle_03.png",
+                    "res://Assets/Art/Sprites/Units/sheep/idle_04.png",
+                    "res://Assets/Art/Sprites/Units/sheep/idle_05.png"
+                ],
+                "walk": [
+                    "res://Assets/Art/Sprites/Units/sheep/run_00.png",
+                    "res://Assets/Art/Sprites/Units/sheep/run_01.png",
+                    "res://Assets/Art/Sprites/Units/sheep/run_02.png",
+                    "res://Assets/Art/Sprites/Units/sheep/run_03.png"
+                ],
+                "graze": [
+                    "res://Assets/Art/Sprites/Units/sheep/grass_00.png",
+                    "res://Assets/Art/Sprites/Units/sheep/grass_01.png",
+                    "res://Assets/Art/Sprites/Units/sheep/grass_02.png",
+                    "res://Assets/Art/Sprites/Units/sheep/grass_03.png",
+                    "res://Assets/Art/Sprites/Units/sheep/grass_04.png",
+                    "res://Assets/Art/Sprites/Units/sheep/grass_05.png",
+                    "res://Assets/Art/Sprites/Units/sheep/grass_06.png",
+                    "res://Assets/Art/Sprites/Units/sheep/grass_07.png",
+                    "res://Assets/Art/Sprites/Units/sheep/grass_08.png",
+                    "res://Assets/Art/Sprites/Units/sheep/grass_09.png",
+                    "res://Assets/Art/Sprites/Units/sheep/grass_10.png",
+                    "res://Assets/Art/Sprites/Units/sheep/grass_11.png"
+                ]
+            }
+        ]
+    },
+    "enemy_traits": {
+        "_comment": "敌人特性的全局规则。特性本身配在 enemy_types.types[*].traits[] 里，这里只管**跨实例/跨特性共用的调节**。",
+        "phantom": {
+            "_comment": "幻影分身（弓手 phantom_double）的全局调节。enabled=false → 分到该特性的弓手不再召唤分身（本体照常行动、照常挨打），调试/平衡用。单只本体的分身上限配在特性里（max_phantoms_per_owner=8）；max_live_phantoms 是**全场的硬兜底**（0 = 不限），2026-09-17 从 40 下调到 16 —— 100 只敌里十几只弓手、每只最多 8 具，理论上一局能到 100 具以上，这个兜底才是真正决定「同屏能看到几具幻影」的那个数，嫌多/嫌少先调它。",
+            "enabled": true,
+            "max_live_phantoms": 16,
+            "max_phantoms_per_owner": 8
+        },
+        "noise_amplify": {
+            "_comment": "噪音放大的全局封顶（特性 burst_drum「爆裂鼓手」用，见 enemy_types.types[cultist].traits[0].noise_amplify）。多只邪术师的增幅叠加后统一夹在 max_multiplier 之内；enabled=false 可整体关掉放大（调试/平衡用）。",
+            "enabled": true,
+            "max_multiplier": 3.0
+        },
+        "population_scaling": {
+            "_comment": "数量缩放（用户 2026-09-17 定）：「掠夺者总数量越少，特性初始触发概率越高」，用来防止链条把怪刷爆。参与统计的是**场上所有带特性的活敌人**（掠夺者本体 + 它分裂/再生出来的全部后代）。算法：factor = clamp((base_at - n) / (base_at - full_at), 0, 1)，实际概率 = lerp(chance_base, chance_max, factor)；带特性的敌人 ≤ full_chance_at_or_below 时 factor=1（拿到各自特性的 chance_max 上限），≥ base_chance_at_or_above 时 factor=0（回落到 chance_base）。两边相等时退化成开关（要么上限要么基础）。",
+            "enabled": true,
+            "full_chance_at_or_below": 8,
+            "base_chance_at_or_above": 40,
+            "cache_seconds": 0.25
+        }
+    },
+    "animals": {
+        "count": 60,
+        "min_distance_from_player_cells": 10,
+        "wander_radius_cells": 10,
+        "flee_radius_cells": 6,
+        "speed": 240.0,
+        "flee_speed_mult": 1.6,
+        "drop": {
+            "chance": 1.0,
+            "res": "food",
+            "amount_min": 1,
+            "amount_max": 3
+        }
+    },
+    "weather": {
+        "_comment": "局内雨天效果（仅 Mode.RUN，基地无雨）。enabled=false 整套零节点装配，截图二分用。数值全在这里，脚本零硬编码。踩水触发节奏复用 noise.footstep_interval_seconds，不另设键造成两处真相。2026-09-19：水洼/倒影/折射三条通路按用户裁定删除，改为\"雨湿地面层 rain_ground\"；同日再加的湿脚印 footprint 试完即废（用户：太丑），踩水反馈只剩波纹一条通道。",
+        "enabled": true,
+        "viewports": {
+            "_comment": "波纹离屏 SubViewport 的渲染倍率。scale=0.5 即半分辨率（用户已确认）；子视口相机 zoom = 主相机 zoom × scale，保证 SCREEN_UV 与子视口贴图逐点对应，雨湿地面 shader 直接按屏幕 UV 取波纹。",
+            "scale": 0.5
+        },
+        "rain_ground": {
+            "_comment": "雨湿地面层（取代旧\"水洼\"概念，2026-09-19 用户裁定）：**不是第 5 个群系**——项目只有草地/森林/荒原/沼泽四种，这里指被雨打湿的草地/森林地板。下雨时**指定群系的地板整片是湿的**，踩哪都出波纹，不需要先找到一洼水。allowed_biomes=哪些群系会湿（0草地/2森林；荒原1、沼泽3保持干燥）；boundary_blur/boundary_passes=干湿边界的多轮均值模糊半径与轮数（把整格 0/1 揉成多格宽软带，配合 shader 域扭曲才看不出格网）；wet_threshold=逻辑判定用整格布尔的场值阈值（与 shader 掩码同源）；exclude_water_cells=模糊**之后**把不可通行格（本项目铺 water_bg 水面贴图）的场值清零——不剔的话岸上草地的湿值会经模糊渗进水面格，整片湖被压暗又打上冷调水光，看着像浮了一层沫子（用户 2026-09-19 裁定\"水面剔出去\"）。必须切在切 _wet_cells 之前，让视觉场和脚步判定同源，别反过来搞成\"看着干、踩上去出波纹\"。外观有四件事：darkness 压暗、tint_color/tint_amount 偏冷、sheen 细碎反光（静态 fbm，湿面把天光散成一片模糊亮斑）、mottle_* **斑驳水光**（2026-09-19 补，用户：\"地面看不出湿\"）。mottle_amount=0 整层关闭（截图二分用）；mottle_scale=条带噪声频率（每格）；mottle_stretch=[x,y] 各向异性拉伸——x 取低频、y 取高频才拉得出**横向条带**，等方频率只会均匀糊成一块膜；mottle_speed=[x,y] 水光流速（格/秒）**恒为 [0,0]**：明暗与亮斑都必须钉在格子上——非零就是「一层水膜从草地上飘过去」（用户 2026-09-19：水的那个图层会飘），局内会动的只该有踩水波纹；mottle_threshold=亮/暗分界场值；mottle_soft=两侧过渡宽度；mottle_gain=亮斑把草色**换成**天光的混合强度（0..1，不是加白量）；mottle_dark=配对暗斑压暗量；mottle_color=亮斑色（深一档的天蓝，不是近白）。**亮斑与暗斑必须成对**：只加亮斑读成油渍/雪堆，亮旁边紧贴一条暗边才有\"水膜反着天光\"的立体读法；两层都按 cov 门控，干地与湿边拿不到水光。mottle 三个失败模式是截图 A/B 出来的，别退回旧值：① 频率低（0.075～0.34/格，斑幅 3～9 格＝屏上 150～300px）读成**雾团/云影**，要 2.2/格 才碎成\"斑\"；② 亮斑用\"往底色加白\"的写法，在橄榄绿草地上只会得到更亮的橄榄绿＝**苔藓斑**，必须 mix 到冷调天光色（乘本地亮度，树荫下才不自己发光）；③ 亮斑色取近白（#cce6f5）＋gain 拉高（0.5）时，2 倍放大看是一堆**粉笔团/棉絮**——亮斑要的是深一档的蓝（#7fa8cc）配低混合强度（0.35），宁可看不太出也不要糊成白斑。sheen 随之从 0.16 降到 0.05：它和 mottle 是同一件事的两层，都开就糊成一片。alpha=满湿处层不透明度；noise_scale/scroll_cells_per_s=细碎反光频率/流速（流速同样恒为 [0,0]，理由同 mottle_speed）；edge_soft/edge_warp/edge_warp_scale=过渡带宽度/边界揉弯幅度与频率（格）；ripple_wiggle=波纹经过处让反光抖多少；step_wet_radius_cells=脚步\"算不算踩到湿的地方\"的邻域半径（可见湿面是软边轮廓、_wet_cells 是整格布尔，边界错开近一格，0=退回单格硬判定）。",
+            "allowed_biomes": [
+                0,
+                2
+            ],
+            "boundary_blur": 2,
+            "boundary_passes": 3,
+            "wet_threshold": 0.5,
+            "exclude_water_cells": true,
+            "step_wet_radius_cells": 1,
+            "darkness": 0.3,
+            "tint_color": "#9dc0dc",
+            "tint_amount": 0.3,
+            "sheen": 0.05,
+            "mottle_amount": 1.0,
+            "mottle_scale": 2.2,
+            "mottle_stretch": [
+                0.8,
+                1.4
+            ],
+            "mottle_speed": [
+                0.0,
+                0.0
+            ],
+            "mottle_threshold": 0.74,
+            "mottle_soft": 0.06,
+            "mottle_gain": 0.35,
+            "mottle_dark": 0.12,
+            "mottle_color": "#7fa8cc",
+            "alpha": 0.9,
+            "noise_scale": 0.13,
+            "scroll_cells_per_s": [
+                0.0,
+                0.0
+            ],
+            "edge_soft": 0.45,
+            "edge_warp": 0.9,
+            "edge_warp_scale": 0.16,
+            "ripple_wiggle": 0.003
+        },
+        "ripple": {
+            "_comment": "踩水波纹（只在雨湿地面内合成，干地脚步不出波纹；r=亮度基提亮湿面、g=晃动量驱动反光抖动，旧版色散/倒影通道已随\"水洼\"概念一起删除）。radius_px=主弧展开半径（世界像素；要经半分辨率子视口 + 相机 zoom 两次缩小，太小则屏上不足一像素＝看不见）；duration_s=寿命；color/alpha=弧色与基准透明度；base_channel/disp_channel=写进 r/g 通道的强度；glow=亮度增益；line_width=软带总宽 px；band_layers=[[宽度倍率, 透明度倍率]…] 三层同心描边**由外向内递减**（外缘最亮、往里越来越淡）；反过来排（内圈最强）会读成\"地上一枚瞄准准星\"，正是用户否掉过的观感；inner_ratio/inner_alpha=拖尾内弧半径比/透明度比（角度整体再错开半个槽，两层不能同心）；ellipse_squash=椭圆压扁（贴地透视）。2026-09-19 终版形状：一整圈→**一小撮碎片弧**。每圈掷 fragments 段，各段只占整圈均分槽里的一截：arc_span_deg 基准跨角、arc_span_jitter 跨角起伏（±比例）、arc_radius_jitter 半径起伏（±比例，打散\"共圆\"＝关键，首版就是因为所有碎片同半径同时扩到同一圈而读成白色虚线靶子）、arc_phase_jitter 起播延迟（0..该比例的寿命）、arc_alpha_jitter 各段亮度起伏。槽位均分＋硬上限（单段跨角 ≤ 槽宽 80%）保证永远留缺口、绝不闭合成环。",
+            "pool_size": 16,
+            "radius_px": 66.0,
+            "duration_s": 0.6,
+            "color": "#9fd0e8",
+            "alpha": 0.8,
+            "base_channel": 0.85,
+            "disp_channel": 0.5,
+            "glow": 0.95,
+            "line_width": 5.5,
+            "band_layers": [
+                [
+                    1.0,
+                    0.42
+                ],
+                [
+                    0.7,
+                    0.22
+                ],
+                [
+                    0.42,
+                    0.1
+                ]
+            ],
+            "inner_ratio": 0.5,
+            "inner_alpha": 0.45,
+            "fragments": 4,
+            "arc_span_deg": 44.0,
+            "arc_span_jitter": 0.4,
+            "arc_radius_jitter": 0.14,
+            "arc_phase_jitter": 0.3,
+            "arc_alpha_jitter": 0.35,
+            "ellipse_squash": 0.45
+        },
+        "rain": {
+            "_comment": "三层景深雨（DEV LOG.02）：RainFar/RainMid/RainNear，同屏总滴数=各层 amount 之和（参考区间 400-800）。每层：lifetime_s 与 speed_px 决定单滴寿命与下落速度（远慢近快=视差）；scale=[min,max] 雨丝缩放（近处更粗更长）；alpha 覆盖 streak.color 的透明度；wind_factor 该层吃多少风（远处偏转小）；gust_phase 各层阵风错相，避免整屏同步摆动像一面墙；spread_deg 方向散布；z 为**相对 RainAnchor** 的层级（anchor_z=6 已整体压在雾层 5 之上，三层只需排 0/1/2）。下落方式：initial_velocity 沿 +y、重力只给 X（参考步骤 3 用 gravity.x 做风偏），所以风是**持续加速**而非固定倾角。gust=阵风包络：gravity.x = wind_x_px × wind_factor × (1 + amplitude×sin(2π(t/period_s + phase)))。fade_in_s=进局时雨幕/雨滴淡入（用户要求天气切换用 Tween 过渡）。streak=贴图基准尺寸（每层再乘 scale）。splash=地面飞溅，独立发射器、沿视口下半带持续发射（不用粒子碰撞回调：headless 与性能都更稳）。",
+            "layers": [
+                {
+                    "name": "RainFar",
+                    "amount": 400,
+                    "lifetime_s": 0.95,
+                    "speed_px": [
+                        760.0,
+                        980.0
+                    ],
+                    "scale": [
+                        0.55,
+                        0.8
+                    ],
+                    "alpha": 0.3,
+                    "wind_factor": 0.55,
+                    "gust_phase": 0.0,
+                    "spread_deg": 4.0,
+                    "z": 0
+                },
+                {
+                    "name": "RainMid",
+                    "amount": 260,
+                    "lifetime_s": 0.7,
+                    "speed_px": [
+                        1050.0,
+                        1350.0
+                    ],
+                    "scale": [
+                        0.9,
+                        1.25
+                    ],
+                    "alpha": 0.45,
+                    "wind_factor": 1.0,
+                    "gust_phase": 0.33,
+                    "spread_deg": 6.0,
+                    "z": 1
+                },
+                {
+                    "name": "RainNear",
+                    "amount": 140,
+                    "lifetime_s": 0.5,
+                    "speed_px": [
+                        1450.0,
+                        1800.0
+                    ],
+                    "scale": [
+                        1.5,
+                        2.2
+                    ],
+                    "alpha": 0.5,
+                    "wind_factor": 1.45,
+                    "gust_phase": 0.66,
+                    "spread_deg": 8.0,
+                    "z": 2
+                }
+            ],
+            "blend_add": true,
+            "wind_x_px": -320.0,
+            "gust": {
+                "amplitude": 0.5,
+                "period_s": 7.0
+            },
+            "fade_in_s": 1.2,
+            "splash_amount": 140,
+            "streak": {
+                "width_px": 1,
+                "length_px": 30,
+                "color": "#d5e6f5",
+                "alpha": 0.45
+            },
+            "splash": {
+                "lifetime_s": 0.35,
+                "speed_px": [
+                    40.0,
+                    110.0
+                ],
+                "gravity_px": 1400.0,
+                "size_px": 4.0,
+                "color": "#cfe6ff",
+                "alpha": 0.7
+            },
+            "overlay": {
+                "enabled": true,
+                "layer": 1,
+                "color": "#8fb0cc",
+                "opacity": 0.15,
+                "darken": 0.9,
+                "vertical_bias": 0.35
+            },
+            "emission_margin_px": 160.0,
+            "anchor_z": 6,
+            "splash_z": 3
+        },
+        "step": {
+            "_comment": "脚步音：players 个 AudioStreamPlayer2D 轮转避免重叠被吞；max_distance 之外不响（世界像素）。volume_db=湿脚步（踩水）音量；dry_volume_db=干地脚步音量。",
+            "max_distance_px": 900.0,
+            "volume_db": -10.0,
+            "players": 3,
+            "dry_volume_db": -14.0
+        },
+        "audio": {
+            "_comment": "程序合成占位音（项目无音频素材）。rain_loop_seconds 越长 gust 起伏越自然；sample_rate 单声道即可；low/high_pass 塑形雨声频谱（去隆隆/去尖啸）；gust_depth=响度起伏深度；drip_count=循环内混入的嘀嗒瞬态个数；step_duration_s=踩水音长度；step_dry_*=干脚步（900Hz 低通噪声脆响）长度与滤波截止。",
+            "rain_loop_seconds": 4.0,
+            "sample_rate": 22050,
+            "rain_volume_db": -16.0,
+            "rain_lowpass_hz": 1400.0,
+            "rain_highpass_hz": 180.0,
+            "gust_depth": 0.35,
+            "drip_count": 6,
+            "step_duration_s": 0.18,
+            "step_dry_duration_s": 0.1,
+            "step_dry_lowpass_hz": 900.0
+        }
+    }
+}

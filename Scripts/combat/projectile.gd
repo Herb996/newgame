@@ -97,6 +97,8 @@ func _physics_process(delta: float) -> void:
 		# 受击视觉反馈（白闪+挤压+击退）；origin 已在上面判过非零，方向=远离箭来向
 		if origin != Vector2.ZERO and target.has_method("play_hit_fx"):
 			target.call("play_hit_fx", origin)
+		# 命中微冻：本项目弹道只出自玩家武器，所以算"我方打出伤害"那一档
+		HitStop.pulse(get_tree(), "on_deal_damage")
 		_finish()
 		return
 	if blocked:

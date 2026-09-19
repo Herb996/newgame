@@ -114,23 +114,24 @@ func _build_ui() -> void:
 
 	# --- 主按钮列 ---
 	# 图标取 Tiny Swords Icons：绿旗=新开局、剑盾=已有战力、齿轮=设置、木槌=杂项、红X=退出
+	# 悬停不弹介绍（用户 2026-09-19 定）：按钮只给名字，menu_button 也没有提示位了
 	var entries := [
-		["新建存档", "开一个新的存档槽，从头开始", _on_new_save, "icon_07"],
-		["历史存档", "读取已有存档继续游戏", _on_load_save, "icon_05"],
-		["参数配置", "画面 / 音频 / 玩法 / 操作 / 语言", _on_settings, "icon_10"],
-		["其他", "制作人员 / 统计 / 成就 / 图鉴（占位）", _on_misc, "icon_01"],
-		["退出游戏", "", _on_quit, "icon_09"],
+		["新建存档", _on_new_save, "icon_07"],
+		["历史存档", _on_load_save, "icon_05"],
+		["参数配置", _on_settings, "icon_10"],
+		["其他", _on_misc, "icon_01"],
+		["退出游戏", _on_quit, "icon_09"],
 	]
 	for e in entries:
-		var b := UiKit.menu_button(str(e[0]), str(e[1]))
-		var icon: Texture2D = UiKit.ts_tex(str(e[3]))
+		var b := UiKit.menu_button(str(e[0]))
+		var icon: Texture2D = UiKit.ts_tex(str(e[2]))
 		if icon != null:
 			b.icon = icon
 			b.add_theme_constant_override("icon_max_width", 30)
 			b.expand_icon = false
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		if e[2] is Callable:
-			b.pressed.connect(e[2])
+		if e[1] is Callable:
+			b.pressed.connect(e[1])
 		_menu_box.add_child(b)
 		if str(e[0]) == "退出游戏":
 			_menu_box.add_child(UiKit.spacer(6))

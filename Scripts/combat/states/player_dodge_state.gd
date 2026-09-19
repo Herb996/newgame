@@ -5,7 +5,8 @@ extends State
 ## 对应 DESIGN.md 手感清单第 1 项"冲刺短暂无敌"。
 ## 进入：朝鼠标方向冲刺（速度 × combat.dodge.speed_multiplier），期间无敌。
 ## 退出：关闭无敌 + 进入冷却（combat.dodge.cooldown_seconds）。
-## 硬直/攻击期间不可冲刺（由 Player.can_dodge 判定）。
+## 攻击期间不可冲刺；受击硬直满 dodge_cancel_after_seconds 后可以（见 player_hitstun_state.gd）。
+## 能不能冲由 Player.can_dodge 判定（只管死亡与冷却）。
 ## ============================================================
 
 var _timer := 0.0

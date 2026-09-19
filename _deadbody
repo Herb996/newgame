@@ -1,0 +1,145 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[Config] 配置已加载：地图 128.0x128.0 | 撤离点 3.0 个 | 局内 3600.0 秒
+[Config] 用户设置已加载：41 项（user://settings.json）
+[SaveSlots] 6 个槽位可用｜上次游玩：槽 2
+[DisplaySettings] 已创建音频总线：Music
+[DisplaySettings] 已创建音频总线：SFX
+[Meta] 存档加载完成（本地默认槽）：仓库 {  } | 升级 { "survival.max_hp": 1.0 } | 基地 0 栋 | 名册 4 人
+[Base] 基地就绪：64x64 平地，建筑 12 栋，出生点 (2080.0, 2080.0)
+[Main] 出击小队：枪手、弓兵
+[Run] 一局开始：时长 3600 秒 | 玩家属性 { "survival.max_hp": 110.0, "survival.backpack_capacity": 10.0, "survival.extraction_speed": 1.0, "survival.warehouse_capacity": 20.0, "acquisition.resource_find_chance": 0.5, "acquisition.rare_resource_chance": 0.05 }
+[Map] 装饰碰撞体：300 格（树/石，物理层与寻路层已对齐）
+[Map] 地图生成完成：128x256 瓦片（8192x16384 像素），地板 26432 格，可达 26359 格（100%），贴图=AI
+[Map] 装饰物：树 180 / 石头 120 / 灌木 986 / 碎石 431 / 裂缝 0 / 河水 0，出生点 (4128.0, 8224.0)
+[Map] 矿脉 76 处
+[Map] 群系分布：草地 10423, 荒原 10441, 森林 11329, 沼泽 575
+[ResourceRegistry] 已登记资源节点：{ "wood": 180, "stone": 120, "iron": 61, "oil": 15 }
+[PlayerAnimator] 帧序列就绪：idle=12帧/8fps walk=6帧/12fps attack=3帧/12fps dodge=程序化 hit=6帧/12fps dead=程序化 graze=程序化
+[Combat] 本局生命上限 110（含局外养成/升级特性）
+[PlayerAnimator] 帧序列就绪：idle=6帧/8fps walk=4帧/10fps attack=8帧/15fps dodge=程序化 hit=程序化 dead=程序化 graze=程序化
+[Combat] 本局生命上限 110（含局外养成/升级特性）
+[Enemy] 敌人生成完成：0 个（距出生点 ≥ 20 格，AI = 巡逻 + 追击）｜兵种 {  }
+[Loot] 资源点生成完成：1186 个（密度 5%，6 种资源按稀有度加权）
+[Weather] 波纹子视口建好 640x360（scale=0.50）
+[Weather] 雨湿地面 16672 格（占全图 50.9%）＝群系 [0.0, 2.0]，半径 2 格 × 3 轮模糊
+[Run] 弓兵 拾取 石头 x10（他 1/10 格 · 全队 2 格）
+[Combat] 玩家受到 999999 伤害（减免 0），剩余 HP 0/110
+[Combat] 枪手 倒下，队友仍在，本局继续（他的背包已撒在原地，走近可捡回）
+[Run] 弓兵 拾取 木头 x9（他 2/10 格 · 全队 2 格）
+[Combat] 玩家受到 999999 伤害（减免 0），剩余 HP 0/110
+[Run] 一局结束：died | 带回资源 {  } | 丢弃资源 {  }
+[Base] 基地就绪：64x64 平地，建筑 12 栋，出生点 (2080.0, 2080.0)
+--- 前置 ---
+  视口=(1280.0, 720.0) 角色=2 名 run.state=1
+  OK   出击后拿到 2 名角色
+--- A 段：队友还在时，甲阵亡 → 尸骨该留在原地 ---
+  倒下前：in_tree=true visible=true in_view_tree=true group=true dead=false state=idle alpha=1.0 has_body=true body_visible=true body_alpha=1.0 body_tex=true scale_x=0.60000002384186 pos=4102,8224 cell=64,128 screen=640,360
+  倒下后 f0：in_tree=true visible=true in_view_tree=true group=true dead=true state=dead alpha=1.0 has_body=true body_visible=true body_alpha=1.0 body_tex=true scale_x=0.60000002384186 pos=4102,8224 cell=64,128 screen=640,360
+  OK   甲阵亡后 180 个物理帧里始终可见（异常帧=-1）
+  OK   甲确实处于死亡态（不是没打死）
+  OK   死后仍在 player 组（掉物归属/弹窗收起都靠它）
+  OK   尸体没被物理顶开（漂移 0.0px）
+  倒地掉物：0 个资源点贴着尸体
+  FAIL 掉物就长在尸体旁边（能对上是谁掉的）
+  OK   乙还活着 → 本局继续
+--- B 段：最后一名也倒下（本局 died）→ 结算期间尸体仍在 ---
+  乙倒下后 f0：in_tree=true visible=true in_view_tree=true group=true dead=true state=dead alpha=1.0 has_body=true body_visible=true body_alpha=1.0 body_tex=true scale_x=0.60000002384186 pos=4154,8224 cell=64,128 screen=4071,3755
+  OK   全队阵亡结算期间乙仍可见（异常帧=-1）
+  OK   结算期间尸体没被物理顶开（漂移 0.0px）
+  OK   run 已结算（state=2）
+  OK   Main 没被顺手释放
+--- C 段：按 R 回基地 → 世界清空（此时消失才是对的）---
+  OK   回基地后场上角色清空（实得 0）
+
+=== 共 12 项断言，失败 1 项 ===
+  !! 掉物就长在尸体旁边（能对上是谁掉的）
+[probe_dead_body] fails=1 -> FAIL
+
+WARNING: [Config] 缺少配置项 inventory_popup.head_offset_px，使用默认值：44.0
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] get_value (res://Scripts/config_loader.gd:77)
+       [1] _ready (res://Scripts/inventory_popup.gd:49)
+       [2] _ready (res://Scripts/hud.gd:62)
+       [3] _ready (res://Dev/probe_dead_body.gd:144)
+       [4] _frames (res://Dev/probe_dead_body.gd:45)
+WARNING: [Config] 缺少配置项 inventory_popup.viewport_margin_px，使用默认值：8.0
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] get_value (res://Scripts/config_loader.gd:77)
+       [1] _ready (res://Scripts/inventory_popup.gd:50)
+       [2] _ready (res://Scripts/hud.gd:62)
+       [3] _ready (res://Dev/probe_dead_body.gd:144)
+       [4] _frames (res://Dev/probe_dead_body.gd:45)
+WARNING: [Config] 缺少配置项 inventory_popup.min_width_px，使用默认值：210.0
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] get_value (res://Scripts/config_loader.gd:77)
+       [1] _ready (res://Scripts/inventory_popup.gd:51)
+       [2] _ready (res://Scripts/hud.gd:62)
+       [3] _ready (res://Dev/probe_dead_body.gd:144)
+       [4] _frames (res://Dev/probe_dead_body.gd:45)
+WARNING: [Config] 缺少配置项 player.box_select_threshold_px，使用默认值：6.0
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] get_value (res://Scripts/config_loader.gd:77)
+       [1] _ready (res://Scripts/selection_controller.gd:42)
+       [2] _enter_run (res://Scripts/main.gd:510)
+       [3] _on_launch (res://Scripts/main.gd:618)
+       [4] _ready (res://Dev/probe_dead_body.gd:147)
+       [5] _frames (res://Dev/probe_dead_body.gd:45)
+WARNING: [Config] 缺少配置项 player.box_select_line_color，使用默认值：#99E699
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] get_value (res://Scripts/config_loader.gd:77)
+       [1] _ready (res://Scripts/selection_controller.gd:43)
+       [2] _enter_run (res://Scripts/main.gd:510)
+       [3] _on_launch (res://Scripts/main.gd:618)
+       [4] _ready (res://Dev/probe_dead_body.gd:147)
+       [5] _frames (res://Dev/probe_dead_body.gd:45)
+WARNING: [Config] 缺少配置项 player.box_select_fill_alpha，使用默认值：0.14
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] get_value (res://Scripts/config_loader.gd:77)
+       [1] _ready (res://Scripts/selection_controller.gd:45)
+       [2] _enter_run (res://Scripts/main.gd:510)
+       [3] _on_launch (res://Scripts/main.gd:618)
+       [4] _ready (res://Dev/probe_dead_body.gd:147)
+       [5] _frames (res://Dev/probe_dead_body.gd:45)
+WARNING: [Config] 缺少配置项 loot.drop_spread_px，使用默认值：22.0
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] get_value (res://Scripts/config_loader.gd:77)
+       [1] drop_inventory (res://Scripts/player.gd:1297)
+       [2] on_death (res://Scripts/player.gd:1259)
+       [3] enter (res://Scripts/combat/states/player_dead_state.gd:22)
+       [4] _transition_to (res://Scripts/combat/state_machine.gd:123)
+       [5] force_transition (res://Scripts/combat/state_machine.gd:85)
+       [6] take_damage (res://Scripts/player.gd:1209)
+       [7] _ready (res://Dev/probe_dead_body.gd:173)
+       [8] _pframes (res://Dev/probe_dead_body.gd:50)
+WARNING: [Config] 缺少配置项 loot.drop_spread_px，使用默认值：22.0
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] get_value (res://Scripts/config_loader.gd:77)
+       [1] drop_inventory (res://Scripts/player.gd:1297)
+       [2] on_death (res://Scripts/player.gd:1259)
+       [3] enter (res://Scripts/combat/states/player_dead_state.gd:22)
+       [4] _transition_to (res://Scripts/combat/state_machine.gd:123)
+       [5] force_transition (res://Scripts/combat/state_machine.gd:85)
+       [6] take_damage (res://Scripts/player.gd:1209)
+       [7] _ready (res://Dev/probe_dead_body.gd:187)
+       [8] _watch (res://Dev/probe_dead_body.gd:126)
+WARNING: [Config] 缺少配置项 loot.drop_spread_px，使用默认值：22.0
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] get_value (res://Scripts/config_loader.gd:77)
+       [1] drop_inventory (res://Scripts/player.gd:1297)
+       [2] on_death (res://Scripts/player.gd:1259)
+       [3] enter (res://Scripts/combat/states/player_dead_state.gd:22)
+       [4] _transition_to (res://Scripts/combat/state_machine.gd:123)
+       [5] force_transition (res://Scripts/combat/state_machine.gd:85)
+       [6] take_damage (res://Scripts/player.gd:1209)
+       [7] _ready (res://Dev/probe_dead_body.gd:187)
+       [8] _watch (res://Dev/probe_dead_body.gd:126)

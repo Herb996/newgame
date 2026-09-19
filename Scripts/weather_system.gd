@@ -386,19 +386,6 @@ func _build_wet_layer(map_data: Dictionary) -> void:
 		for x in range(_map_w):
 			var v := clampf(float(_wet_field[y][x]), 0.0, 1.0)
 			img.set_pixel(x, y, Color(v, 0.0, 0.0, 1.0))
-	# 诊断（"水面剔出去"查因）：把**真正上传给 shader 的那张图**落盘，R=湿度、G=wall。
-	# 探针侧是现场 MapGenerator.generate()，游戏侧的 map_data 可能已被后续系统改过；
-	# 两边只要 walls 对不上，这张图就会露馅。
-	if bool(Config.get_value("weather.rain_ground.debug_dump_mask", false)):
-		var dbg := Image.create(_map_w, _map_h, false, Image.FORMAT_RGBA8)
-		var wl: Array = map_data.get("walls", [])
-		for y in range(_map_h):
-			for x in range(_map_w):
-				var gw := 1.0 if (not wl.is_empty() and bool(wl[y][x])) else 0.0
-				dbg.set_pixel(x, y, Color(float(img.get_pixel(x, y).r), gw, 0.0, 1.0))
-		dbg.resize(_map_w * 4, _map_h * 4, Image.INTERPOLATE_NEAREST)
-		print("[Weather] 掩码诊断图 err=%d（R=湿度 G=wall）" % int(
-				dbg.save_png(OS.get_user_data_dir() + "/_wet_mask_dbg.png")))
 	var mask_tex := ImageTexture.create_from_image(img)
 
 	var rect := ColorRect.new()
@@ -415,8 +402,6 @@ func _build_wet_layer(map_data: Dictionary) -> void:
 	var scroll: Array = Config.get_value("weather.rain_ground.scroll_cells_per_s", [0.0, 0.0])
 	mat.set_shader_parameter("wet_mask", mask_tex)
 	mat.set_shader_parameter("mask_size", Vector2(_map_w, _map_h))
-	mat.set_shader_parameter("tile_px", float(_tile_size))
-	mat.set_shader_parameter("world_origin", rect.position)
 	mat.set_shader_parameter("darkness", float(Config.get_value("weather.rain_ground.darkness", 0.3)))
 	mat.set_shader_parameter("tint_color",
 			Color.from_string(str(Config.get_value("weather.rain_ground.tint_color", "#9dc0dc")), Color(0.62, 0.75, 0.86)))
@@ -836,7 +821,7 @@ static func _gen_rain_wav() -> AudioStreamWAV:
 			buf[pos + k] += sin(ph) * exp(-tt * 60.0) * 0.25
 
 	_crossfade_loop(buf)
-	return _pack_wav(buf, rate)
+	return _pack_wav(buf, rate, true)   # 雨底 = 背景循环（接缝已交叉淡化）
 
 
 ## 踩水音：短噪声包络（指数衰减）× 中心频率下滑 + 下滑正弦「啾」，模拟脚离水面。
@@ -896,7 +881,9 @@ static func _crossfade_loop(buf: PackedFloat32Array) -> void:
 		buf[i] = lerpf(buf[n - xf + i], buf[i], w)
 
 
-static func _pack_wav(buf: PackedFloat32Array, rate: int) -> AudioStreamWAV:
+## loop=true 只给背景音（雨底这类首尾交叉淡化过的采样）。脚步/踩水是一次性采样，
+## 循环会在 0.18s 后从头再来 —— 听着就是"音效一直在"（用户 2026-09-19 报）。
+static func _pack_wav(buf: PackedFloat32Array, rate: int, loop: bool = false) -> AudioStreamWAV:
 	var w := AudioStreamWAV.new()
 	w.format = AudioStreamWAV.FORMAT_16_BITS
 	w.stereo = false
@@ -906,7 +893,8 @@ static func _pack_wav(buf: PackedFloat32Array, rate: int) -> AudioStreamWAV:
 	for i in range(buf.size()):
 		bytes.encode_s16(i * 2, int(clampf(buf[i], -1.0, 1.0) * 32767.0))
 	w.data = bytes
-	w.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	w.loop_begin = 0
-	w.loop_end = buf.size()
+	if loop:
+		w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		w.loop_begin = 0
+		w.loop_end = buf.size()
 	return w

@@ -60,6 +60,9 @@ func _ready() -> void:
 	_popup = INVENTORY_POPUP.new()
 	_popup.name = "InventoryPopup"
 	add_child(_popup)
+	# 受击方向指示（角色挨打时朝攻击者的一道红楔）：与弹窗同层，回基地一起收掉。
+	# 上报走 call_group，所以这里只管挂着，不用在角色生成/销毁时接线。
+	add_child(HitDirectionIndicator.new())
 
 
 func _make_label(size: int, preset: int) -> Label:

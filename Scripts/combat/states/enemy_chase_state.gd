@@ -43,5 +43,11 @@ func physics_update(delta: float) -> void:
 		# 跟丢（多数是被墙挡住）：只朝最后已知位置走，不透视追踪
 		if not actor.has_move_target():
 			actor.repath_to_last_known()
+	# 进了射程就站住：出手由 enemy.gd::_tick_attack() 负责，这里只管别再挪。
+	# 分离层已经把敌人顶在接触距离外，再往前挤也只是推着玩家走；而且边走边挥会让
+	# 攻击动作下一帧就被 walk 覆盖，玩家看不见"它在打我"。
+	if actor.in_attack_range():
+		actor.clear_move_target()
+		return
 	if actor.follow_path(actor.chase_speed()):
 		actor.clear_move_target()  # 走到最后已知位置后停下，等放弃计时

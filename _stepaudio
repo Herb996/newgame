@@ -1,0 +1,27 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[Config] 配置已加载：地图 128.0x128.0 | 撤离点 3.0 个 | 局内 3600.0 秒
+[Config] 用户设置已加载：44 项（user://settings.json）
+[SaveSlots] 6 个槽位可用｜上次游玩：槽 2
+[DisplaySettings] 已创建音频总线：Music
+[DisplaySettings] 已创建音频总线：SFX
+[Meta] 存档加载完成（本地默认槽）：仓库 {  } | 升级 { "survival.max_hp": 1.0 } | 基地 0 栋 | 名册 4 人
+--- A 段：合成采样的循环标志 ---
+  踩水 0.180s loop=0 ｜干脚步 0.100s loop=0 ｜雨底 4.000s loop=1
+  OK   踩水音不循环（loop_mode=0）—— 旧值 LOOP_FORWARD 就是「响个不停」
+  OK   干脚步声同样不循环
+  OK   雨底仍然循环（背景音别跟着改坏，loop_mode=1）
+  OK   踩水音长度 == config step_duration_s（实测 0.180 / 期望 0.180）
+  OK   干脚步长度 == config step_dry_duration_s（实测 0.100 / 期望 0.100）
+  OK   踩水音播放器池已建出（3 个）
+  OK   播放器挂的那份 stream 也是不循环的（loop_mode=0）
+--- B 段：真播一次之后会不会自己停 ---
+  跳过：无头跑的是 Dummy 音频驱动，playing 恒假，量不出「停不停」
+  → 本段要开窗跑（Dev/probe_step_audio.tscn --window）
+--- C 段：脚步只在移动状态发 ---
+  调用点：Scripts/combat/states/player_move_state.gd
+  OK   on_wet_step/on_dry_step 只有 PlayerMoveState 调用（站住即不响）
+
+=== 共 8 项断言，失败 0 项 ===
+[probe_step_audio] fails=0 -> PASS
+

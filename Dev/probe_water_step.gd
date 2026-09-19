@@ -116,22 +116,6 @@ func _ready() -> void:
 	_check(leak_field == 0, "水面格的湿度场一颗都不带（实测漏 %d）" % leak_field)
 	_check(leak_cells == 0, "水面格的逻辑判定全干（实测漏 %d）" % leak_cells)
 
-	# 临时诊断（水面剔出）：把「地形 + 湿度场」烘成一张图，与 --capture2d 画面对齐看，
-	# 直接回答"shader 到底把哪几格画湿了"。比在截图上按颜色猜水面可靠。
-	var dbg := Image.create(mw, mh, false, Image.FORMAT_RGBA8)
-	var pal := [Color(0.42, 0.62, 0.24), Color(0.58, 0.45, 0.22),
-			Color(0.10, 0.34, 0.20), Color(0.78, 0.72, 0.16)]
-	for y in range(mh):
-		for x in range(mw):
-			var c: Color = Color(0.24, 0.60, 0.64) if bool(walls[y][x]) else pal[clampi(int(biome[y][x]), 0, 3)]
-			var f := float(w._wet_field[y][x])
-			if f > 0.02:
-				c = c.lerp(Color(0.0, 0.0, 0.0), minf(1.0, f))
-			dbg.set_pixel(x, y, c)
-	dbg.resize(mw * 4, mh * 4, Image.INTERPOLATE_NEAREST)
-	var dbg_path := OS.get_user_data_dir() + "/_wet_dbg.png"
-	_say("诊断图 %s (err=%d)" % [dbg_path, dbg.save_png(dbg_path)])
-
 	# ---------- A2) 湿度场是连续的 ----------
 	# 掩码一纹理对应一格：_wet_field 若只剩 0/1，shader 侧无论怎么插值都揉不出过渡带，
 	# 干湿边界必然露出 64px 格网台阶（看起来就是一块块方形水洼，正是本方案要消掉的东西）。

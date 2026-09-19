@@ -511,12 +511,12 @@ static func generate() -> Dictionary:
 		for _it in range(smooth_iters):
 			biome = _consolidate_biome(biome, width, height)
 
-	# 去飞地：任何不接地图边缘、被别的群系整个包住的孤立块，并入周围主导群系。
-	# 保证「一个地形不会包含另一个地形」。反复到稳定（最多 8 遍）。
+	# 去小地块（绝对最小尺寸）：任何小于 biome_min_region_cells 的连通地块（含贴边的）
+	# 都并入周围主导群系；连锁收敛，最多 64 遍。
 	if bool(Config.get_value("map.biome_remove_islands", true)):
 		var min_region: int = int(Config.get_value("map.biome_min_region_cells", 40))
 		var _isl_guard := 0
-		while _isl_guard < 8 and _remove_biome_islands(biome, width, height, min_region):
+		while _isl_guard < 64 and _remove_biome_islands(biome, width, height, min_region):
 			_isl_guard += 1
 
 	# 河流与裂缝均已按需求移除，地图不再产生任何水格。
@@ -1004,9 +1004,9 @@ static func _consolidate_biome(biome: Array, width: int, height: int) -> Array:
 	return out
 
 
-## 去飞地：把「不接地图边缘、被别的群系整个包住」的孤立群系块并入周围主导群系。
-## 一遍扫完当前所有飞地并原地改 biome；返回是否有改动（调用方循环到稳定）。
-## 效果：每个群系的每块区域都接地图边缘 → 不存在「一个地形包含另一个地形」。
+## 去小地块（绝对最小尺寸）：把任何小于 min_region 的连通群系地块——无论是否贴着
+## 地图边缘——并入包围它最多的那个群系。设了 N 就不会有比 N 小的地块。
+## 一遍扫完并原地改 biome；返回是否有改动（调用方循环到稳定，连锁收敛）。
 static func _remove_biome_islands(biome: Array, w: int, h: int, min_region: int) -> bool:
 	var visited: Array = []
 	for y in range(h):
@@ -1024,13 +1024,10 @@ static func _remove_biome_islands(biome: Array, w: int, h: int, min_region: int)
 			var stack: Array = [Vector2i(x, y)]
 			visited[y][x] = 1
 			var cells: Array = []
-			var touches_border := false
 			var neigh := {}
 			while not stack.is_empty():
 				var c: Vector2i = stack.pop_back()
 				cells.append(c)
-				if c.x == 0 or c.y == 0 or c.x == w - 1 or c.y == h - 1:
-					touches_border = true
 				for d in d4:
 					var nx: int = c.x + d.x
 					var ny: int = c.y + d.y
@@ -1043,7 +1040,9 @@ static func _remove_biome_islands(biome: Array, w: int, h: int, min_region: int)
 							stack.append(Vector2i(nx, ny))
 					else:
 						neigh[nb] = int(neigh.get(nb, 0)) + 1
-			if touches_border or neigh.is_empty() or cells.size() >= min_region:
+			# 绝对最小地块尺寸：任何小于 min_region 的连通地块（含贴地图边缘的）
+			# 都并入包围它最多的群系。→ 设了 200 就不会有比 200 小的地块。
+			if neigh.is_empty() or cells.size() >= min_region:
 				continue
 			var best: int = -1
 			var bestc: int = -1
@@ -1114,8 +1113,10 @@ static func _grow_cluster(biome: Array, terrain: Array, decor: Array, occ: Dicti
 	return cells
 
 
-## 地图资源成簇放置：读 map.resource_clusters，对 tree/rock/iron/oil 每种，
-## 在每个 weight>0 的群系放 count 个相连簇，每簇 size = weight[群系]。
+## 地图资源成簇放置（新模型）：读 map.resource_clusters = {total, types}。
+## ① 全图 total 个簇，按各类型 share 比例分给 tree/rock/iron/oil；
+## ② 每种类型的簇再按其 biome_weight 分到各群系（0草/1荒/2林/3沼）；
+## ③ 每簇大小在 [min_size, max_size] 随机（min 调大即避免过小孤簇）。
 ## tree/rock 写进 decor 并设为阻挡；iron/oil 追加进 veins（res_id,gx,gy）供采集/渲染。
 ## 返回 veins 数组。
 static func _place_clustered_resources(decor: Array, terrain: Array, biome: Array,
@@ -1125,11 +1126,30 @@ static func _place_clustered_resources(decor: Array, terrain: Array, biome: Arra
 	var occ := {}
 	var clear_r: int = int(Config.get_value("map.decor.clear_spawn_radius_cells", 3))
 	var cfg: Dictionary = Config.get_value("map.resource_clusters", {})
-	for res_key in cfg.keys():
-		var rc: Dictionary = cfg[res_key]
-		var count: int = int(rc.get("count", 0))
-		var weight: Dictionary = rc.get("weight", {})
-		if count <= 0:
+	var total: int = int(cfg.get("total", 0))
+	var types: Dictionary = cfg.get("types", {})
+	if total <= 0 or types.is_empty():
+		return veins
+	var sum_share := 0
+	for t in types.keys():
+		sum_share += int((types[t] as Dictionary).get("share", 0))
+	if sum_share <= 0:
+		return veins
+	for res_key in types.keys():
+		var tc: Dictionary = types[res_key]
+		var share: int = int(tc.get("share", 0))
+		if share <= 0:
+			continue
+		var n_clusters: int = int(round(float(total) * float(share) / float(sum_share)))
+		var min_size: int = int(tc.get("min_size", 1))
+		var max_size: int = int(tc.get("max_size", min_size))
+		if max_size < min_size:
+			max_size = min_size
+		var bw: Dictionary = tc.get("biome_weight", {})
+		var bsum := 0
+		for bk in bw.keys():
+			bsum += int(bw[bk])
+		if bsum <= 0:
 			continue
 		var is_vein: bool = res_key == "iron" or res_key == "oil" or res_key == "gold"
 		var decor_kind: int = DECOR_NONE
@@ -1137,12 +1157,14 @@ static func _place_clustered_resources(decor: Array, terrain: Array, biome: Arra
 			decor_kind = DECOR_TREE
 		elif res_key == "rock":
 			decor_kind = DECOR_ROCK
-		for bk in weight.keys():
+		for bk in bw.keys():
 			var bid: int = int(bk)
-			var size: int = int(weight[bk])
-			if size <= 0:
+			var wgt: int = int(bw[bk])
+			if wgt <= 0:
 				continue
-			for _c in range(count):
+			var n_in_biome: int = int(round(float(n_clusters) * float(wgt) / float(bsum)))
+			for _c in range(n_in_biome):
+				var size: int = rng.randi_range(min_size, max_size)
 				var cells: Array = _grow_cluster(biome, terrain, decor, occ, w, h,
 						center, clear_r, rng, bid, size)
 				for cell in cells:

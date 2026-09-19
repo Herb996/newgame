@@ -382,7 +382,7 @@ func _apply_motion(anim: int, facing: Vector2) -> void:
 			off.x += sin(t * 55.0) * _pixel_unit * 1.0
 			mod = Color(1.0, 0.55, 0.5)
 		Anim.DEAD:
-			# 死亡：倾倒 + 变暗
+			# 死亡：倾倒 + 变暗（只在这零点几秒的淡出里可见，之后节点移除）
 			rot = 0.4
 			off.y += _pixel_unit * 2.5
 			mod = Color(0.55, 0.55, 0.55)
