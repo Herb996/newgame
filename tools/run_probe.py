@@ -17,6 +17,9 @@ import sys
 GODOT = r"C:/Users/Administrator/Downloads/Godot_v4.7.2-stable_win64_console.exe"
 PROJ = r"D:/SteamPunkExtraction"
 OUT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+## 探针跑飞了（半路报错、没走到 quit()）时不能把调用方一起挂住 ——
+## terrain 探针当年就是崩在半路，run_probe 一直没有超时，整条回归卡死。
+TIMEOUT = 600
 
 
 def main() -> int:
@@ -50,16 +53,25 @@ def main() -> int:
     if scene:
         cmd.append(scene)
 
-    p = subprocess.run(cmd, capture_output=True)
-    text = (p.stdout + b"\n" + p.stderr).decode("utf-8", "replace")
+    rc = -1
+    timed_out = False
+    try:
+        p = subprocess.run(cmd, capture_output=True, timeout=TIMEOUT)
+        rc = p.returncode
+        raw = p.stdout + b"\n" + p.stderr
+    except subprocess.TimeoutExpired as e:
+        timed_out = True
+        raw = (e.stdout or b"") + b"\n" + (e.stderr or b"")
+    text = raw.decode("utf-8", "replace")
     path = os.path.join(OUT_DIR, log_name)
     io.open(path, "w", encoding="utf-8", newline="").write(text)
 
-    print("EXIT =", p.returncode)
+    print("EXIT =", "超时 %ds，进程已杀（探针没走到 quit()）" % TIMEOUT
+          if timed_out else rc)
     print("LOG  =", path, os.path.getsize(path), "bytes")
     print("----- tail -----")
     print("\n".join(text.splitlines()[-60:]))
-    return p.returncode
+    return 124 if timed_out else rc
 
 
 if __name__ == "__main__":

@@ -17,10 +17,7 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	_panel = PanelContainer.new()
-	_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	_panel.custom_minimum_size = Vector2(560, 0)
-	add_child(_panel)
+	_panel = UiKit.centered_dialog(self, 560)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 8)

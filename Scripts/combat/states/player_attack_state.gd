@@ -27,7 +27,9 @@ func _init(p_actor: Node = null) -> void:
 
 
 func enter(_msg: Dictionary = {}) -> void:
-	actor.stop_moving()
+	# 只停脚，不清指令：清了指令的话，下面后摇结束那句
+	# 「若还有移动指令就回 move」永远走不到（历史上就是这么把玩家的点击吃掉的）。
+	actor.halt_in_place()
 	# 自动战斗：朝当前锁定目标起手（无目标则保持原朝向，不再看鼠标）
 	actor.aim_at_auto_target()
 	_phase = Phase.WINDUP

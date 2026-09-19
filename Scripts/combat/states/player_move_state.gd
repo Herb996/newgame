@@ -25,26 +25,24 @@ func physics_update(delta: float) -> void:
 		var pos: Vector2 = actor.global_position
 		# from_player=true → 计入菜单栏「当前/累积噪音」读数（脚步也算暴露度）
 		NoiseSystem.emit(pos, float(Config.get_value("noise.sources.walk", 10.0)), true, actor)
-		# 踩水：站在积水格上时，同一次脚步额外出波纹 + 播水声。
+		# 湿地脚步：草地/森林下雨就是湿的，同一次脚步额外出波纹 + 播水声。
 		# 噪声照常发（踩水不豁免噪音暴露）。这是 0.4s 一次的低频路径，
 		# 直接查组即可、不缓存（缓存反而要处理切图时 WeatherSystem 引用失效）。
-		# is_water_at 内部已判 _active，基地/未激活/无该节点时安全返回 false。
+		# is_wet_at 内部已判 _active，基地/未激活/无该节点时安全返回 false。
 		var weather := actor.get_tree().get_first_node_in_group("weather_system")
 		if weather != null:
-			if weather.is_water_at(pos):
-				weather.on_water_step(pos)
+			if weather.is_wet_at(pos):   # 邻域判定，见 weather.rain_ground.step_wet_radius_cells
+				weather.on_wet_step(pos)
 			else:
-				weather.on_dry_step(pos)   # 雨天干地也出小湿痕波纹
-	# 自动战斗（2026-09-17）：赶路途中敌人进入「视野 ∩ 攻击距离」就地开打，
-	# 打完回到 move 继续赶路（见 PlayerAttackState 的后摇分支）。
-	if actor.auto_target() != null:
-		request_transition(&"attack")
-		return
-	# 冲刺可以打断移动（进入对应状态时会 stop_moving）
-	if actor.can_dodge() and actor.consume_input(&"dodge"):
-		request_transition(&"dodge")
-		return
+				weather.on_dry_step(pos)   # 干地脚步：只有闷响，不出波纹
+	# 移动指令优先于自动战斗（2026-09-19 修「点十几次后控制不了」）：
+	# 还带着目标点就一直走，打到一半停下来跟眼前这只对砍 = 玩家的下一次点击会被
+	# attack.enter 清掉，赶路永远走不完。到点清空指令后，Idle 才恢复自动索敌。
 	if not actor.has_move_target():
 		request_transition(&"idle")
+		return
+	# 冲刺可以打断移动（进入对应状态时会停脚，但同样不丢这条移动指令）
+	if actor.can_dodge() and actor.consume_input(&"dodge"):
+		request_transition(&"dodge")
 		return
 	actor.follow_path()

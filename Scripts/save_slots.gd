@@ -133,6 +133,7 @@ func create_slot(slot: int, slot_name: String = "") -> bool:
 		"upgrades": {},
 		"base_layout": {},
 		"roster": [],
+		"seeded_ids": [],
 	}
 	if not write_slot(slot, payload):
 		return false
@@ -163,8 +164,9 @@ func active_payload() -> Dictionary:
 
 
 ## Meta.save_game 走这里：把仓库/升级/**名册**写回当前槽，并刷新时间戳。
+## seeded_ids = 出厂名单里已发过的原型（见 Meta._migrate_starting_units），一起持久化。
 func write_active(bank: Dictionary, upgrades: Dictionary, base_layout: Dictionary = {},
-		roster: Array = []) -> bool:
+		roster: Array = [], seeded_ids: Array = []) -> bool:
 	if active_slot <= 0:
 		return false
 	var data := read_slot(active_slot)
@@ -179,6 +181,7 @@ func write_active(bank: Dictionary, upgrades: Dictionary, base_layout: Dictionar
 	data["upgrades"] = upgrades
 	data["base_layout"] = base_layout
 	data["roster"] = roster
+	data["seeded_ids"] = seeded_ids
 	data["last_played_unix"] = int(Time.get_unix_time_from_system())
 	return write_slot(active_slot, data)
 

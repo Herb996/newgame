@@ -114,7 +114,9 @@ var _animator: PlayerAnimator = null
 var _hp_bar: Node = null           # 头顶血条（enemy_hp_bar.gd）；受伤才显示
 var _anim_state := PlayerAnimator.Anim.IDLE
 var _attack_timer := 0.0           # >0 表示正在播攻击动作，播完回 idle/walk
-var _hit_flash := 0.0              # 受击泛红剩余秒数
+var _hit_flash := 0.0              # 受击泛红剩余秒数（白闪→红 两段的驱动）
+var _hit_tween: Tween = null       # 受击 squash/击退回弹动画（命中瞬间重开，连击不打结）
+var _hit_stun := 0.0               # 受击微停顿(hitlag)剩余秒，>0 时 AI 让位（敌人"被打愣"）
 var _dying := false                # 已进入死亡淡出，不再参与 AI/受伤
 
 # --- 死亡特性（判定与派发在 enemy_system.gd）---
@@ -198,8 +200,11 @@ func _physics_process(delta: float) -> void:
 	_dormant = distance_to_player_cells() > ai_active_radius_cells()
 	if _dormant:
 		return
-	_tick_pack(delta)          # 成群：找同类结伙 + 成员跟上群主（只有带 pack 的兵种有开销）
-	state_machine.physics_update(delta)
+	if _hit_stun > 0.0:
+		_hit_stun -= delta           # 受击微停顿：AI/导航让位，但动画与染色照常刷新
+	else:
+		_tick_pack(delta)          # 成群：找同类结伙 + 成员跟上群主（只有带 pack 的兵种有开销）
+		state_machine.physics_update(delta)
 	_update_anim(delta)
 	# 染色必须在动画器之后：动画器每帧会写 modulate，放前面会被覆盖掉
 	_update_alert_visual()
@@ -678,8 +683,14 @@ func _update_alert_visual() -> void:
 	elif noise_alertness >= susp:
 		tint = Color(1.0, 0.9, 0.4)    # 疑惑：浅黄
 	if _hit_flash > 0.0:
-		var full := maxf(float(Config.get_value("enemy.hit_flash_seconds", 0.18)), 0.01)
-		tint = tint.lerp(Color(1.0, 0.25, 0.2), clampf(_hit_flash / full, 0.0, 1.0))
+		var full := maxf(float(Config.get_value("enemy.hit_flash_seconds", 0.22)), 0.01)
+		var r := clampf(_hit_flash / full, 0.0, 1.0)   # 1=刚命中 → 0=结束
+		if r > 0.5:
+			# 命中头帧：白闪（modulate 乘法可超 1 提亮，比纯红更"啪"一下）
+			tint = tint.lerp(Color(1.9, 1.9, 1.9), (r - 0.5) / 0.5)
+		else:
+			# 后段：泛红回落
+			tint = tint.lerp(Color(1.0, 0.28, 0.22), r / 0.5)
 	_body.modulate = tint
 
 
@@ -1413,6 +1424,44 @@ func _pick_drop_resource() -> String:
 	if pool.is_empty():
 		return ""
 	return str(pool[randi() % pool.size()])
+
+
+## 受击视觉反馈（程序化，不依赖官方受击帧）：白闪 + 挤压回弹 + 视觉击退。
+## 全部作用在视觉子节点 _body（modulate / scale / position），不碰根节点 global_position，
+## 因此绝不和导航/碰撞打架、不会穿墙 —— 帧切换由 _update_anim 负责，它不写 scale/position，
+## 故这里的 squash/击退不会被每帧覆盖。
+## 由攻击结算点命中后调用（不进 take_damage 签名，保持探针里「只测伤害数值」的假敌人兼容）。
+## from_pos = 攻击者位置（箭出膛点 / 玩家位置），用来算「敌人被推离攻击者」的方向。
+func play_hit_fx(from_pos: Vector2) -> void:
+	if _dying or _body == null:
+		return
+	# 命中泛红计时（_physics_process 每帧 decay，_update_alert_visual 据此做白闪→红）
+	_hit_flash = float(Config.get_value("enemy.hit_flash_seconds", 0.22))
+	# 方向：从攻击者指向本体的单位向量（敌人被推离攻击者）
+	var dir := Vector2.ZERO
+	if from_pos != Vector2.ZERO:
+		var d := global_position - from_pos
+		if d.length_squared() > 1.0:
+			dir = d.normalized()
+	var kb := float(Config.get_value("enemy.hit_knockback_px", 14.0))
+	var squash := float(Config.get_value("enemy.hit_squash_amount", 0.18))
+	# 重开上一次的回弹动画（连击不打结）
+	if _hit_tween != null and _hit_tween.is_valid():
+		_hit_tween.kill()
+	_hit_tween = create_tween()
+	# 挤压：横向压扁、纵向拉长（被打中的"肉感"），再弹性回弹到 1
+	_body.scale = Vector2(1.0 - squash, 1.0 + squash)
+	_hit_tween.tween_property(_body, "scale", Vector2.ONE, 0.16) \
+			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	# 视觉击退：_body 局部位置从 0 推到 dir*kb，再弹性回弹 0（纯视觉，不碰碰撞体）
+	if dir != Vector2.ZERO and kb > 0.0:
+		_body.position = dir * kb
+		_hit_tween.tween_property(_body, "position", Vector2.ZERO, 0.20) \
+				.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	# 受击微停顿（hitlag）：让 AI/导航短暂让位，敌人「被打愣」一下
+	var stun := float(Config.get_value("enemy.hit_stun_seconds", 0.0))
+	if stun > 0.0:
+		_hit_stun = maxf(_hit_stun, stun)
 
 
 ## 被击退：按冲量做一段位移

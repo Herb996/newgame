@@ -13,7 +13,12 @@
         "biome_smooth_iterations": 3,
         "biome_remove_islands": true,
         "biome_min_region_cells": 40,
-        "biome_weights": {"0": 3.4, "1": 1.05, "2": 1.25, "3": 0.95},
+        "biome_weights": {
+            "0": 3.4,
+            "1": 1.05,
+            "2": 1.25,
+            "3": 0.95
+        },
         "biomes": [
             {
                 "id": 0,
@@ -123,19 +128,39 @@
         "resource_clusters": {
             "tree": {
                 "count": 18,
-                "weight": {"0": 3, "1": 1, "2": 6, "3": 0}
+                "weight": {
+                    "0": 3,
+                    "1": 1,
+                    "2": 6,
+                    "3": 0
+                }
             },
             "rock": {
                 "count": 12,
-                "weight": {"0": 2, "1": 6, "2": 2, "3": 0}
+                "weight": {
+                    "0": 2,
+                    "1": 6,
+                    "2": 2,
+                    "3": 0
+                }
             },
             "iron": {
                 "count": 6,
-                "weight": {"0": 1, "1": 8, "2": 1, "3": 0}
+                "weight": {
+                    "0": 1,
+                    "1": 8,
+                    "2": 1,
+                    "3": 0
+                }
             },
             "oil": {
                 "count": 5,
-                "weight": {"0": 1, "1": 1, "2": 1, "3": 0}
+                "weight": {
+                    "0": 1,
+                    "1": 1,
+                    "2": 1,
+                    "3": 0
+                }
             }
         },
         "cluster_noise_frequency": 0.05,
@@ -323,7 +348,10 @@
                 "center_offset_y": -34.0,
                 "radius_px": 11.0,
                 "screen_fixed": true,
-                "orbit_radius_px": [24.0, 36.0],
+                "orbit_radius_px": [
+                    24.0,
+                    36.0
+                ],
                 "orbit_y_scale": 0.85,
                 "spin_speed": 1.2,
                 "speed_sway": 0.5,
@@ -338,15 +366,38 @@
                     "max_alpha": 0.9,
                     "core_whiten": 0.5,
                     "falloff": 1.7,
-                    "layers": [[1.3, 0.14], [0.95, 0.24], [0.62, 0.44], [0.34, 1.0]],
-                    "pulse_seconds": [3.4, 2.1],
+                    "layers": [
+                        [
+                            1.3,
+                            0.14
+                        ],
+                        [
+                            0.95,
+                            0.24
+                        ],
+                        [
+                            0.62,
+                            0.44
+                        ],
+                        [
+                            0.34,
+                            1.0
+                        ]
+                    ],
+                    "pulse_seconds": [
+                        3.4,
+                        2.1
+                    ],
                     "pulse_power": 1.15,
                     "min_scale": 0.72
                 }
             },
             "flash": {
                 "_comment": "「闪一下报等级」的节奏：间隔 interval 秒随机闪一次（first_delay = 进场后第一次，别让玩家等太久才明白这光点干嘛的）。rise 胀大 / hold 保持 / fade 淡出。闪的时候**可见度被强制拉满**（orb.glow 的时隐时现会被顶掉）—— 否则光点正好处在「隐」的时刻，闪了也白闪。on_select = 点选该角色立刻闪一次（想知道就能知道）—— 这是「不常驻数字」的补偿手段。scale 比球时代大（2.0）：底球半径小了，不多胀一点数字搁不下。",
-                "interval": [5.0, 9.0],
+                "interval": [
+                    5.0,
+                    9.0
+                ],
                 "first_delay": 1.5,
                 "scale": 2.0,
                 "rise": 0.15,
@@ -383,7 +434,8 @@
             "starting": [
                 "spearman",
                 "archer",
-                "swordsman"
+                "swordsman",
+                "monk"
             ],
             "recruit_free": true,
             "max_size": 8
@@ -391,18 +443,57 @@
         "traits": {
             "_comment": "升级特性（2026-09-18 用户定）：每次升级**随机获得一个特性 +1 层**，收益按层累计（id 即属性键，层数 × per_stack）。等级越高攒的层越多 = 收益越大。**per_stack 一律是整数「单位」**（速度 +5、攻击 +7、攻击距离 +4 这种），不写小数。unit=flat 是把 per_stack 当点数直接相加（移速 px/s、气血点、视野/攻击距离/弹速 px）；unit=pct 用在攻击频率上，per_stack = 每层加的**整数百分点**（5 = 每层 +5%），前摇/判定/后摇 除以 (1 + 层数×5/100)，层越多打得越快。defense 是**入伤减免的点数**（take_damage 里先扣再算，扣到 0 就不掉血）。8 条一视同仁被抽中（均匀随机、无权重）。",
             "list": [
-                {"id": "attack", "name": "攻击", "unit": "flat", "per_stack": 7},
-                {"id": "defense", "name": "防御", "unit": "flat", "per_stack": 5},
-                {"id": "hp", "name": "气血", "unit": "flat", "per_stack": 5},
-                {"id": "move_speed", "name": "移速", "unit": "flat", "per_stack": 5},
-                {"id": "vision", "name": "视野距离", "unit": "flat", "per_stack": 5},
-                {"id": "attack_range", "name": "攻击距离", "unit": "flat", "per_stack": 4},
-                {"id": "attack_speed", "name": "攻击频率", "unit": "pct", "per_stack": 5},
-                {"id": "projectile_speed", "name": "投射体速度", "unit": "flat", "per_stack": 5}
+                {
+                    "id": "attack",
+                    "name": "攻击",
+                    "unit": "flat",
+                    "per_stack": 7
+                },
+                {
+                    "id": "defense",
+                    "name": "防御",
+                    "unit": "flat",
+                    "per_stack": 5
+                },
+                {
+                    "id": "hp",
+                    "name": "气血",
+                    "unit": "flat",
+                    "per_stack": 5
+                },
+                {
+                    "id": "move_speed",
+                    "name": "移速",
+                    "unit": "flat",
+                    "per_stack": 5
+                },
+                {
+                    "id": "vision",
+                    "name": "视野距离",
+                    "unit": "flat",
+                    "per_stack": 5
+                },
+                {
+                    "id": "attack_range",
+                    "name": "攻击距离",
+                    "unit": "flat",
+                    "per_stack": 4
+                },
+                {
+                    "id": "attack_speed",
+                    "name": "攻击频率",
+                    "unit": "pct",
+                    "per_stack": 5
+                },
+                {
+                    "id": "projectile_speed",
+                    "name": "投射体速度",
+                    "unit": "flat",
+                    "per_stack": 5
+                }
             ]
         }
-    }
-,
+    },
     "sprites": {
         "view": {
             "sprite_scale": 0.5,
@@ -519,7 +610,10 @@
         "knockback_px": 32.0,
         "speed": 360.0,
         "chase_speed_multiplier": 1.35,
-        "hit_flash_seconds": 0.18,
+        "hit_flash_seconds": 0.22,
+        "hit_knockback_px": 14.0,
+        "hit_squash_amount": 0.18,
+        "hit_stun_seconds": 0.0,
         "death_fade_seconds": 0.45,
         "vision_cells": 10,
         "vision_blocked_by_walls": true,
@@ -623,10 +717,26 @@
             "_comment": "菜单右下的读数接线：第 1 行 = 自身噪音（全队最大值，见 noise.self），第 2 行 = 世界噪音（见 noise.world）。**只统计小队自己发出的声音**（emit 的 from_player）—— 敌人呼喊不计入，否则会被误读成『是我在吵』。levels 决定第 1 行的档位名与配色（从高往低匹配 min）。",
             "alert_watch_interval_seconds": 0.25,
             "levels": [
-                {"name": "安静", "min": 0, "color": "#7bc86c"},
-                {"name": "轻响", "min": 45, "color": "#d8c34a"},
-                {"name": "吵闹", "min": 120, "color": "#e08a3c"},
-                {"name": "震耳", "min": 200, "color": "#d8452f"}
+                {
+                    "name": "安静",
+                    "min": 0,
+                    "color": "#7bc86c"
+                },
+                {
+                    "name": "轻响",
+                    "min": 45,
+                    "color": "#d8c34a"
+                },
+                {
+                    "name": "吵闹",
+                    "min": 120,
+                    "color": "#e08a3c"
+                },
+                {
+                    "name": "震耳",
+                    "min": 200,
+                    "color": "#d8452f"
+                }
             ]
         }
     },
@@ -772,10 +882,22 @@
         "extraction_hold_seconds": 3
     },
     "survival": {
+        "_comment": "局内每分钟物资消耗。supplies = 消耗表（2026-09-18 从「只有食物一个键」改成结构化列表，为的是以后加一种物资只加一行、不改代码）：per_meal = 每 meal_interval_seconds 扣几份；shortage_debuff = **短缺时**扣的属性点数，正数表示扣这么多，键名复用 progression.traits 的属性 id（attack 点 / defense 点 / move_speed px每秒 / vision px / attack_range px / attack_speed 百分点 / projectile_speed px每秒）。**补上物资立刻全额还原**，扣减不进存档；hp 故意不支持——中途缩上限会牵动已有血量与血条语义。短缺**不致死**：饥饿仍按 starvation_interval_seconds 掉 starvation_damage 血，但血量封在 starvation_hp_floor 之上，最后一滴只能由敌人补刀。",
         "meal_interval_seconds": 60,
-        "food_per_meal": 1,
+        "supplies": [
+            {
+                "_comment": "口粮。饿肚子掉的是**输出和腿速**（攻击 -7 = 正好一层攻击特性；移速 -10 px/s 相对出厂 player.speed 640 只有 1.6%，是「脚步发沉」的手感而非硬惩罚）—— 打不动、跑不快，但死不了人。",
+                "id": "food",
+                "per_meal": 1,
+                "shortage_debuff": {
+                    "attack": 7,
+                    "move_speed": 10
+                }
+            }
+        ],
         "starvation_damage": 5,
         "starvation_interval_seconds": 30,
+        "starvation_hp_floor": 1,
         "heal_per_food": 25,
         "eat_cooldown_seconds": 1.0,
         "eat_key": 72
@@ -814,7 +936,7 @@
                 "id": "warehouse",
                 "name": "仓库",
                 "cell": [
-                    24,
+                    10,
                     30
                 ],
                 "hint": "按 E 查看仓库",
@@ -825,7 +947,7 @@
                 "id": "statue",
                 "name": "修道院",
                 "cell": [
-                    36,
+                    38,
                     30
                 ],
                 "hint": "按 E 进行升级",
@@ -836,8 +958,8 @@
                 "id": "gate",
                 "name": "出发大门",
                 "cell": [
-                    30,
-                    42
+                    24,
+                    30
                 ],
                 "hint": "按 E 选择角色出发",
                 "h3d": 2.2,
@@ -847,8 +969,8 @@
                 "id": "archery",
                 "name": "箭术场",
                 "cell": [
-                    22,
-                    22
+                    38,
+                    16
                 ],
                 "hint": "",
                 "h3d": 2.6,
@@ -858,8 +980,8 @@
                 "id": "barracks",
                 "name": "兵营",
                 "cell": [
-                    38,
-                    22
+                    52,
+                    16
                 ],
                 "hint": "",
                 "h3d": 2.6,
@@ -869,7 +991,7 @@
                 "id": "tower",
                 "name": "瞭望塔",
                 "cell": [
-                    46,
+                    52,
                     30
                 ],
                 "hint": "",
@@ -880,8 +1002,8 @@
                 "id": "house2",
                 "name": "民居",
                 "cell": [
-                    20,
-                    38
+                    10,
+                    44
                 ],
                 "hint": "",
                 "h3d": 2.0,
@@ -891,12 +1013,56 @@
                 "id": "house3",
                 "name": "民居",
                 "cell": [
-                    40,
-                    38
+                    24,
+                    44
                 ],
                 "hint": "",
                 "h3d": 2.0,
                 "sprite": "res://Assets/Art/Sprites/Buildings/blue_house3.png"
+            },
+            {
+                "id": "farm",
+                "name": "谷仓",
+                "cell": [
+                    10,
+                    16
+                ],
+                "hint": "",
+                "h3d": 2.6,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_farm.png"
+            },
+            {
+                "id": "quarry",
+                "name": "采石场",
+                "cell": [
+                    38,
+                    44
+                ],
+                "hint": "",
+                "h3d": 2.6,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_quarry.png"
+            },
+            {
+                "id": "portal",
+                "name": "传送门",
+                "cell": [
+                    24,
+                    16
+                ],
+                "hint": "",
+                "h3d": 3.4,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_portal.png"
+            },
+            {
+                "id": "catapult",
+                "name": "弩车",
+                "cell": [
+                    52,
+                    44
+                ],
+                "hint": "",
+                "h3d": 1.6,
+                "sprite": "res://Assets/Art/Sprites/Buildings/blue_catapult.png"
             }
         ]
     },
@@ -1084,7 +1250,7 @@
         "hint": "ESC 返回上一级 · 设置改动即时保存到 user://settings.json"
     },
     "language": {
-        "_comment": "语言目前是**占位**：下拉能选、选择会存进 user://settings.json，但还没接 i18n（无翻译表，界面文案仍是代码里的中文）。接真翻译时把对应项 ready 改 true 并挂 TranslationServer。",
+        "_comment": "界面语言：中文是源语言（代码原文），en 走 Data/language/translations.csv；ready=false 的项在下拉里标「 (not wired)」。切换写入 user://settings.json 的 language.current，确认应用时 TranslationServer.set_locale。",
         "current": "zh_CN",
         "available": [
             {
@@ -1100,7 +1266,7 @@
             {
                 "code": "en",
                 "name": "English",
-                "ready": false
+                "ready": true
             },
             {
                 "code": "ja",
@@ -1129,8 +1295,9 @@
         "stretch_aspect": "keep"
     },
     "debug": {
+        "walk_seek_wet": false,
         "smoke_test": false,
-        "flow_test": false,
+        "flow_test": true,
         "auto_enter_run": true,
         "main3d_start": "base",
         "time_scale": 20.0,
@@ -3243,10 +3410,27 @@
                         "id": "death_split",
                         "weight": 1,
                         "stages": [
-                            {"_note": "原始死亡 → 出 2。**初始概率**随场上掠夺者总数缩放（人少拉高、人多压低，见 enemy_traits.population_scaling）：chance_base = 场上很多时的概率，chance_max = 场上很少时的上限（用户给的「最高 100」）。想连后面几代一起压，给 stage[1..3] 也加上这两个键即可（只写 chance 就是固定概率）。", "count": 2, "chance_base": 0.45, "chance_max": 1.0},
-                            {"_note": "那 2 个的最后一个死 → 90% 出 4", "count": 4, "chance": 0.9},
-                            {"_note": "那 4 个的最后一个死 → 80% 出 8", "count": 8, "chance": 0.8},
-                            {"_note": "那 8 个的最后一个死 → 70% 出 64（你没给这一代的概率，按 100/90/80 的递减规律填的，改这个数即可）", "count": 64, "chance": 0.7}
+                            {
+                                "_note": "原始死亡 → 出 2。**初始概率**随场上掠夺者总数缩放（人少拉高、人多压低，见 enemy_traits.population_scaling）：chance_base = 场上很多时的概率，chance_max = 场上很少时的上限（用户给的「最高 100」）。想连后面几代一起压，给 stage[1..3] 也加上这两个键即可（只写 chance 就是固定概率）。",
+                                "count": 2,
+                                "chance_base": 0.45,
+                                "chance_max": 1.0
+                            },
+                            {
+                                "_note": "那 2 个的最后一个死 → 90% 出 4",
+                                "count": 4,
+                                "chance": 0.9
+                            },
+                            {
+                                "_note": "那 4 个的最后一个死 → 80% 出 8",
+                                "count": 8,
+                                "chance": 0.8
+                            },
+                            {
+                                "_note": "那 8 个的最后一个死 → 70% 出 64（你没给这一代的概率，按 100/90/80 的递减规律填的，改这个数即可）",
+                                "count": 64,
+                                "chance": 0.7
+                            }
                         ],
                         "spawn_interval_seconds": 0.1,
                         "scatter_px": 0.0,
@@ -3382,78 +3566,177 @@
         }
     },
     "weather": {
-        "_comment": "局内雨天效果（仅 Mode.RUN，基地无雨）。enabled=false 整套零节点装配，截图二分用。数值全在这里，脚本零硬编码。踩水触发节奏复用 noise.footstep_interval_seconds，不另设键造成两处真相。第二三阶段已落地：viewports/reflection/refraction/ripple_viewport 控制 SubViewport 波纹+倒影与屏幕纹理折射色散；puddle.shimmer 已废弃，由 refraction/reflection 替代。",
+        "_comment": "局内雨天效果（仅 Mode.RUN，基地无雨）。enabled=false 整套零节点装配，截图二分用。数值全在这里，脚本零硬编码。踩水触发节奏复用 noise.footstep_interval_seconds，不另设键造成两处真相。2026-09-19：水洼/倒影/折射三条通路按用户裁定删除，改为\"雨湿地面层 rain_ground\"；同日再加的湿脚印 footprint 试完即废（用户：太丑），踩水反馈只剩波纹一条通道。",
         "enabled": true,
         "viewports": {
-            "_comment": "两个离屏 SubViewport（波纹+倒影）的统一渲染倍率。scale=0.5 即半分辨率（用户已确认）；子视口相机 zoom = 主相机 zoom × scale，保证 SCREEN_UV 与子视口贴图逐点对齐。",
+            "_comment": "波纹离屏 SubViewport 的渲染倍率。scale=0.5 即半分辨率（用户已确认）；子视口相机 zoom = 主相机 zoom × scale，保证 SCREEN_UV 与子视口贴图逐点对应，雨湿地面 shader 直接按屏幕 UV 取波纹。",
             "scale": 0.5
         },
-        "reflection": {
-            "_comment": "积水倒影：MultiMesh2D 实例在 CPU 侧绕各自底边垂直镜像（真倒挂，水在哪倒影在哪）+ SubViewport 正立渲染 + 天空渐变底，puddle shader 按 SCREEN_UV 直接采样。alpha=反射整体不透明度；wobble_*=噪波扰动倒影 UV（晃动强度）；dispersion=色散采样最大 UV 偏移（红通道 +off、绿蓝 −off）；sky_*=天空渐变上下色；exclude_path_fragments=剔除路径含该片段的装饰（双保险，主过滤靠 map_generator 打的 refl meta）。",
-            "enabled": true,
-            "alpha": 0.85,
-            "wobble_scale": 0.12,
-            "wobble_speed": 0.8,
-            "wobble_strength": 0.012,
-            "dispersion": 0.015,
-            "sky_top_color": "#3c4c60",
-            "sky_bottom_color": "#6d8ba6",
-            "exclude_path_fragments": ["crack"]
-        },
-        "refraction": {
-            "_comment": "屏幕纹理折射：SCREEN_TEXTURE 采样 + 噪波 UV 偏移实现水面扭曲（strength=偏移量级，格坐标）。",
-            "enabled": true,
-            "strength": 0.008
-        },
-        "ripple_viewport": {
-            "_comment": "波纹 SubViewport 渲染倍率（与 viewports.scale 一致，独立可调）。波纹渲染到该视口后由 puddle shader 采样合成。",
-            "scale": 0.5
-        },
-        "rain": {
-            "_comment": "amount=同屏雨滴数（发射框按相机 zoom 动态算，故屏内密度近似恒定）。fall_speed/wind 是世界像素/秒。streak=雨丝贴图尺寸与颜色；splash=落地飞溅（独立发射器，非 sub-emitter）。emission_margin=发射框比视口多出的余量，防止边缘无雨。z 决定盖在雾层（5）之上。",
-            "amount": 800,
-            "splash_amount": 140,
-            "fall_speed_px": [1100.0, 1500.0],
-            "wind_x_px": -400.0,
-            "lifetime_s": 0.5,
-            "streak": {"width_px": 1, "length_px": 32, "color": "#d5e6f5", "alpha": 0.45},
-            "splash": {"lifetime_s": 0.22, "speed_px": [40.0, 110.0], "gravity_px": 1800.0, "size_px": 4.0, "color": "#cfe6ff", "alpha": 0.7},
-            "emission_margin_px": 160.0,
-            "z": 6
-        },
-        "puddle": {
-            "_comment": "积水=噪声水洼 ∪ DECOR_WATER 浅滩（当前浅滩恒 0 格，见 map_generator）。floor_ratio=水洼占地板格比例（分位数阈值保证命中目标）；smooth_iterations=多数投票轮数，让水洼成团而非椒盐；clear_spawn_radius_cells=出生点周围强制无水。color/alpha=水体本身；noise_scale=边缘噪声频率（格坐标）；scroll=滚动速度（格/秒，做边缘流动）；wobble=噪声啃噬边缘幅度；edge_soft=虚化带宽。shimmer 已废弃（第二阶段由 refraction/reflection 替代）；reflection_blend=倒影/折射合成结果与水色混合比例（1=全倒影，0=纯水色）。",
-            "floor_ratio": 0.18,
-            "allowed_biomes": [0, 2],
-            "noise_frequency": 0.045,
-            "smooth_iterations": 2,
-            "clear_spawn_radius_cells": 4,
-            "color": "#3f6f8f",
-            "alpha": 0.62,
-            "noise_scale": 0.1,
-            "scroll_cells_per_s": [0.5, 0.9],
-            "wobble": 0.65,
-            "edge_soft": 0.3,
-            "shimmer": 0.08,
-            "reflection_blend": 0.65
+        "rain_ground": {
+            "_comment": "雨湿地面层（取代旧\"水洼\"概念，2026-09-19 用户裁定）：**不是第 5 个群系**——项目只有草地/森林/荒原/沼泽四种，这里指被雨打湿的草地/森林地板。下雨时**指定群系的地板整片是湿的**，踩哪都出波纹，不需要先找到一洼水。allowed_biomes=哪些群系会湿（0草地/2森林；荒原1、沼泽3保持干燥）；boundary_blur/boundary_passes=干湿边界的多轮均值模糊半径与轮数（把整格 0/1 揉成多格宽软带，配合 shader 域扭曲才看不出格网）；wet_threshold=逻辑判定用整格布尔的场值阈值（与 shader 掩码同源）；exclude_water_cells=模糊**之后**把不可通行格（本项目铺 water_bg 水面贴图）的场值清零——不剔的话岸上草地的湿值会经模糊渗进水面格，整片湖被压暗又打上冷调水光，看着像浮了一层沫子（用户 2026-09-19 裁定\"水面剔出去\"）。必须切在切 _wet_cells 之前，让视觉场和脚步判定同源，别反过来搞成\"看着干、踩上去出波纹\"。可涉水的 DECOR_WATER 浅滩**不在**剔除之列（踩河水果然该出波纹）。外观有四件事：darkness 压暗、tint_color/tint_amount 偏冷、sheen 细碎反光（滚动 fbm，湿面把天光散成一片模糊亮斑）、mottle_* **斑驳水光**（2026-09-19 补，用户：\"地面看不出湿\"）。mottle_amount=0 整层关闭（截图二分用）；mottle_scale=条带噪声频率（每格）；mottle_stretch=[x,y] 各向异性拉伸——x 取低频、y 取高频才拉得出**横向条带**，等方频率只会均匀糊成一块膜；mottle_speed=[x,y] 水光自己的流速（格/秒，与湿边的 scroll_cells_per_s 解耦，两处真相是故意的：水光该爬得比湿边快）；mottle_threshold=亮/暗分界场值；mottle_soft=两侧过渡宽度；mottle_gain=亮斑把草色**换成**天光的混合强度（0..1，不是加白量）；mottle_dark=配对暗斑压暗量；mottle_color=亮斑色（深一档的天蓝，不是近白）。**亮斑与暗斑必须成对**：只加亮斑读成油渍/雪堆，亮旁边紧贴一条暗边才有\"水膜反着天光\"的立体读法；两层都按 cov 门控，干地与湿边拿不到水光。mottle 三个失败模式是截图 A/B 出来的，别退回旧值：① 频率低（0.075～0.34/格，斑幅 3～9 格＝屏上 150～300px）读成**雾团/云影**，要 2.2/格 才碎成\"斑\"；② 亮斑用\"往底色加白\"的写法，在橄榄绿草地上只会得到更亮的橄榄绿＝**苔藓斑**，必须 mix 到冷调天光色（乘本地亮度，树荫下才不自己发光）；③ 亮斑色取近白（#cce6f5）＋gain 拉高（0.5）时，2 倍放大看是一堆**粉笔团/棉絮**——亮斑要的是深一档的蓝（#7fa8cc）配低混合强度（0.35），宁可看不太出也不要糊成白斑。sheen 随之从 0.16 降到 0.05：它和 mottle 是同一件事的两层，都开就糊成一片。alpha=满湿处层不透明度；noise_scale/scroll_cells_per_s=细碎反光频率/流速；edge_soft/edge_warp/edge_warp_scale=过渡带宽度/边界揉弯幅度与频率（格）；ripple_wiggle=波纹经过处让反光抖多少；step_wet_radius_cells=脚步\"算不算踩到湿的地方\"的邻域半径（可见湿面是软边轮廓、_wet_cells 是整格布尔，边界错开近一格，0=退回单格硬判定）。",
+            "allowed_biomes": [
+                0,
+                2
+            ],
+            "boundary_blur": 2,
+            "boundary_passes": 3,
+            "wet_threshold": 0.5,
+            "exclude_water_cells": true,
+        "debug_dump_mask": false,
+            "step_wet_radius_cells": 1,
+            "darkness": 0.3,
+            "tint_color": "#9dc0dc",
+            "tint_amount": 0.3,
+            "sheen": 0.05,
+            "mottle_amount": 1.0,
+            "mottle_scale": 2.2,
+            "mottle_stretch": [
+                0.8,
+                1.4
+            ],
+            "mottle_speed": [0.0, 0.0],
+            "mottle_threshold": 0.74,
+            "mottle_soft": 0.06,
+            "mottle_gain": 0.35,
+            "mottle_dark": 0.12,
+            "mottle_color": "#7fa8cc",
+            "alpha": 0.9,
+            "noise_scale": 0.13,
+            "scroll_cells_per_s": [0.0, 0.0],
+            "edge_soft": 0.45,
+            "edge_warp": 0.9,
+            "edge_warp_scale": 0.16,
+            "ripple_wiggle": 0.003
         },
         "ripple": {
-            "_comment": "踩水波纹对象池（池满则丢弃本次波纹）。radius=最外圈半径 px，duration=存活秒数。base_channel/disp_channel=波纹渲染到纹理时编码到红/绿通道的强度（红=亮度基，绿=色散量，shader 据此做红绿蓝分离）；glow=波纹对水面的提亮强度。",
+            "_comment": "踩水波纹（只在雨湿地面内合成，干地脚步不出波纹；r=亮度基提亮湿面、g=晃动量驱动反光抖动，旧版色散/倒影通道已随\"水洼\"概念一起删除）。radius_px=主弧展开半径（世界像素；要经半分辨率子视口 + 相机 zoom 两次缩小，太小则屏上不足一像素＝看不见）；duration_s=寿命；color/alpha=弧色与基准透明度；base_channel/disp_channel=写进 r/g 通道的强度；glow=亮度增益；line_width=软带总宽 px；band_layers=[[宽度倍率, 透明度倍率]…] 三层同心描边**由外向内递减**（外缘最亮、往里越来越淡）；反过来排（内圈最强）会读成\"地上一枚瞄准准星\"，正是用户否掉过的观感；inner_ratio/inner_alpha=拖尾内弧半径比/透明度比（角度整体再错开半个槽，两层不能同心）；ellipse_squash=椭圆压扁（贴地透视）。2026-09-19 终版形状：一整圈→**一小撮碎片弧**。每圈掷 fragments 段，各段只占整圈均分槽里的一截：arc_span_deg 基准跨角、arc_span_jitter 跨角起伏（±比例）、arc_radius_jitter 半径起伏（±比例，打散\"共圆\"＝关键，首版就是因为所有碎片同半径同时扩到同一圈而读成白色虚线靶子）、arc_phase_jitter 起播延迟（0..该比例的寿命）、arc_alpha_jitter 各段亮度起伏。槽位均分＋硬上限（单段跨角 ≤ 槽宽 80%）保证永远留缺口、绝不闭合成环。",
             "pool_size": 16,
-            "radius_px": 46.0,
-            "duration_s": 0.55,
-            "color": "#bfe3ff",
+            "radius_px": 66.0,
+            "duration_s": 0.6,
+            "color": "#9fd0e8",
             "alpha": 0.8,
             "base_channel": 0.85,
             "disp_channel": 0.5,
-            "glow": 0.35,
-            "dry_radius_px": 30.0,
-            "dry_duration_s": 0.6,
-            "dry_alpha": 0.55,
-            "ellipse_squash": 0.45,
-            "frag_seg_rad": [0.25, 0.8],
-            "frag_gap_rad": [0.1, 0.45],
-            "frag_alpha_jitter": 0.5
+            "glow": 0.95,
+            "line_width": 5.5,
+            "band_layers": [
+                [
+                    1.0,
+                    0.42
+                ],
+                [
+                    0.7,
+                    0.22
+                ],
+                [
+                    0.42,
+                    0.1
+                ]
+            ],
+            "inner_ratio": 0.5,
+            "inner_alpha": 0.45,
+            "fragments": 4,
+            "arc_span_deg": 44.0,
+            "arc_span_jitter": 0.4,
+            "arc_radius_jitter": 0.14,
+            "arc_phase_jitter": 0.3,
+            "arc_alpha_jitter": 0.35,
+            "ellipse_squash": 0.45
+        },
+        "rain": {
+            "_comment": "三层景深雨（DEV LOG.02）：RainFar/RainMid/RainNear，同屏总滴数=各层 amount 之和（参考区间 400-800）。每层：lifetime_s 与 speed_px 决定单滴寿命与下落速度（远慢近快=视差）；scale=[min,max] 雨丝缩放（近处更粗更长）；alpha 覆盖 streak.color 的透明度；wind_factor 该层吃多少风（远处偏转小）；gust_phase 各层阵风错相，避免整屏同步摆动像一面墙；spread_deg 方向散布；z 为**相对 RainAnchor** 的层级（anchor_z=6 已整体压在雾层 5 之上，三层只需排 0/1/2）。下落方式：initial_velocity 沿 +y、重力只给 X（参考步骤 3 用 gravity.x 做风偏），所以风是**持续加速**而非固定倾角。gust=阵风包络：gravity.x = wind_x_px × wind_factor × (1 + amplitude×sin(2π(t/period_s + phase)))。fade_in_s=进局时雨幕/雨滴淡入（用户要求天气切换用 Tween 过渡）。streak=贴图基准尺寸（每层再乘 scale）。splash=地面飞溅，独立发射器、沿视口下半带持续发射（不用粒子碰撞回调：headless 与性能都更稳）。",
+            "layers": [
+                {
+                    "name": "RainFar",
+                    "amount": 400,
+                    "lifetime_s": 0.95,
+                    "speed_px": [
+                        760.0,
+                        980.0
+                    ],
+                    "scale": [
+                        0.55,
+                        0.8
+                    ],
+                    "alpha": 0.3,
+                    "wind_factor": 0.55,
+                    "gust_phase": 0.0,
+                    "spread_deg": 4.0,
+                    "z": 0
+                },
+                {
+                    "name": "RainMid",
+                    "amount": 260,
+                    "lifetime_s": 0.7,
+                    "speed_px": [
+                        1050.0,
+                        1350.0
+                    ],
+                    "scale": [
+                        0.9,
+                        1.25
+                    ],
+                    "alpha": 0.45,
+                    "wind_factor": 1.0,
+                    "gust_phase": 0.33,
+                    "spread_deg": 6.0,
+                    "z": 1
+                },
+                {
+                    "name": "RainNear",
+                    "amount": 140,
+                    "lifetime_s": 0.5,
+                    "speed_px": [
+                        1450.0,
+                        1800.0
+                    ],
+                    "scale": [
+                        1.5,
+                        2.2
+                    ],
+                    "alpha": 0.5,
+                    "wind_factor": 1.45,
+                    "gust_phase": 0.66,
+                    "spread_deg": 8.0,
+                    "z": 2
+                }
+            ],
+            "blend_add": true,
+            "wind_x_px": -320.0,
+            "gust": {
+                "amplitude": 0.5,
+                "period_s": 7.0
+            },
+            "fade_in_s": 1.2,
+            "splash_amount": 140,
+            "streak": {
+                "width_px": 1,
+                "length_px": 30,
+                "color": "#d5e6f5",
+                "alpha": 0.45
+            },
+            "splash": {
+                "lifetime_s": 0.35,
+                "speed_px": [
+                    40.0,
+                    110.0
+                ],
+                "gravity_px": 1400.0,
+                "size_px": 4.0,
+                "color": "#cfe6ff",
+                "alpha": 0.7
+            },
+            "overlay": {
+                "enabled": true,
+                "layer": 1,
+                "color": "#8fb0cc",
+                "opacity": 0.15,
+                "darken": 0.9,
+                "vertical_bias": 0.35
+            },
+            "emission_margin_px": 160.0,
+            "anchor_z": 6,
+            "splash_z": 3
         },
         "step": {
             "_comment": "脚步音：players 个 AudioStreamPlayer2D 轮转避免重叠被吞；max_distance 之外不响（世界像素）。volume_db=湿脚步（踩水）音量；dry_volume_db=干地脚步音量。",
@@ -3477,4 +3760,3 @@
         }
     }
 }
-

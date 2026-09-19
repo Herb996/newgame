@@ -22,6 +22,7 @@ func _ready() -> void:
 	# 裸 Control 的 rect 是 0×0（本面板由 StartMenu 用 .new() 造出来再挂上去），
 	# 不铺满的话 CenterContainer 会在 0×0 里居中，面板整体缩到左上角。
 	UiKit.stretch(self)
+	texture_filter = UiKit.TS_NEAREST
 	_build_ui()
 	_select(0)
 
@@ -29,18 +30,15 @@ func _ready() -> void:
 func _build_ui() -> void:
 	add_child(UiKit.overlay())
 
-	var center := CenterContainer.new()
-	UiKit.stretch(center)
-	add_child(center)
-
-	var panel := UiKit.panel(UiKit.COL_PANEL, 20)
-	panel.custom_minimum_size = Vector2(880, 520)
-	center.add_child(panel)
+	# 与设置面板同一套全屏骨架：10px 黑边 + 木框 + 石板芯
+	var panel := UiKit.fullscreen_panel(self)
 
 	var col := UiKit.vbox(10)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_child(col)
 
-	col.add_child(UiKit.title("其他"))
+	col.add_child(UiKit.ribbon_title("其他", 340, 26))
 
 	var sub := UiKit.dim("以下界面均为占位 —— 入口先占住，内容后续补")
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -60,11 +58,10 @@ func _build_ui() -> void:
 	var group := ButtonGroup.new()
 	var entries := _make_entries()
 	for i in range(entries.size()):
-		var b := UiKit.button(str(entries[i]["name"]), 0, UiKit.FS_BODY)
+		var b := UiKit.small_button(str(entries[i]["name"]), 240)
 		b.toggle_mode = true
 		b.button_group = group
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.custom_minimum_size = Vector2(240, 40)
 		if i == 0:
 			b.button_pressed = true
 		b.pressed.connect(_select.bind(i))
@@ -80,11 +77,30 @@ func _build_ui() -> void:
 	right_box.add_child(_detail)
 
 	var footer := UiKit.hbox(10)
-	footer.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(footer)
-	var back := UiKit.button("返回", 120)
+	footer.add_child(_expander())
+	var back := UiKit.button("返回", 150)
 	back.pressed.connect(func(): close_requested.emit())
 	footer.add_child(back)
+
+	# 右上角关闭钮，等价返回
+	var close_btn := UiKit.small_button("X", 0, UiKit.FS_HEADER)
+	close_btn.custom_minimum_size = Vector2(48, 48)
+	close_btn.tooltip_text = "关闭（返回菜单）"
+	close_btn.pressed.connect(func(): close_requested.emit())
+	close_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	close_btn.offset_left = -92.0
+	close_btn.offset_top = 40.0
+	close_btn.offset_right = -44.0
+	close_btn.offset_bottom = 88.0
+	add_child(close_btn)
+
+
+func _expander() -> Control:
+	var c := Control.new()
+	c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return c
 
 
 func _select(index: int) -> void:
@@ -154,11 +170,8 @@ func _make_entries() -> Array:
 					+ "素材来源同时记在 docs/DESIGN.md 的「缺失素材清单」章里。",
 		},
 		{
-			"name": "语言（占位）",
-			"plan": "语言切换本身已经能用，在「参数配置 → 语言」里，但目前只是存值、"
-					+ "没有翻译表，选了不会改变界面文字。",
-			"impl": "接真 i18n：Data/language/<code>.po + "
-					+ "TranslationServer.set_locale(Config.get_value(\"language.current\"))；"
-					+ "再把 config 里 language.available 对应项的 ready 改成 true。",
+			"name": "语言",
+			"plan": "菜单界面语言切换：中文 / English，与「参数配置 → 语言」共用同一个配置键。",
+			"impl": "切换已接线：TranslationServer.set_locale；翻译表在 Data/language/translations.csv。",
 		},
 	]

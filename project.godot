@@ -45,3 +45,7 @@ anti_aliasing/quality/use_taa=false
 textures/default_filters/anisotropic_filtering_level=4
 textures/default_filters/texture_mipmap_bias=-0.5
 environment/defaults/default_clear_color=Color(0.23, 0.18, 0.14, 1)
+
+[internationalization]
+locale/translations=PackedStringArray("res://Data/language/translations.en.translation")
+locale/fallback="zh_CN"

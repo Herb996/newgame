@@ -28,6 +28,14 @@ const DAMAGEABLE_GROUPS := ["enemies", "animals"]
 ## 武器表里不是武器 id 的键（说明性字段），遍历时跳过。
 const WEAPON_META_KEYS := ["_comment"]
 
+## 掉落物场景（阵亡撒包用；与 enemy.gd / animal.gd 同一份资源点场景）
+const DROP_SCENE := preload("res://Scenes/LootNode.tscn")
+
+## 背包内容变了（拾进来 / 被生存系统扣走 / 阵亡撒出去）。
+## 背包弹窗与菜单栏每帧自己读 inventory，这个信号只用来在「刚变了」那一帧
+## 把弹窗重排一次 —— 不拿它当状态副本，免得两边内容各说各话。
+signal inventory_changed
+
 var speed := 0.0
 var selected := false
 
@@ -82,6 +90,16 @@ var level: int = 0
 # 升级特性层数表：{"attack": 2, "hp": 1, ...}（main.gd 在 add_child 前注入，
 # 来自 Meta.traits_of(roster_uid)）。临时角色（命令行/无头回归）为空 → 一切加成归零。
 var traits: Dictionary = {}
+# 物资短缺的属性扣减表：{"attack": 7.0, "move_speed": 10.0}（属性 id 与 traits 同一套）。
+# SurvivalSystem 每次物资 tick 按「背包里缺哪几种」合并 survival.supplies 的 shortage_debuff
+# 注入进来，补上物资即清空 → 扣减是**当前状态**的函数，不进存档。
+# 临时角色 / 无 SurvivalSystem 的场合为空 → 一切扣减归零。
+var supply_penalties: Dictionary = {}
+# --- 背包（2026-09-19 起「每人一份」，之前是 RunManager 里全队共用的一本账）---
+# 本角色身上携带的资源：{"wood": 20, "food": 3}。规则不变 —— **每种占 1 格**、
+# 已有种类无限叠加，种类数上限见 backpack_capacity()。
+# 阵亡时整包就地撒成一地资源点（用户定），活着的队友走进拾取范围即可捡回。
+var inventory: Dictionary = {}
 # 头顶等级徽章（Scenes/Player.tscn 的 LevelBadge 节点，见 unit_level_badge.gd）
 var _badge: Node = null
 
@@ -177,7 +195,7 @@ func _ready() -> void:
 		sprite_cfg = Config.get_value("sprites", {})
 	_animator.load_from_config(sprite_cfg, _view_cfg_for(sprite_cfg))
 	facing = Vector2(0, 1)   # 出生默认朝下方（标准俯视）
-	speed = float(Config.get_value("player.speed", 160.0)) + trait_flat("move_speed")
+	speed = _compute_speed()
 	var select_radius := float(Config.get_value("player.select_radius_px", 16.0))
 	(_select_area.get_node("CollisionShape2D").shape as CircleShape2D).radius = select_radius
 	# 选中标记用**暖色**：头顶那颗等级光点是蓝白系，两个蓝色悬浮物挤在一起
@@ -580,14 +598,87 @@ func trait_flat(id: String) -> float:
 	return float(traits.get(id, 0)) * float(_trait_def(id).get("per_stack", 0.0))
 
 
+## ------------------------------------------------------------
+## 物资短缺的属性扣减（config survival.supplies[].shortage_debuff）
+##
+## 与特性加成同一条式子上的减法：短缺只让角色**变弱**，不掉血上限、
+## 不改变「缺的是哪种物资」以外的任何规则。补上物资后 SurvivalSystem 会把
+## supply_penalties 清空并调 refresh_supply_stats()，属性当场还原。
+## ------------------------------------------------------------
+
+## 某属性当前要扣多少点（多种物资同时短缺时由 SurvivalSystem 合并好了再注入）
+func supply_penalty(id: String) -> float:
+	return float(supply_penalties.get(id, 0.0))
+
+
+## 移速 = 配置基础 + 移速特性 - 物资短缺扣减
+func _compute_speed() -> float:
+	return float(Config.get_value("player.speed", 160.0)) \
+			+ trait_flat("move_speed") - supply_penalty("move_speed")
+
+
+## 短缺状态变化后重算「缓存下来的」属性。伤害/视野/射程那几条都是每次读现算的
+## （见 trait_damage / vision_px / attack_range_px），不需要在这里处理。
+func refresh_supply_stats() -> void:
+	speed = _compute_speed()
+
+
 ## 攻击频率的时序缩放：累计 +X% → 前摇/判定/后摇除以 (1 + X/100)，越多越快
+## （物资短缺按百分点扣，扣到负数就是打得比基础更慢）
 func _trait_cadence_scale() -> float:
-	return 1.0 + trait_flat("attack_speed") / 100.0
+	return 1.0 + (trait_flat("attack_speed") - supply_penalty("attack_speed")) / 100.0
 
 
-## 攻击伤害叠加特性后的最终基础伤害（近战/弹道/瞬狙三条路径共用）
+## 攻击伤害叠加特性与物资扣减后的最终基础伤害（近战/弹道/瞬狙三条路径共用）
 func trait_damage(base: float) -> float:
-	return base + trait_flat("attack")
+	return base + trait_flat("attack") - supply_penalty("attack")
+
+
+# ------------------------------------------------------------
+# 背包层：每人一份（拾取归属、生存消耗、弹窗展示都只认这一份）
+# ------------------------------------------------------------
+
+## 本角色的背包格数上限。数值来源与旧版一字不差（局外养成注入的
+## survival.backpack_capacity，缺配置回落 meta_progression 的 base），
+## 变的只是记账单位：从「全队共用一本」换成「一人一本」。
+func backpack_capacity() -> int:
+	if _run == null or not is_instance_valid(_run):
+		_run = get_tree().get_first_node_in_group("run_manager")
+	var stats: Dictionary = {}
+	if _run != null and is_instance_valid(_run):
+		stats = _run.player_stats
+	return int(stats.get("survival.backpack_capacity",
+			Config.get_value("meta_progression.survival.backpack_capacity.base", 10)))
+
+
+func item_count(res_id: String) -> int:
+	return int(inventory.get(res_id, 0))
+
+
+## 放进背包：已有种类直接叠加；新种类且格子已满 → false（资源点留在地上等重试）
+func add_item(res_id: String, amount: int) -> bool:
+	if res_id == "" or amount <= 0:
+		return false
+	if item_count(res_id) <= 0 and inventory.size() >= backpack_capacity():
+		return false
+	inventory[res_id] = item_count(res_id) + amount
+	inventory_changed.emit()
+	return true
+
+
+## 取走最多 amount 份，返回**实际**拿到的份数（扣到 0 就释放那一格）。
+## 要「不够就整份不动」的调用方（生存消耗）自己先问 item_count()。
+func take_item(res_id: String, amount: int) -> int:
+	var have := item_count(res_id)
+	if amount <= 0 or have <= 0:
+		return 0
+	var got: int = mini(have, amount)
+	if have - got <= 0:
+		inventory.erase(res_id)   # 归零即释放背包格
+	else:
+		inventory[res_id] = have - got
+	inventory_changed.emit()
+	return got
 
 
 ## ------------------------------------------------------------
@@ -603,13 +694,18 @@ func trait_damage(base: float) -> float:
 ##   但不管数值怎么配，实际射程一律被观察视野截断 —— 杜绝"打到看不见的目标"。
 ## ------------------------------------------------------------
 
-## 观察视野（像素）；含视野特性加成
+## 观察视野（像素）；含视野特性加成与物资短缺扣减
 func vision_px() -> float:
 	return float(Config.get_value("player.vision_radius_cells", 10)) * float(_tile_size) \
-			+ trait_flat("vision")
+			+ trait_flat("vision") - supply_penalty("vision")
 
 
-## 武器自身的攻击距离（像素）；含攻击距离特性加成
+## 攻击距离的净修正 = 特性加成 - 物资短缺扣减（三种武器路径共用一份）
+func _range_bonus() -> float:
+	return trait_flat("attack_range") - supply_penalty("attack_range")
+
+
+## 武器自身的攻击距离（像素）；含攻击距离特性加成与物资短缺扣减
 func attack_range_px() -> float:
 	var w := weapon_data()
 	match attack_kind():
@@ -617,13 +713,13 @@ func attack_range_px() -> float:
 			var pc = w.get("projectile", null)
 			if pc is Dictionary:
 				return float((pc as Dictionary).get("max_distance_px",
-						attack_param("range_px", 120.0))) + trait_flat("attack_range")
+						attack_param("range_px", 120.0))) + _range_bonus()
 		"hitscan":
 			var hc = w.get("hitscan", null)
 			if hc is Dictionary:
 				return float((hc as Dictionary).get("max_distance_px",
-						attack_param("range_px", 120.0))) + trait_flat("attack_range")
-	return attack_param("range_px", 120.0) + trait_flat("attack_range")
+						attack_param("range_px", 120.0))) + _range_bonus()
+	return attack_param("range_px", 120.0) + _range_bonus()
 
 
 ## 有效攻击距离：攻击距离与观察视野取小者
@@ -960,6 +1056,9 @@ func resolve_attack_hit() -> void:
 		# 用 has_method 而不是硬调：命中目标可能是动物（另一个脚本），它没有这个方法。
 		if area.has_method("alert_from_attacker"):
 			area.call("alert_from_attacker", global_position)
+		# 受击视觉反馈（白闪+挤压+击退），方向同 alert_from_attacker
+		if area.has_method("play_hit_fx"):
+			area.call("play_hit_fx", global_position)
 		print("[Combat] 命中 %s，造成 %d 伤害" % [area.name, dmg])
 
 
@@ -982,7 +1081,8 @@ func fire_projectile() -> bool:
 	var cfg: Dictionary = (pc as Dictionary).duplicate()
 	cfg["max_distance_px"] = effective_attack_range_px()
 	# 投射体速度特性：直接叠在弹速上（箭/子弹飞得更快，射程已按有效攻击距离截断）
-	cfg["speed"] = float(cfg.get("speed", 900.0)) + trait_flat("projectile_speed")
+	cfg["speed"] = float(cfg.get("speed", 900.0)) + trait_flat("projectile_speed") \
+			- supply_penalty("projectile_speed")
 	var p := PROJECTILE.new()
 	p.name = "Projectile"
 	parent.add_child(p)
@@ -1032,6 +1132,9 @@ func fire_hitscan() -> int:
 		# 「受到攻击也要动」：挨了瞬狙的敌人会朝枪口方向来（远处点名不再毫无反应）
 		if t.has_method("alert_from_attacker"):
 			t.call("alert_from_attacker", global_position)
+		# 受击视觉反馈（白闪+挤压+击退）
+		if t.has_method("play_hit_fx"):
+			t.call("play_hit_fx", global_position)
 		print("[Combat] 狙击命中 %s，造成 %d 伤害" % [t.name, dmg])
 
 	_spawn_tracer(from, to, cfg)
@@ -1090,7 +1193,9 @@ func take_damage(amount: int, source_pos: Vector2 = Vector2.ZERO) -> bool:
 	if _dead or is_invincible():
 		return false
 	# 防御特性：入伤先扣固定减免，扣到 0 就是完全挡下（不掉血、不进硬直）
-	var mitigated := maxi(amount - int(trait_flat("defense")), 0)
+	# 物资短缺会把净防御扣成负数 → 同样一击掉更多血（短缺本身不直接掉血）
+	var defense := trait_flat("defense") - supply_penalty("defense")
+	var mitigated := maxi(amount - int(defense), 0)
 	if mitigated <= 0:
 		return false
 	hp = maxi(hp - mitigated, 0)
@@ -1116,12 +1221,20 @@ func heal(amount: int) -> int:
 	return hp - before
 
 
-## 直接扣血（饥饿等非战斗来源）：不进硬直、不击退、不吃无敌帧；归零即死亡
-func apply_direct_damage(amount: int) -> void:
+## 直接扣血（饥饿等非战斗来源）：不进硬直、不击退、不吃无敌帧。
+## hp_floor = 血量下限：非战斗来源**永不把血扣穿这个底**。物资饥饿传
+## survival.starvation_hp_floor（1）→ 饿不死人，最后一滴只能由敌人补刀；
+## 默认 0 = 可以扣到死（保持旧行为）。
+func apply_direct_damage(amount: int, hp_floor: int = 0) -> void:
 	if _dead or amount <= 0:
 		return
-	hp = maxi(hp - amount, 0)
-	print("[Combat] 玩家损失 %d 生命（非战斗来源），剩余 HP %d/%d" % [amount, hp, max_hp])
+	var floor_hp := maxi(hp_floor, 0)
+	var before := hp
+	hp = maxi(hp - amount, floor_hp)
+	if hp >= before:
+		return      # 已经贴着下限，不再刷日志
+	print("[Combat] 玩家损失 %d 生命（非战斗来源，下限 %d），剩余 HP %d/%d" \
+			% [before - hp, floor_hp, hp, max_hp])
 	if hp <= 0:
 		state_machine.force_transition(&"dead")
 
@@ -1141,6 +1254,9 @@ func on_death() -> void:
 	stop_moving()
 	velocity = Vector2.ZERO
 	move_and_slide()
+	# 背包随人一起倒：整包就地撒成一地资源点（用户 2026-09-19 定）。
+	# 不跟着人消失、也不凭空回到仓库 —— 想留东西就得有人活着把它捡回来。
+	drop_inventory()
 	if selected:
 		for p in get_tree().get_nodes_in_group("player"):
 			if p != self and is_instance_valid(p) and not bool(p.is_dead()):
@@ -1148,12 +1264,41 @@ func on_death() -> void:
 				break
 	for p in get_tree().get_nodes_in_group("player"):
 		if p != self and is_instance_valid(p) and not bool(p.is_dead()):
-			print("[Combat] %s 倒下，队友仍在，本局继续（背包全队共享）" % character_name)
+			print("[Combat] %s 倒下，队友仍在，本局继续（他的背包已撒在原地，走近可捡回）"
+					% character_name)
 			return
 	if _run == null:
 		_run = get_tree().get_first_node_in_group("run_manager")
 	if _run != null:
 		_run.player_died()
+
+
+## 把整包撒在脚下：每种资源变成一个资源点（复用敌人/羊掉落那条路），
+## 绕着尸体撒开一圈 —— 十来种叠在同一个像素上会糊成一坨，也分不清掉了什么。
+## 只有阵亡会调它：撤离走 total_loot() 入库，超时本来就全丢。
+func drop_inventory() -> void:
+	if inventory.is_empty():
+		return
+	var parent := get_parent()
+	if parent == null:
+		inventory = {}
+		inventory_changed.emit()
+		return
+	var ids: Array = inventory.keys()
+	var n := ids.size()
+	for i in range(n):
+		var res_id := str(ids[i])
+		var amount := int(inventory[res_id])
+		if amount <= 0:
+			continue
+		var drop := DROP_SCENE.instantiate()
+		parent.add_child(drop)
+		var a := TAU * float(i) / float(maxi(n, 1))
+		drop.global_position = global_position + Vector2(cos(a), sin(a)) \
+				* float(Config.get_value("loot.drop_spread_px", 22.0))
+		drop.setup(res_id, amount, 0.8)
+	inventory = {}
+	inventory_changed.emit()
 
 
 # ------------------------------------------------------------
@@ -1183,6 +1328,14 @@ func stop_moving() -> void:
 	_has_target = false
 	_clear_path_cache()
 	_path_line.visible = false
+
+
+## 只停脚、**不丢指令**：被打断（起手攻击 / 受击 / 冲刺）时用这条。
+## 状态机以前统一调 stop_moving()，等于把玩家点的那一下抹掉 —— 自动战斗下
+## 每次 attack.enter 都清一次，玩家再点就"完全没反应"（见 DESIGN.md §5.8）。
+func halt_in_place() -> void:
+	velocity = Vector2.ZERO
+	move_and_slide()
 
 
 ## 沿缓存路径走一格（Move 状态每帧调用）
@@ -1335,6 +1488,11 @@ func _query_path(from_cell: Vector2i, to_cell: Vector2i) -> PackedVector2Array:
 	if _astar == null or not _in_bounds(from_cell) or not _in_bounds(to_cell):
 		return PackedVector2Array()
 	var start_cell := _nearest_open_cell(from_cell, _unstick_radius())
+	if start_cell.x < 0:
+		# 小半径找不到出口 = 陷在整片实心区（密林/沼泽）中央。此时**绝不能放弃指令**：
+		# 改成全图找最近可走格，先把自己走出去 —— 否则之后每次点击都是空路径，
+		# 表现为「点十几下之后彻底控制不了」。
+		start_cell = MapGenerator.nearest_open_cell(_walls, from_cell, -1)
 	var goal_cell := _nearest_open_cell(to_cell, _snap_radius())
 	if start_cell.x < 0 or goal_cell.x < 0:
 		return PackedVector2Array()

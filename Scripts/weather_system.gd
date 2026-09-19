@@ -1,52 +1,68 @@
 extends Node
 ## ============================================================
-## WeatherSystem — 局内雨天效果（全部阶段：雨滴 / 积水 / 波纹 / 倒影 / 折射色散）
+## WeatherSystem — 局内雨天效果（雨滴 / 雨湿地面 / 踩水波纹）
+##
+## 命名说明（用户 2026-09-19 指出"我没让弄湿地啊"）：项目只有草地/森林/荒原/沼泽
+## 四个群系，**没有"湿地"这一种**。本文件的"雨湿地面"= 下雨把草地/森林的地面打湿，
+## 是天气状态、不是地形类别，故配置段与节点都叫 rain_ground / RainGroundLayer。
 ##
 ## 挂在 Main 下（Scenes/Main.tscn），生命周期与 FogSystem 完全对齐：
 ##   _enter_run()  → setup(game_root, map_result)   每局重建全部雨天节点
 ##   _enter_base() → deactivate()                    停雨、清引用
-## 挂进 game_root 的世界节点（雨/积水/双 SubViewport）会随 main._clear_game_root()
+## 挂进 game_root 的世界节点（雨/雨湿地面/波纹视口）会随 main._clear_game_root()
 ## 自动销毁；WeatherSystem 本体与它名下的音频播放器持久存活，故 deactivate 里要
-## 显式 stop 雨声、并把 puddle 的 ViewportTexture 参数换回占位图防 stale 采样。
+## 显式 stop 雨声、并把雨湿地面层的 ViewportTexture 参数换回占位图防 stale 采样。
 ##
 ## 数值全部来自 Data/config.json 的 weather 节（项目铁律：脚本零硬编码）。
 ## 踩水触发节奏复用 noise.footstep_interval_seconds（见 player_move_state.gd）。
 ##
-## 渲染管线（阶段二三）：
-##   - _ripple_vp：波纹 SubViewport（半分辨率、透明底）。RippleRing 池改挂在这里，
-##     波纹按 (r=亮度基, g=色散量) 编码进纹理，由 puddle shader 采样做提亮+色散。
-##   - _refl_vp：倒影 SubViewport（半分辨率、透明底）。内容 = 天空渐变 Sprite2D +
-##     按贴图分组的 MultiMesh2D（静态装饰倒影）。倒影实例在 CPU 侧绕各自底边
-##     垂直镜像挂到脚下（真倒挂），视口正立渲染，水在哪倒影就在哪。
-##   - puddle.gdshader：SCREEN_TEXTURE 折射 + reflection_tex 倒影 + ripple_tex 色散。
+## 2026-09-19 按用户裁定整段重做：**取消"水洼"概念**。只要下雨，草地/森林的
+## 地面整体是湿的，踩哪都出波纹；荒原/沼泽不湿。于是删掉
+##   - 噪声水洼生成（floor_ratio 分位数阈值 / 出生点无水圈）
+##   - 倒影通道（天空渐变 SubViewport；物件倒影此前已按需求裁掉）
+##   - 折射色散（屏幕纹理扭曲）
+## 雨湿地面层只做"压暗 + 偏冷 + 斑驳反光"，波纹合成通路保持原样。
+##
+## 同日第二轮裁定：**湿脚印通路整体删除**（用户："把脚印去掉吧，太丑了"）。
+## 干草地上凭空一串深色椭圆只会读成脏点/落叶，地面本身不够有读感时更是如此。
+## 于是 wet_footprint.gd、_prints 池、weather.footprint 配置段一并移除，
+## 踩水的反馈全部回到波纹一条通道上（椭圆 + 只画部分弧段）。
+##
+## 渲染管线：
+##   - _wet_layer：覆盖全图的 ColorRect + rain_ground.gdshader，湿度场掩码
+##     （CPU 按群系烘焙 + 模糊）线性插值 + 域扭曲 → 干湿边界是揉弯的软带。
+##   - _ripple_vp：波纹 SubViewport（半分辨率、透明底）。RippleRing 池挂在这里，
+##     波纹按 (r=亮度基, g=晃动量) 编码进纹理，由雨湿地面 shader 采样做提亮+扰动。
 ## ============================================================
 
 const RIPPLE_SCRIPT := preload("res://Scripts/ripple_ring.gd")
-const PUDDLE_SHADER := preload("res://Shaders/puddle.gdshader")
+const WET_SHADER := preload("res://Shaders/rain_ground.gdshader")
+const RAIN_OVERLAY_SHADER := preload("res://Shaders/rain_overlay.gdshader")
 
 # ---------- 运行时状态 ----------
 var _active := false
 var _tile_size := 64
 var _map_w := 0
 var _map_h := 0
-var _water_cells: Array = []      # bool[y][x]：逻辑查询用，与 shader mask 同源
+var _wet_field: Array = []        # float[y][x] 连续湿度场 0..1（烘焙成 shader 掩码）
+var _wet_cells: Array = []        # bool[y][x]：逻辑查询用，与掩码同源
+var _wet_count := 0
 
 var _root: Node2D = null          # game_root
 var _rain_anchor: Node2D = null
-var _rain: GPUParticles2D = null
+var _rain_layers: Array = []      # [{node, mat, wind_factor, phase, extents_k}] 远/中/近三层
 var _splash: GPUParticles2D = null
-var _puddle: ColorRect = null
+var _overlay: ColorRect = null    # 屏幕雨幕（DEV LOG.02 步骤 6）
+var _overlay_layer: CanvasLayer = null
+var _elapsed := 0.0               # 阵风包络的相位时钟
+var _fade_tween: Tween = null     # 进局雨幕淡入（见 _fade_in_rain）
+var _wet_layer: ColorRect = null
 var _ripple_root_world: Node2D = null   # 波纹 SubViewport 内容根
 var _ripples: Array = []
 
-# 阶段二三：两个离屏 SubViewport（半分辨率）
-var _refl_vp: SubViewport = null
+# 离屏 SubViewport（半分辨率）：只留波纹通道
 var _ripple_vp: SubViewport = null
-var _refl_cam: Camera2D = null
 var _ripple_cam: Camera2D = null
-var _refl_root: Node2D = null
-var _sky_rect: Sprite2D = null
-var _refl_meshes: Array = []          # 每贴图一组 MultiMesh2D
 var _placeholder_tex: ImageTexture = null   # deactivate 换掉 ViewportTexture 防 stale
 
 # 音频播放器挂在 self（持久节点），不随切图销毁
@@ -60,16 +76,14 @@ var _dry_wav: AudioStreamWAV = null
 
 # 缓存 _process 每帧要用的 config 值（避免热路径反复点路径查表）
 var _margin := 160.0
-var _rain_lifetime := 0.5
-
-# 积水统计（日志用，区分两类来源，避免误以为浅滩会自动有水）
-var _puddle_noise_cells := 0
-var _puddle_shallow_cells := 0
+var _wind_x := -320.0
+var _gust_amp := 0.5
+var _gust_period := 7.0
 
 
 func _ready() -> void:
 	add_to_group("weather_system")
-	# 2×2 白占位图：deactivate 时把 puddle 的 ViewportTexture 参数换回它，
+	# 2×2 白占位图：deactivate 时把湿地层的 ViewportTexture 参数换回它，
 	# 防止子视口销毁后 shader 仍采样 stale 纹理报错。
 	var img := Image.create(2, 2, false, Image.FORMAT_RGBA8)
 	img.fill(Color.WHITE)
@@ -90,20 +104,21 @@ func setup(root: Node2D, map_data: Dictionary) -> void:
 	_root = root
 	_tile_size = int(map_data.get("tile_size", 64))
 
-	_build_water_grid(map_data)
+	_build_wet_mask(map_data)
 	_build_viewports(root)
-	_build_puddle(map_data)
-	_build_reflection(map_data)
+	_build_wet_layer(map_data)
 	_build_ripples()
 	_build_rain(root)
 	_play_rain()
+	_fade_in_rain()
 
 	var total := _map_w * _map_h
-	print("[Weather] 积水 %d 格（占比 %.1f%%，目标 %.1f%%）= 噪声水洼 %d + 浅滩 %d" % [
-		_water_count(),
-		100.0 * float(_water_count()) / float(maxi(total, 1)),
-		100.0 * float(Config.get_value("weather.puddle.floor_ratio", 0.10)),
-		_puddle_noise_cells, _puddle_shallow_cells,
+	print("[Weather] 雨湿地面 %d 格（占全图 %.1f%%）＝群系 %s，半径 %d 格 × %d 轮模糊" % [
+		_wet_count,
+		100.0 * float(_wet_count) / float(maxi(total, 1)),
+		str(Config.get_value("weather.rain_ground.allowed_biomes", [0, 2])),
+		int(Config.get_value("weather.rain_ground.boundary_blur", 2)),
+		int(Config.get_value("weather.rain_ground.boundary_passes", 3)),
 	])
 
 
@@ -112,20 +127,23 @@ func deactivate() -> void:
 	_active = false
 	if _rain_player != null:
 		_rain_player.stop()
+	if _fade_tween != null and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = null
 	_rain_anchor = null
-	_rain = null
+	_rain_layers = []
 	_splash = null
-	_puddle = null
+	_overlay = null
+	_overlay_layer = null
+	_elapsed = 0.0
+	_wet_layer = null
 	_ripple_root_world = null
 	_ripples = []
-	_refl_vp = null
 	_ripple_vp = null
-	_refl_cam = null
 	_ripple_cam = null
-	_refl_root = null
-	_sky_rect = null
-	_refl_meshes = []
-	_water_cells = []
+	_wet_field = []
+	_wet_cells = []
+	_wet_count = 0
 	_root = null
 
 
@@ -150,22 +168,29 @@ func _exit_tree() -> void:
 	_dry_wav = null
 
 
-## 该世界坐标是否踩在积水上（浅滩 ∪ 水洼）。供 player_move_state 每脚步 tick 查询。
-func is_water_at(world_pos: Vector2) -> bool:
-	if not _active or _water_cells.is_empty():
+## 该世界坐标是否踩在湿地上（草地/森林）。供 player_move_state 每脚步 tick 查询。
+## 为什么是邻域查询而不是单格硬判定：屏幕上的湿地是 wet_mask 经线性插值 + 域扭曲
+## （最多 edge_warp 格）后的软边轮廓，而 _wet_cells 是整格布尔——两者在干湿交界处
+## 本来就错开近一格，单格判定会让"视觉上明显站在湿地里"的脚步不出波纹。
+## 容差由 weather.rain_ground.step_wet_radius_cells 控制（0=退回单格硬判定）。
+func is_wet_at(world_pos: Vector2) -> bool:
+	if not _active or _wet_cells.is_empty():
 		return false
 	var cx := int(world_pos.x / _tile_size)
 	var cy := int(world_pos.y / _tile_size)
-	if cx < 0 or cy < 0 or cy >= _water_cells.size():
+	if cx < 0 or cy < 0 or cx >= _map_w or cy >= _wet_cells.size():
 		return false
-	var row: Array = _water_cells[cy]
-	if cx >= row.size():
-		return false
-	return bool(row[cx])
+	var r := int(Config.get_value("weather.rain_ground.step_wet_radius_cells", 1))
+	for y in range(maxi(0, cy - r), mini(_map_h, cy + r + 1)):
+		var row: Array = _wet_cells[y]
+		for x in range(maxi(0, cx - r), mini(_map_w, cx + r + 1)):
+			if bool(row[x]):
+				return true
+	return false
 
 
-## 踩水事件：出波纹 + 播 2D 踩水音。调用者不区分（玩家/将来敌人动物都走这里）。
-func on_water_step(world_pos: Vector2) -> void:
+## 湿地脚步事件：出波纹 + 播踩水音。调用者不区分（玩家/将来敌人动物都走这里）。
+func on_wet_step(world_pos: Vector2) -> void:
 	if not _active:
 		return
 	var r := _get_free_ripple()
@@ -180,17 +205,12 @@ func on_water_step(world_pos: Vector2) -> void:
 		p.play()
 
 
-## 干地脚步（雨天）：出小一圈的湿痕波纹，让整片地面看着"被雨淋湿"。
-## 不播踩水音、不产生暴露噪音变化（噪音由调用方照常发）。
+## 干地脚步（雨天）：只播闷响，**不出波纹**。波纹是水面专属：它经湿地层合成，
+## 在荒原/沼泽上要么完全不显示、要么显示成一圈白线（用户反馈"地面波纹丑爆"的来源）。
+## 不产生暴露噪音变化（噪音由调用方照常发）。
 func on_dry_step(world_pos: Vector2) -> void:
 	if not _active:
 		return
-	var r := _get_free_ripple()
-	if r != null:
-		r.spawn(world_pos,
-				float(Config.get_value("weather.ripple.dry_radius_px", 30.0)),
-				float(Config.get_value("weather.ripple.dry_duration_s", 0.6)),
-				_ripple_color(float(Config.get_value("weather.ripple.dry_alpha", 0.55))))
 	var p := _get_free_dry_player()
 	if p != null:
 		p.global_position = world_pos
@@ -198,25 +218,16 @@ func on_dry_step(world_pos: Vector2) -> void:
 
 
 # ============================================================
-# 双离屏 SubViewport（半分辨率）：倒影 / 波纹
-# 都挂在 game_root 下，随 _clear_game_root() 自动销毁。
+# 离屏 SubViewport（半分辨率）：波纹通道
+# 挂在 game_root 下，随 _clear_game_root() 自动销毁。
+# 为什么波纹要走离屏视口而不是直接画在世界里：波纹要**被湿地层门控**（离开湿地
+# 范围就不能显示成地上一圈白线），必须由湿地 shader 采样后按覆盖度合成。
 # ============================================================
 
 func _build_viewports(root: Node2D) -> void:
 	var scale := float(Config.get_value("weather.viewports.scale", 0.5))
 	var vp := get_viewport().get_visible_rect().size
 	var sub := Vector2i(maxi(1, int(vp.x * scale)), maxi(1, int(vp.y * scale)))
-
-	# 倒影视口：内容根 + 相机（正 zoom 渲染；垂直镜像由 puddle shader 采样翻 V 实现）
-	_refl_vp = _make_sub_vp(sub, "ReflectionViewport")
-	root.add_child(_refl_vp)
-	_refl_root = Node2D.new()
-	_refl_root.name = "ReflectionRoot"
-	_refl_vp.add_child(_refl_root)
-	_refl_cam = Camera2D.new()
-	_refl_cam.name = "ReflCam"
-	_refl_root.add_child(_refl_cam)
-	_refl_cam.make_current()   # 只影响所属 SubViewport 的当前相机，不抢主视口
 
 	# 波纹视口：RippleRing 池挂在世界坐标内容根下，spawn 协议不变
 	_ripple_vp = _make_sub_vp(sub, "RippleViewport")
@@ -227,26 +238,26 @@ func _build_viewports(root: Node2D) -> void:
 	_ripple_cam = Camera2D.new()
 	_ripple_cam.name = "RippleCam"
 	_ripple_root_world.add_child(_ripple_cam)
-	_ripple_cam.make_current()
+	_ripple_cam.make_current()   # 只影响所属 SubViewport 的当前相机，不抢主视口
 
-	print("[Weather] 子视口建好 %dx%d ×2（scale=%.2f）" % [sub.x, sub.y, scale])
+	print("[Weather] 波纹子视口建好 %dx%d（scale=%.2f）" % [sub.x, sub.y, scale])
 
 
 func _make_sub_vp(size: Vector2i, vp_name: String) -> SubViewport:
 	var v := SubViewport.new()
 	v.name = vp_name
 	v.size = size
-	v.transparent_bg = true   # 透明底：天空渐变由视口内节点自绘，缺省不污染成黑/灰
+	v.transparent_bg = true   # 透明底：缺省不污染成黑/灰
 	v.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	v.gui_disable_input = true
 	return v
 
 
-## 每帧把主相机位姿同步到两个子视口相机：
-## - zoom = 主相机 zoom × scale（半分辨率视口显示同一世界区域，SCREEN_UV 与贴图 UV 逐点对应）
-## - 倒影视口 zoom.y 取负 → 内容绕视口水平中线垂直镜像（相机一行实现翻转）
+## 每帧把主相机位姿同步到波纹子视口相机：
+## zoom = 主相机 zoom × scale（半分辨率视口显示同一世界区域，SCREEN_UV 与贴图 UV
+## 逐点对应），所以湿地 shader 直接按 SCREEN_UV 采样即与屏幕对齐。
 func _sync_viewports() -> void:
-	if _refl_vp == null or _ripple_vp == null:
+	if _ripple_vp == null:
 		return
 	var cam := get_viewport().get_camera_2d()
 	if cam == null or not is_instance_valid(cam):
@@ -254,252 +265,144 @@ func _sync_viewports() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	var scale := float(Config.get_value("weather.viewports.scale", 0.5))
 	var sub_px := Vector2i(maxi(1, int(vp.x * scale)), maxi(1, int(vp.y * scale)))
-	if _refl_vp.size != sub_px:
-		_refl_vp.size = sub_px      # 窗口缩放自愈
-		_ripple_vp.size = sub_px
+	if _ripple_vp.size != sub_px:
+		_ripple_vp.size = sub_px      # 窗口缩放自愈
 	var z := maxf(cam.zoom.x, 0.05)
 	var zs := z * scale
-	_refl_cam.global_position = cam.global_position
-	# 正 zoom 正立渲染：镜像已在 _build_reflection 的实例变换里完成（绕各装饰底边翻转）。
-	_refl_cam.zoom = Vector2(zs, zs)
 	_ripple_cam.global_position = cam.global_position
 	_ripple_cam.zoom = Vector2(zs, zs)
-	if _sky_rect != null and is_instance_valid(_sky_rect):
-		var vis := vp / z   # 可见世界区域（与 RainAnchor 同款算法）
-		_sky_rect.position = cam.global_position - vis * 0.5
-		_sky_rect.scale = vis / 64.0   # GradientTexture2D 默认 64px
 
 
 # ============================================================
-# 倒影内容：天空渐变底 + 按贴图分组的 MultiMesh2D 批量静态装饰
-# 倒影 = 每个装饰绕自身底边垂直镜像的副本（CPU 侧翻转实例变换，真倒挂），
-# 视口正立渲染，puddle shader 直接按 SCREEN_UV 采样即逐点对齐。
+# 湿度场：群系地板 → 连续湿度 0..1 → _wet_field（shader 掩码）+ _wet_cells（逻辑判定）
+#
+# 旧版这里是"噪声水洼"：FastNoiseLite + 分位数阈值切出 floor_ratio 比例的孤立水格，
+# 再叠 DECOR_WATER 浅滩、出生点无水圈。用户裁定水洼概念整体作废——下雨时草地/森林
+# 的地面就是湿的，不需要"找到一洼水才踩得出波纹"。故噪声、阈值、浅滩、出生点圈
+# 全部删除，湿度只由群系决定。
 # ============================================================
 
-func _build_reflection(map_data: Dictionary) -> void:
-	if _refl_root == null:
-		return
-
-	# 天空渐变底：先添加 → 垫在所有倒影之下。Sprite2D 拉伸 64px 渐变贴图，
-	# _sync_viewports 每帧按可见世界区域同步位置/缩放。
-	var gtex := GradientTexture2D.new()
-	var grad := Gradient.new()
-	grad.offsets = PackedFloat32Array([0.0, 1.0])
-	grad.colors = PackedColorArray([
-		Color.from_string(str(Config.get_value("weather.reflection.sky_top_color", "#3c4c60")), Color(0.24, 0.30, 0.38)),
-		Color.from_string(str(Config.get_value("weather.reflection.sky_bottom_color", "#6d8ba6")), Color(0.43, 0.55, 0.65)),
-	])
-	gtex.gradient = grad
-	gtex.fill_from = Vector2(0, 0)
-	gtex.fill_to = Vector2(0, 1)   # 垂直渐变：世界坐标顶部深、底部浅
-	_sky_rect = Sprite2D.new()
-	_sky_rect.name = "SkyGradient"
-	_sky_rect.texture = gtex
-	_sky_rect.centered = false
-	_refl_root.add_child(_sky_rect)
-
-	# 收集带 refl 标记的装饰（map_generator 侧 set_meta），按贴图分组
-	var map_root: Node2D = map_data["node"]
-	var decor: Node2D = map_root.get_node_or_null("DecorLayer") if map_root != null else null
-	if decor == null:
-		return
-	var frags: Array = Config.get_value("weather.reflection.exclude_path_fragments", ["crack"])
-	var groups := {}   # texture -> Array[Sprite2D]
-	var total := 0
-	for c in decor.get_children():
-		var sp := c as Sprite2D
-		if sp == null or not sp.has_meta("refl") or sp.texture == null:
-			continue
-		var skip := false
-		for f in frags:
-			if str(f) != "" and sp.texture.resource_path.contains(str(f)):
-				skip = true   # 剔除贴地裂缝类（双保险：meta 本就不会打给它们）
-				break
-		if skip:
-			continue
-		if not groups.has(sp.texture):
-			groups[sp.texture] = []
-		groups[sp.texture].append(sp)
-		total += 1
-
-	# 每组一个 MultiMesh2D：静态装饰 setup 建一次，不每帧更新
-	for tex in groups:
-		var sprites: Array = groups[tex]
-		var ts := Vector2((tex as Texture2D).get_size())
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_2D
-		mm.use_colors = true   # 本引擎版本无 color_format 枚举，布尔开关；必须先于 instance_count
-		var quad := QuadMesh.new()
-		quad.size = ts
-		mm.mesh = quad
-		mm.instance_count = sprites.size()
-		for i in range(sprites.size()):
-			var s: Sprite2D = sprites[i]
-			# 倒影 = 绕自身底边（脚线）垂直镜像的副本：
-			# 世界矩形 [P, P+S]，P = position + offset*scale，S = tex_size*scale；
-			# 底边 y_b = P.y + S.y，镜像后矩形占 [P.y+S.y, P.y+2S.y]（正挂脚下），
-			# 中心 y = P.y + 1.5*S.y。basis.y 取负 → quad 内容上下翻转（真倒挂）；
-			# basis.x 延续 flip_h 的水平镜像。倒影直接挂在物体脚下的水里，位置永远正确。
-			var p0 := s.position + s.offset * s.scale
-			var sx := s.scale.x * (-1.0 if s.flip_h else 1.0)
-			var origin := Vector2(p0.x + ts.x * s.scale.x * 0.5, p0.y + ts.y * s.scale.y * 1.5)
-			mm.set_instance_transform_2d(i, Transform2D(Vector2(sx, 0.0), Vector2(0.0, -s.scale.y), origin))
-			mm.set_instance_color(i, s.modulate)   # 烘焙群系色调/亮度抖动
-		var mm2d := MultiMeshInstance2D.new()
-		mm2d.multimesh = mm
-		mm2d.texture = tex
-		_refl_root.add_child(mm2d)
-		_refl_meshes.append(mm2d)
-
-	print("[Weather] 倒影 MultiMesh %d 组 / %d 个装饰" % [_refl_meshes.size(), total])
-
-
-# ============================================================
-# 积水网格：噪声水洼 ∪ DECOR_WATER 浅滩 → _water_cells + shader mask
-# ============================================================
-
-func _build_water_grid(map_data: Dictionary) -> void:
+func _build_wet_mask(map_data: Dictionary) -> void:
 	var walls: Array = map_data["walls"]
-	var decor: Array = map_data["decor"]
 	var biome: Array = map_data.get("biome", [])
 	_map_w = (walls[0] as Array).size()
 	_map_h = walls.size()
-	var spawn_cell: Vector2i = map_data.get("spawn_cell", Vector2i(_map_w / 2, _map_h / 2))
 
-	# 积水只允许出现在指定群系（默认草地0/森林2）的地板格上
-	var allowed_raw: Array = Config.get_value("weather.puddle.allowed_biomes", [0, 2])
-	var eligible: Array = []
-	for y in range(_map_h):
-		var erow: Array = []
-		erow.resize(_map_w)
-		for x in range(_map_w):
-			var ok := not bool(walls[y][x])
-			if ok and not biome.is_empty():
-				var bid := int(biome[y][x])
-				var inb := false
-				for a in allowed_raw:
-					if int(a) == bid:
-						inb = true
-						break
-				ok = inb
-			erow[x] = ok
-		eligible.append(erow)
-
-	var fn := FastNoiseLite.new()
-	fn.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	fn.frequency = float(Config.get_value("weather.puddle.noise_frequency", 0.045))
-	# 种子走 _enter_run 的 seed 链（那里已 seed(forced_seed)），故 --seed 可复现。
-	fn.seed = randi()
-
-	var ratio := clampf(float(Config.get_value("weather.puddle.floor_ratio", 0.10)), 0.0, 0.9)
-
-	# 分位数阈值只在"可选格(草地/森林地板)"里统计 → floor_ratio 是"占这些格的比例"，
-	# 保证部分地面有水、且精确命中占比（simplex 近似钟形，固定阈值会失衡）。
-	var samples: Array = []
-	for y in range(_map_h):
-		for x in range(_map_w):
-			if bool(eligible[y][x]):
-				samples.append(fn.get_noise_2d(float(x), float(y)))
-	samples.sort()
-	var thr := 1e9
-	if not samples.is_empty():
-		var cut := clampi(int(float(samples.size()) * (1.0 - ratio)), 0, samples.size() - 1)
-		thr = float(samples[cut])
-
-	var mask: Array = []
+	# 湿地只允许出现在指定群系（默认草地0/森林2）的地板格上。
+	# 注意 config 里 JSON 数字解析成 float，必须逐条 int 比较（Array.has(0) 恒 false）。
+	var allowed_raw: Array = Config.get_value("weather.rain_ground.allowed_biomes", [0, 2])
+	var field: Array = []
 	for y in range(_map_h):
 		var row: Array = []
 		row.resize(_map_w)
-		mask.append(row)
-
-	# 噪声水洼（仅可选格）
-	_puddle_noise_cells = 0
-	for y in range(_map_h):
 		for x in range(_map_w):
-			var w := false
-			if bool(eligible[y][x]) and fn.get_noise_2d(float(x), float(y)) >= thr:
-				w = true
-			mask[y][x] = w
+			var v := 0.0
+			if not bool(walls[y][x]) and not biome.is_empty():
+				var bid := int(biome[y][x])
+				for a in allowed_raw:
+					if int(a) == bid:
+						v = 1.0
+						break
+			row[x] = v
+		field.append(row)
+
+	# 多轮均值模糊（半径 boundary_blur 格，横纵各一趟）把整格 0/1 揉成多格宽的软
+	# 过渡带：干湿边界由连续场给出，shader 再叠一层域扭曲就完全看不出格网。
+	# 顺序很关键（旧水洼版踩过反例：先切阈值再平滑会把水成片吃掉）——这里先模糊
+	# 再切逻辑阈值，切多少就是多少。
+	var passes := maxi(0, int(Config.get_value("weather.rain_ground.boundary_passes", 3)))
+	var radius := maxi(1, int(Config.get_value("weather.rain_ground.boundary_blur", 2)))
+	for _i in range(passes):
+		field = _blur_field(field, radius)
+
+	# 水面剔出湿地（用户 2026-09-19："水面剔出去"）。上面那几轮模糊会把岸上草地的场值
+	# 渗到水面格里，于是整片湖被压暗、再打上冷调水光，看着像水面浮了一层沫子。
+	# 水面格＝不可通行格：TileMap 对 terrain=1 的格一律铺 water_bg，而 walls ⊇ terrain
+	# （walls 还多包含树/石），所以按 walls 清零就把真水面全剔干净了。
+	# 视觉场和逻辑判定必须同源切：只清一边就会出现"看着是干的、踩上去却出波纹"的错位。
+	var excl_water := bool(Config.get_value("weather.rain_ground.exclude_water_cells", true))
+	if excl_water:
+		for y in range(_map_h):
+			for x in range(_map_w):
+				if bool(walls[y][x]):
+					field[y][x] = 0.0
+	_wet_field = field
+
+	var thr := clampf(float(Config.get_value("weather.rain_ground.wet_threshold", 0.5)), 0.01, 0.99)
+	_wet_cells = []
+	_wet_count = 0
+	for y in range(_map_h):
+		var crow: Array = []
+		crow.resize(_map_w)
+		for x in range(_map_w):
+			var w := float(field[y][x]) >= thr
+			crow[x] = w
 			if w:
-				_puddle_noise_cells += 1
+				_wet_count += 1
+		_wet_cells.append(crow)
 
-	# 并入浅滩（当前恒 0 格，河流已移除；保留并集为将来恢复零改动接上）
-	_puddle_shallow_cells = 0
+
+## 一轮可分离均值模糊（横纵各一趟 box，半径 r 格）。越界按边重复（clampi），
+## 地图外缘不会被拉出一圈假干带。box×3 ≈ 高斯，够用且比二项式核少一层算术。
+func _blur_field(field: Array, r: int) -> Array:
+	var w := 2 * r + 1
+	var tmp: Array = []
 	for y in range(_map_h):
+		var row: Array = []
+		row.resize(_map_w)
 		for x in range(_map_w):
-			if int(decor[y][x]) == MapGenerator.DECOR_WATER:
-				if not bool(mask[y][x]):
-					_puddle_shallow_cells += 1
-				mask[y][x] = true
-
-	# 出生点周围强制无水（玩家不该一出生就站水里）
-	var clear_r := int(Config.get_value("weather.puddle.clear_spawn_radius_cells", 4))
-	for y in range(maxi(0, spawn_cell.y - clear_r), mini(_map_h, spawn_cell.y + clear_r + 1)):
-		for x in range(maxi(0, spawn_cell.x - clear_r), mini(_map_w, spawn_cell.x + clear_r + 1)):
-			mask[y][x] = false
-
-	# 多数投票平滑：消单格椒盐，让水洼成团。墙格始终为 0。
-	var iters := int(Config.get_value("weather.puddle.smooth_iterations", 2))
-	for _it in range(iters):
-		mask = _majority_pass(mask, walls)
-	# 平滑可能把水漫到非草地/森林格（或墙），最后再与 eligible 求交收回。
-	for y in range(_map_h):
-		for x in range(_map_w):
-			if not bool(eligible[y][x]):
-				mask[y][x] = false
-
-	_water_cells = mask
-
-
-## 一轮 8 邻多数投票（≥5 判水）。墙格强制 0。
-func _majority_pass(mask: Array, walls: Array) -> Array:
+			var s := 0.0
+			for i in range(w):
+				s += float(field[y][clampi(x + i - r, 0, _map_w - 1)])
+			row[x] = s / float(w)
+		tmp.append(row)
 	var out: Array = []
 	for y in range(_map_h):
 		var row: Array = []
 		row.resize(_map_w)
-		out.append(row)
-	for y in range(_map_h):
 		for x in range(_map_w):
-			if bool(walls[y][x]):
-				out[y][x] = false
-				continue
-			var n := 0
-			for dy in range(-1, 2):
-				for dx in range(-1, 2):
-					var yy := y + dy
-					var xx := x + dx
-					if yy >= 0 and yy < _map_h and xx >= 0 and xx < _map_w and bool(mask[yy][xx]):
-						n += 1
-			out[y][x] = n >= 5
+			var s := 0.0
+			for i in range(w):
+				s += float(tmp[clampi(y + i - r, 0, _map_h - 1)][x])
+			row[x] = s / float(w)
+		out.append(row)
 	return out
 
 
-func _water_count() -> int:
-	var c := 0
-	for row in _water_cells:
-		for v in row:
-			if bool(v):
-				c += 1
-	return c
-
-
 # ============================================================
-# 积水渲染：单个覆盖全图的 ColorRect + puddle.gdshader
+# 湿地渲染：单个覆盖全图的 ColorRect + rain_ground.gdshader
 # ============================================================
 
-func _build_puddle(map_data: Dictionary) -> void:
-	var map_root: Node2D = map_data["node"]
+func _build_wet_layer(map_data: Dictionary) -> void:
+	var map_root: Node2D = map_data.get("node")
 	if map_root == null:
 		return
 
-	var img := Image.create(_map_w, _map_h, false, Image.FORMAT_RGBA8)
+	# 湿度场烘焙成掩码纹理。用 FORMAT_RF（32 位浮点单通道）而不是 R8：8 位单通道图
+	# 到底按不按 sRGB 解码，各后端/版本说法不一，猜错等于把整条 0..1 软场悄悄重映射，
+	# 于是"看着是湿地"的边界与 is_wet_at 的 0.5 阈值错开。浮点图恒为线性，写多少读多少。
+	var img := Image.create(_map_w, _map_h, false, Image.FORMAT_RF)
 	for y in range(_map_h):
 		for x in range(_map_w):
-			img.set_pixel(x, y, Color(1, 1, 1, 1) if bool(_water_cells[y][x]) else Color(0, 0, 0, 0))
+			var v := clampf(float(_wet_field[y][x]), 0.0, 1.0)
+			img.set_pixel(x, y, Color(v, 0.0, 0.0, 1.0))
+	# 诊断（"水面剔出去"查因）：把**真正上传给 shader 的那张图**落盘，R=湿度、G=wall。
+	# 探针侧是现场 MapGenerator.generate()，游戏侧的 map_data 可能已被后续系统改过；
+	# 两边只要 walls 对不上，这张图就会露馅。
+	if bool(Config.get_value("weather.rain_ground.debug_dump_mask", false)):
+		var dbg := Image.create(_map_w, _map_h, false, Image.FORMAT_RGBA8)
+		var wl: Array = map_data.get("walls", [])
+		for y in range(_map_h):
+			for x in range(_map_w):
+				var gw := 1.0 if (not wl.is_empty() and bool(wl[y][x])) else 0.0
+				dbg.set_pixel(x, y, Color(float(img.get_pixel(x, y).r), gw, 0.0, 1.0))
+		dbg.resize(_map_w * 4, _map_h * 4, Image.INTERPOLATE_NEAREST)
+		print("[Weather] 掩码诊断图 err=%d（R=湿度 G=wall）" % int(
+				dbg.save_png(OS.get_user_data_dir() + "/_wet_mask_dbg.png")))
 	var mask_tex := ImageTexture.create_from_image(img)
 
 	var rect := ColorRect.new()
-	rect.name = "PuddleLayer"
+	rect.name = "RainGroundLayer"
 	rect.position = Vector2.ZERO
 	rect.size = Vector2(float(_map_w * _tile_size), float(_map_h * _tile_size))
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE   # 全屏 Control 必须忽略鼠标，否则吃掉局内点击/选中
@@ -508,69 +411,99 @@ func _build_puddle(map_data: Dictionary) -> void:
 	rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 	var mat := ShaderMaterial.new()
-	mat.shader = PUDDLE_SHADER
-	var col: Color = Color.from_string(str(Config.get_value("weather.puddle.color", "#3f6f8f")), Color(0.25, 0.44, 0.56))
-	col.a = float(Config.get_value("weather.puddle.alpha", 0.42))
-	var scroll: Array = Config.get_value("weather.puddle.scroll_cells_per_s", [0.5, 0.9])
-	mat.set_shader_parameter("cell_mask", mask_tex)
+	mat.shader = WET_SHADER
+	var scroll: Array = Config.get_value("weather.rain_ground.scroll_cells_per_s", [0.0, 0.0])
+	mat.set_shader_parameter("wet_mask", mask_tex)
 	mat.set_shader_parameter("mask_size", Vector2(_map_w, _map_h))
 	mat.set_shader_parameter("tile_px", float(_tile_size))
 	mat.set_shader_parameter("world_origin", rect.position)
-	mat.set_shader_parameter("water_color", col)
-	mat.set_shader_parameter("noise_scale", float(Config.get_value("weather.puddle.noise_scale", 0.10)))
+	mat.set_shader_parameter("darkness", float(Config.get_value("weather.rain_ground.darkness", 0.3)))
+	mat.set_shader_parameter("tint_color",
+			Color.from_string(str(Config.get_value("weather.rain_ground.tint_color", "#9dc0dc")), Color(0.62, 0.75, 0.86)))
+	mat.set_shader_parameter("tint_amount", float(Config.get_value("weather.rain_ground.tint_amount", 0.3)))
+	mat.set_shader_parameter("sheen", float(Config.get_value("weather.rain_ground.sheen", 0.05)))
+	# 斑驳水光（用户："地面看不出湿"）：亮斑/暗斑成对，数值全在 config.mottle_* 里。
+	var mstr: Array = Config.get_value("weather.rain_ground.mottle_stretch", [0.8, 1.4])
+	var mspd: Array = Config.get_value("weather.rain_ground.mottle_speed", [0.0, 0.0])
+	mat.set_shader_parameter("mottle_amount", float(Config.get_value("weather.rain_ground.mottle_amount", 1.0)))
+	mat.set_shader_parameter("mottle_scale", float(Config.get_value("weather.rain_ground.mottle_scale", 2.2)))
+	mat.set_shader_parameter("mottle_stretch", Vector2(float(mstr[0]), float(mstr[1])))
+	mat.set_shader_parameter("mottle_speed", Vector2(float(mspd[0]), float(mspd[1])))
+	mat.set_shader_parameter("mottle_threshold", float(Config.get_value("weather.rain_ground.mottle_threshold", 0.74)))
+	mat.set_shader_parameter("mottle_soft", float(Config.get_value("weather.rain_ground.mottle_soft", 0.06)))
+	mat.set_shader_parameter("mottle_gain", float(Config.get_value("weather.rain_ground.mottle_gain", 0.35)))
+	mat.set_shader_parameter("mottle_dark", float(Config.get_value("weather.rain_ground.mottle_dark", 0.12)))
+	mat.set_shader_parameter("mottle_color",
+			Color.from_string(str(Config.get_value("weather.rain_ground.mottle_color", "#7fa8cc")),
+					Color(0.498, 0.659, 0.80)))
+	mat.set_shader_parameter("wet_alpha", float(Config.get_value("weather.rain_ground.alpha", 0.9)))
+	mat.set_shader_parameter("noise_scale", float(Config.get_value("weather.rain_ground.noise_scale", 0.06)))
 	mat.set_shader_parameter("scroll_dir", Vector2(float(scroll[0]), float(scroll[1])))
-	mat.set_shader_parameter("wobble", float(Config.get_value("weather.puddle.wobble", 0.65)))
-	mat.set_shader_parameter("edge_soft", float(Config.get_value("weather.puddle.edge_soft", 0.30)))
-	# ---- 阶段二：倒影 / 折射 / 波纹 ----
-	# 两张视口纹理与 SCREEN_UV 逐点对应（半分辨率视口渲染同一世界区域）。
-	mat.set_shader_parameter("reflection_tex",
-			_refl_vp.get_texture() if _refl_vp != null else _placeholder_tex)
+	mat.set_shader_parameter("edge_soft", float(Config.get_value("weather.rain_ground.edge_soft", 0.45)))
+	mat.set_shader_parameter("edge_warp", float(Config.get_value("weather.rain_ground.edge_warp", 0.9)))
+	mat.set_shader_parameter("edge_warp_scale", float(Config.get_value("weather.rain_ground.edge_warp_scale", 0.16)))
 	mat.set_shader_parameter("ripple_tex",
 			_ripple_vp.get_texture() if _ripple_vp != null else _placeholder_tex)
-	mat.set_shader_parameter("reflection_alpha", float(Config.get_value("weather.reflection.alpha", 0.55)))
-	mat.set_shader_parameter("wobble_scale", float(Config.get_value("weather.reflection.wobble_scale", 0.12)))
-	mat.set_shader_parameter("wobble_speed", float(Config.get_value("weather.reflection.wobble_speed", 0.8)))
-	mat.set_shader_parameter("wobble_strength", float(Config.get_value("weather.reflection.wobble_strength", 0.012)))
-	mat.set_shader_parameter("dispersion", float(Config.get_value("weather.reflection.dispersion", 0.015)))
-	mat.set_shader_parameter("refraction_strength", float(Config.get_value("weather.refraction.strength", 0.008)))
-	mat.set_shader_parameter("reflection_blend", float(Config.get_value("weather.puddle.reflection_blend", 0.65)))
 	mat.set_shader_parameter("ripple_glow", float(Config.get_value("weather.ripple.glow", 0.35)))
 	mat.set_shader_parameter("ripple_tint",
 			Color.from_string(str(Config.get_value("weather.ripple.color", "#bfe3ff")), Color(0.75, 0.89, 1.0)))
+	mat.set_shader_parameter("ripple_wiggle", float(Config.get_value("weather.rain_ground.ripple_wiggle", 0.003)))
 	rect.material = mat
 
 	map_root.add_child(rect)
-	# 插到地形层之后、DecorLayer 之前：水在树/石之下（不淹树），并受 MacroLight 统一压暗。
+	# 插到地形层之后、DecorLayer 之前：湿地贴在草地上（不淹树），并受 MacroLight 统一压暗。
 	map_root.move_child(rect, 1)
-	_puddle = rect
+	_wet_layer = rect
 
 
 # ============================================================
-# 雨滴 + 飞溅：RainAnchor 跟相机 + 两个 local_coords=false 的发射器
+# 雨：RainAnchor 跟相机 + 三层景深发射器（远/中/近）+ 地面飞溅 + 屏幕雨幕
+# 全部 local_coords=false：anchor 平移只影响新发射的雨滴，已有雨滴留在原地
 # ============================================================
 
 func _build_rain(root: Node2D) -> void:
-	var rain_z := int(Config.get_value("weather.rain.z", 6))
-	_rain_lifetime = float(Config.get_value("weather.rain.lifetime_s", 0.5))
 	_margin = float(Config.get_value("weather.rain.emission_margin_px", 160.0))
-	var fall: Array = Config.get_value("weather.rain.fall_speed_px", [900.0, 1300.0])
+	_wind_x = float(Config.get_value("weather.rain.wind_x_px", -320.0))
+	var gust: Dictionary = Config.get_value("weather.rain.gust", {})
+	_gust_amp = clampf(float(gust.get("amplitude", 0.5)), 0.0, 1.5)
+	_gust_period = maxf(float(gust.get("period_s", 7.0)), 0.5)
 
 	_rain_anchor = Node2D.new()
 	_rain_anchor.name = "RainAnchor"
-	_rain_anchor.z_index = rain_z
+	_rain_anchor.z_index = int(Config.get_value("weather.rain.anchor_z", 6))
 	root.add_child(_rain_anchor)
 
-	# 主雨丝
-	_rain = GPUParticles2D.new()
-	_rain.name = "RainStreaks"
-	_rain.texture = _make_streak_tex()
-	_rain.local_coords = false          # 关键：世界空间模拟，anchor 移动不拖着已有雨滴瞬移
-	_rain.lifetime = _rain_lifetime
-	_rain.preprocess = _rain_lifetime   # 开局即铺满，不必等雨下进来
-	_rain.amount = int(Config.get_value("weather.rain.amount", 700))
-	_rain.process_material = _make_rain_mat(fall)
-	_rain.emitting = true
-	_rain_anchor.add_child(_rain)
+	var tex := _make_streak_tex()
+	var add_mat: CanvasItemMaterial = null
+	if bool(Config.get_value("weather.rain.blend_add", true)):
+		# 参考片段里的 material.BlendMode 是 Godot 3 的 ParticlesMaterial；
+		# 4.x 的 ParticleProcessMaterial 没有 blend_mode，2D 粒子叠加要挂在节点的
+		# CanvasItemMaterial 上（否则雨丝是普通 alpha 混合，密处不成亮带）。
+		add_mat = CanvasItemMaterial.new()
+		add_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	for L in Config.get_value("weather.rain.layers", []):
+		if not (L is Dictionary):
+			continue
+		var d: Dictionary = L
+		var g := GPUParticles2D.new()
+		g.name = str(d.get("name", "RainLayer"))
+		g.texture = tex
+		g.local_coords = false
+		var life := float(d.get("lifetime_s", 0.7))
+		g.lifetime = life
+		g.preprocess = life            # 参考步骤 2：preprocess == lifetime → 开局即铺满
+		g.amount = int(d.get("amount", 200))
+		g.z_index = int(d.get("z", 0))
+		var m := _make_rain_mat(d)
+		g.process_material = m
+		if add_mat != null:
+			g.material = add_mat
+		g.emitting = true
+		_rain_anchor.add_child(g)
+		_rain_layers.append({"node": g, "mat": m,
+				"wind_factor": float(d.get("wind_factor", 1.0)),
+				"phase": float(d.get("gust_phase", 0.0)),
+				"extents_k": float(d.get("extents_k", 1.0))})
 
 	# 落地飞溅（独立发射器，非 sub-emitter）
 	var sp: Dictionary = Config.get_value("weather.rain.splash", {})
@@ -578,36 +511,98 @@ func _build_rain(root: Node2D) -> void:
 	_splash.name = "RainSplash"
 	_splash.texture = _make_dot_tex()
 	_splash.local_coords = false
-	_splash.lifetime = float(sp.get("lifetime_s", 0.22))
+	_splash.lifetime = float(sp.get("lifetime_s", 0.35))
+	_splash.preprocess = float(sp.get("lifetime_s", 0.35))
 	_splash.amount = int(Config.get_value("weather.rain.splash_amount", 140))
 	_splash.process_material = _make_splash_mat(sp)
-	_splash.z_index = 1                 # 相对 anchor：雨丝 6、飞溅 7
+	if add_mat != null:
+		_splash.material = add_mat
+	_splash.z_index = int(Config.get_value("weather.rain.splash_z", 3))
 	_splash.emitting = true
 	_rain_anchor.add_child(_splash)
 
+	_build_rain_overlay(root)
 
-func _make_rain_mat(fall: Array) -> ParticleProcessMaterial:
+
+## 单层雨丝材质。参考 DEV LOG.02 步骤 1/3：下落用 +y 初速度，风偏用 gravity.x
+## （所以雨是**越下越斜**的加速偏移，不是固定倾角；配合下面的阵风包络会周期摆动）。
+func _make_rain_mat(d: Dictionary) -> ParticleProcessMaterial:
 	# Godot 4 已统一粒子材质：GPUParticles2D 用的就是 ParticleProcessMaterial（无 2D 专版）。
 	var m := ParticleProcessMaterial.new()
 	m.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
 	m.emission_box_extents = Vector3(800, 600, 0)   # _process 每帧按 zoom 重算
-	# 雨滴用「初速度沿倾斜方向 + 零重力」表达匀速下落带风：
-	# direction 会被引擎归一化，取 (wind, fall_mid) 的合成方向，速率取 fall，
-	# 于是垂直分量≈fall、水平分量≈wind_x。gravity 留零（雨本就匀速）。
-	var wind_x := float(Config.get_value("weather.rain.wind_x_px", -60.0))
-	var fall_mid := (float(fall[0]) + float(fall[1])) * 0.5
-	m.direction = Vector3(wind_x, fall_mid, 0.0)
-	m.spread = 0.0
-	m.initial_velocity_min = float(fall[0])
-	m.initial_velocity_max = float(fall[1])
-	m.gravity = Vector3.ZERO
+	m.direction = Vector3(0, 1, 0)
+	m.spread = float(d.get("spread_deg", 6.0))
+	var spd: Array = d.get("speed_px", [1050.0, 1350.0])
+	m.initial_velocity_min = float(spd[0])
+	m.initial_velocity_max = float(spd[1])
+	m.gravity = Vector3.ZERO                        # _process 每帧按阵风写入
+	var sc: Array = d.get("scale", [1.0, 1.0])
+	# 4.3 起 scale_amount_min/max 改名 scale_min/max（仍是 float，赋 Vector3 直接编译失败）。
+	m.scale_min = float(sc[0])
+	m.scale_max = float(sc[1])
 	# lifetime 在 GPUParticles2D 节点上设（material 只有 lifetime_randomness）
 	m.lifetime_randomness = 0.3
 	var st: Dictionary = Config.get_value("weather.rain.streak", {})
 	var rc := Color.from_string(str(st.get("color", "#a8c4e0")), Color(0.66, 0.77, 0.88))
-	rc.a = float(st.get("alpha", 0.55))
+	rc.a = float(d.get("alpha", st.get("alpha", 0.55)))
 	m.color = rc
 	return m
+
+
+## 屏幕雨幕（参考步骤 6）：全屏 ColorRect + 压暗 + 朝雨幕蓝灰 mix。
+## 挂在独立 CanvasLayer（默认 1，与 HUD 同层但在其之前）→ 不跟随相机缩放，也不被
+## 湿地层的 SCREEN_TEXTURE 采样到（它画在湿地之后）。
+func _build_rain_overlay(root: Node2D) -> void:
+	var ov: Dictionary = Config.get_value("weather.rain.overlay", {})
+	if not bool(ov.get("enabled", true)):
+		return
+	_overlay_layer = CanvasLayer.new()
+	_overlay_layer.name = "RainOverlayLayer"
+	_overlay_layer.layer = int(ov.get("layer", 1))
+	root.add_child(_overlay_layer)
+
+	_overlay = ColorRect.new()
+	_overlay.name = "RainCurtain"
+	# 全屏锚定：窗口缩放自动跟随，不需要每帧量视口尺寸。
+	_overlay.anchor_right = 1.0
+	_overlay.anchor_bottom = 1.0
+	# Control 默认吃鼠标；雨幕在 HUD 之下仍会挡住世界点击，必须显式忽略。
+	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat := ShaderMaterial.new()
+	mat.shader = RAIN_OVERLAY_SHADER
+	var c := Color.from_string(str(ov.get("color", "#8fb0cc")), Color(0.56, 0.69, 0.80))
+	c.a = 1.0
+	mat.set_shader_parameter("tint", c)
+	mat.set_shader_parameter("opacity", float(ov.get("opacity", 0.15)))
+	mat.set_shader_parameter("darken", float(ov.get("darken", 0.9)))
+	mat.set_shader_parameter("vertical_bias", float(ov.get("vertical_bias", 0.35)))
+	_overlay.material = mat
+	_overlay.modulate.a = 0.0
+	_overlay_layer.add_child(_overlay)
+
+
+## 进局淡入（参考"天气切换用 Tween 平滑过渡"）：雨滴与雨幕并行从透明爬到满。
+## _fade_tween 必须在 deactivate() 里 kill：WeatherSystem 是 Main 场景常驻节点，
+## 切回基地后 Tween 仍在跑，而 RainAnchor/雨幕已随 _clear_game_root 释放。
+func _fade_in_rain() -> void:
+	var dur := float(Config.get_value("weather.rain.fade_in_s", 1.2))
+	if dur <= 0.0:
+		return
+	var targets: Array = []
+	if _rain_anchor != null:
+		_rain_anchor.modulate.a = 0.0
+		targets.append(_rain_anchor)
+	if _overlay != null:
+		_overlay.modulate.a = 0.0
+		targets.append(_overlay)
+	if targets.is_empty():
+		return
+	_fade_tween = create_tween()
+	_fade_tween.set_parallel(true)
+	for t in targets:
+		var tw := _fade_tween.tween_property(t, "modulate:a", 1.0, dur)
+		tw.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 func _make_splash_mat(sp: Dictionary) -> ParticleProcessMaterial:
@@ -659,7 +654,7 @@ func _make_dot_tex() -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not _active or _rain_anchor == null or not is_instance_valid(_rain_anchor):
 		return
 	var cam := get_viewport().get_camera_2d()
@@ -667,12 +662,19 @@ func _process(_delta: float) -> void:
 		return
 	# anchor 对齐相机中心；local_coords=false 使已存在粒子留在原地，只有新发射的跟着走。
 	_rain_anchor.global_position = cam.global_position
+	_elapsed += delta
 	var vp := get_viewport().get_visible_rect().size
 	var z := maxf(cam.zoom.x, 0.05)
 	var half := vp / z * 0.5 + Vector2(_margin, _margin)
 	# 发射框只覆盖视口+margin（不再额外加下落行程）：preprocess=lifetime 已让首帧
 	# 铺满整框，再加行程只会把同量粒子摊到更大体积里 → 雨看着稀稀拉拉（截图实测）。
-	_rain.process_material.emission_box_extents = Vector3(half.x, half.y, 0)
+	for rec in _rain_layers:
+		var m: ParticleProcessMaterial = rec["mat"]
+		var k := float(rec["extents_k"])
+		m.emission_box_extents = Vector3(half.x * k, half.y * k, 0)
+		# 风偏 = gravity.x：同一阵风包络按各层 wind_factor/phase 错开，近处摆得多、远处摆得少
+		var gust := 1.0 + _gust_amp * sin((_elapsed / _gust_period + float(rec["phase"])) * TAU)
+		m.gravity = Vector3(_wind_x * float(rec["wind_factor"]) * gust, 0.0, 0.0)
 	if _splash != null and is_instance_valid(_splash):
 		_splash.process_material.emission_box_extents = Vector3(half.x * 0.9, half.y * 0.5, 0)
 	_sync_viewports()
@@ -700,8 +702,8 @@ func _get_free_ripple() -> Node2D:
 	return null
 
 
-## 波纹颜色 = 通道编码（puddle shader 拆通道用）：
-## r=亮度基（提亮水面），g/b=色散量（偏移 UV）。单圈一次绘制即完成通道拆分。
+## 波纹颜色 = 通道编码（湿地 shader 拆通道用）：
+## r=亮度基（提亮湿面），g/b=晃动量（波纹处让反光额外抖动）。单圈一次绘制即完成拆分。
 func _ripple_color(alpha: float) -> Color:
 	var disp := float(Config.get_value("weather.ripple.disp_channel", 0.5))
 	return Color(

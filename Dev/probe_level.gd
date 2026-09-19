@@ -9,7 +9,7 @@ extends Node
 ##   D) **贴图真的在**：4 档 × 3 武器的每一帧都能 ResourceLoader.exists ——
 ##      这是防「新 PNG 没跑 godot_import.py → load() 静默 null → 角色隐形」的那道闸。
 ##      同时断言各档帧数与蓝色基线完全一致（防某套配色只生成了一半）。
-##   E) 名册数据层：初始 3 人 / 补招命名 / 满编拒招 / 清洗 / 除名
+##   E) 名册数据层：初始 4 人 / 补招命名 / 满编拒招 / 出厂名单迁移 / 清洗 / 除名
 ##   F) 经验与升级：曲线取值 / 跨级 / 满级封顶 / 撤离只发存活者
 ##   G) player 等级视觉：apply_level 换档位贴图（跨档才换）+ 徽章同步
 ##   H) 出击面板：列名册（名字·等级·档位·经验）+ 补招按钮 + 出击信号带 uid/level
@@ -56,8 +56,9 @@ func _ready() -> void:
 	_main = main
 	await _frames(30)
 
-	# 名册起步状态 = 出厂那 3 名新兵（先把本地存档带来的状态清掉，保证可复现）
+	# 名册起步状态 = 出厂那 4 名新兵（先把本地存档带来的状态清掉，保证可复现）
 	Meta.roster = []
+	Meta.seeded_ids = []
 	Meta.ensure_roster()
 
 	await _a_config()
@@ -215,7 +216,7 @@ func _d_assets() -> void:
 # ------------------------------------------------------------
 func _e_roster() -> void:
 	_say("--- E 段：名册数据层 ---")
-	_check(Meta.roster.size() == 3, "出厂名册 3 人（实得 %d）" % Meta.roster.size())
+	_check(Meta.roster.size() == 4, "出厂名册 4 人（实得 %d）" % Meta.roster.size())
 	var ids: Array = []
 	var uids: Array = []
 	var all_lv0 := true
@@ -224,22 +225,45 @@ func _e_roster() -> void:
 		uids.append(int(u.get("uid", 0)))
 		if int(u.get("level", -1)) != 0 or float(u.get("xp", -1.0)) != 0.0:
 			all_lv0 = false
-	_check(ids == ["spearman", "archer", "swordsman"],
+	_check(ids == ["spearman", "archer", "swordsman", "monk"],
 			"名单顺序 = progression.roster.starting（实得 %s）" % str(ids))
-	_check(uids == [1, 2, 3], "uid 从 1 起且唯一（实得 %s）" % str(uids))
+	_check(uids == [1, 2, 3, 4], "uid 从 1 起且唯一（实得 %s）" % str(uids))
 	_check(all_lv0, "全员初始 Lv0 / 经验 0")
 	_check(str(Meta.roster[0].get("name", "")) == "枪手", "第一人名字 = 枪手（原型名）")
 
-	var u4 := Meta.recruit("archer")
-	_check(not u4.is_empty() and int(u4.get("level", -1)) == 0, "补招成功且 0 级")
-	_check(str(u4.get("name", "")) == "弓兵2",
-			"同兵种第 2 人自动带序号（实得 %s）" % str(u4.get("name", "")))
-	_check(int(u4.get("uid", 0)) == 4, "新兵 uid 递增 = 4（实得 %d）" % int(u4.get("uid", 0)))
-	_check(Meta.roster.size() == 4, "补招后 4 人")
+	var u5 := Meta.recruit("archer")
+	_check(not u5.is_empty() and int(u5.get("level", -1)) == 0, "补招成功且 0 级")
+	_check(str(u5.get("name", "")) == "弓兵2",
+			"同兵种第 2 人自动带序号（实得 %s）" % str(u5.get("name", "")))
+	_check(int(u5.get("uid", 0)) == 5, "新兵 uid 递增 = 5（实得 %d）" % int(u5.get("uid", 0)))
+	_check(Meta.roster.size() == 5, "补招后 5 人")
 
 	var bad := Meta.recruit("no_such_archetype")
-	_check(bad.is_empty() and Meta.roster.size() == 4,
+	_check(bad.is_empty() and Meta.roster.size() == 5,
 			"原型不存在 → 拒绝补招且名册不变（实得 %d 人）" % Meta.roster.size())
+
+	# 出厂名单迁移：starting 后来加了 monk，老档（3 人、没 seeded_ids 标记）要自动补出僧侣
+	Meta.roster = Meta._sanitize_roster([
+		{"id": "spearman", "name": "枪手", "level": 4, "xp": 10.0},
+		{"id": "archer", "name": "弓兵", "level": 0, "xp": 0.0},
+		{"id": "swordsman", "name": "剑士", "level": 0, "xp": 0.0},
+	])
+	Meta.seeded_ids = []
+	Meta.ensure_roster()
+	var migrated: Array = []
+	for u in Meta.roster:
+		migrated.append(str(u.get("id", "")))
+	_check(migrated == ["spearman", "archer", "swordsman", "monk"],
+			"老档读档后补出僧侣（实得 %s）" % str(migrated))
+	_check(int(Meta.roster[0].get("level", -1)) == 4, "补人不动老成员的等级（Lv4 还在）")
+	# 已发过又阵亡的原型不能被迁移反复拉回来
+	Meta.roster = Meta._sanitize_roster([
+		{"id": "spearman", "name": "枪手", "level": 0, "xp": 0.0},
+	])
+	Meta.seeded_ids = ["spearman", "archer", "swordsman", "monk"]
+	Meta.ensure_roster()
+	_check(Meta.roster.size() == 1, "发过又阵亡的人不会被迁移拉回来（实得 %d 人）"
+			% Meta.roster.size())
 
 	# 补到满编（max_size = 8）
 	var cap := int(Config.get_value("progression.roster.max_size", 8))
@@ -536,7 +560,7 @@ func _h_panel(m: Node) -> void:
 	if panel == null:
 		return
 
-	# 造一个可预期的名册：3 人，其中一人 Lv3（紫档）+ 攒了两个特性
+	# 造一个可预期的名册：4 人，其中一人 Lv3（紫档）+ 攒了两个特性
 	Meta.roster = []
 	Meta.ensure_roster()
 	Meta.roster[1]["level"] = 3
@@ -546,11 +570,12 @@ func _h_panel(m: Node) -> void:
 	panel.call("open", [])
 	await _frames(3)
 	var checks: Array = panel.get("_checks")
-	_check(checks.size() == 3, "面板列出名册 3 人（实得 %d）" % checks.size())
+	_check(checks.size() == 4, "面板列出名册 4 人（实得 %d）" % checks.size())
 	var texts := _row_texts(panel)
 	var joined := " | ".join(texts)
 	_check(joined.find("枪手") >= 0 and joined.find("弓兵") >= 0
-			and joined.find("剑士") >= 0, "三行分别显示三个人的名字")
+			and joined.find("剑士") >= 0 and joined.find("僧侣") >= 0,
+			"四行分别显示四个人的名字")
 	_check(joined.find("Lv3") >= 0 and joined.find("老兵") >= 0,
 			"第二人显示 Lv3 / 老兵档位（档位名来自 progression.tiers）")
 	_check(joined.find("经验 40 /") >= 0, "显示当前经验进度（实得含「经验 40」：%s）"
@@ -563,14 +588,14 @@ func _h_panel(m: Node) -> void:
 			% ("是" if joined.find("攻击×2") >= 0 else "否"))
 	_check(joined.find("特性：尚无") >= 0, "0 层特性的人显示「特性：尚无」提示")
 	var btn: Button = panel.get("_launch_btn")
-	_check(btn.text.find("已选 3 名") >= 0, "默认全选，按钮写「已选 3 名」（实得 %s）" % btn.text)
+	_check(btn.text.find("已选 4 名") >= 0, "默认全选，按钮写「已选 4 名」（实得 %s）" % btn.text)
 
 	# 取消勾选一人
 	(checks[0]["checkbox"] as CheckBox).button_pressed = false
 	await _frames(2)
-	_check(btn.text.find("已选 2 名") >= 0, "取消一人后按钮变「已选 2 名」（实得 %s）" % btn.text)
+	_check(btn.text.find("已选 3 名") >= 0, "取消一人后按钮变「已选 3 名」（实得 %s）" % btn.text)
 
-	# 补招按钮：名册 3/8 → 每个兵种一个按钮（characters.list 现在 4 个原型）
+	# 补招按钮：名册 4/8 → 每个兵种一个按钮（characters.list 现在 4 个原型）
 	# 顺带这也是「新角色有没有真的接进出击面板」的验收点：加了角色这里就该多一颗按钮。
 	var rrow: Node = panel.get("_recruit_row")
 	var recruit_btns: Array = []

@@ -84,7 +84,8 @@ func _unhandled_input(event: InputEvent) -> void:
 # ------------------------------------------------------------
 
 func _build_ui() -> void:
-	add_child(UiKit.solid(UiKit.COL_BG))
+	# 地图背景：MapGenerator 生成图的整图铺满 + 冷色压暗，呼应局内画面
+	add_child(UiKit.tiled_backdrop("menu_map", 0.5, Color(0.05, 0.07, 0.11, 0.5), true))
 
 	# 顶部一条琥珀色细线，纯装饰，让标题不显得悬空
 	var top_line := ColorRect.new()
@@ -112,15 +113,21 @@ func _build_ui() -> void:
 	_menu_box.add_child(UiKit.spacer(26))
 
 	# --- 主按钮列 ---
+	# 图标取 Tiny Swords Icons：绿旗=新开局、剑盾=已有战力、齿轮=设置、木槌=杂项、红X=退出
 	var entries := [
-		["新建存档", "开一个新的存档槽，从头开始", _on_new_save],
-		["历史存档", "读取已有存档继续游戏", _on_load_save],
-		["参数配置", "画面 / 音频 / 玩法 / 操作 / 语言", _on_settings],
-		["其他", "制作人员 / 统计 / 成就 / 图鉴（占位）", _on_misc],
-		["退出游戏", "", _on_quit],
+		["新建存档", "开一个新的存档槽，从头开始", _on_new_save, "icon_07"],
+		["历史存档", "读取已有存档继续游戏", _on_load_save, "icon_05"],
+		["参数配置", "画面 / 音频 / 玩法 / 操作 / 语言", _on_settings, "icon_10"],
+		["其他", "制作人员 / 统计 / 成就 / 图鉴（占位）", _on_misc, "icon_01"],
+		["退出游戏", "", _on_quit, "icon_09"],
 	]
 	for e in entries:
 		var b := UiKit.menu_button(str(e[0]), str(e[1]))
+		var icon: Texture2D = UiKit.ts_tex(str(e[3]))
+		if icon != null:
+			b.icon = icon
+			b.add_theme_constant_override("icon_max_width", 30)
+			b.expand_icon = false
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		if e[2] is Callable:
 			b.pressed.connect(e[2])
@@ -156,7 +163,7 @@ func _refresh_status() -> void:
 	var hint := str(Config.get_value("menu.hint", ""))
 	if SaveSlots.last_slot > 0 and SaveSlots.exists(SaveSlots.last_slot):
 		var info := SaveSlots.slot_info(SaveSlots.last_slot)
-		_slot_line.text = "上次游玩：%s · %s" % [info["name"], info["last_played"]]
+		_slot_line.text = tr("上次游玩：%s · %s") % [info["name"], info["last_played"]]
 	else:
 		_slot_line.text = "尚无存档"
 	_status.text = hint
@@ -247,7 +254,7 @@ func _launch_game() -> void:
 	if err != OK:
 		push_error("[Menu] 切换场景失败：%s（err=%d）" % [scene, err])
 		_status.add_theme_color_override("font_color", UiKit.COL_WARN)
-		_status.text = "进入游戏失败：%s（err=%d）" % [scene, err]
+		_status.text = tr("进入游戏失败：%s（err=%d）") % [scene, err]
 
 
 # ------------------------------------------------------------

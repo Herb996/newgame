@@ -31,6 +31,11 @@ var base_layout: Dictionary = {}
 ## —— id 指向 characters.list 里的原型（决定武器/指令集），level/xp 是这个人自己的。
 var roster: Array = []
 
+## 出厂名单（progression.roster.starting）里**已经发过的**原型 id。
+## 用来区分「这兵种玩家从没有过」和「这个人阵亡后被除名」：
+## starting 以后新增原型时只补发一次，不会每次读档把死者拉回来。
+var seeded_ids: Array = []
+
 
 func _ready() -> void:
 	load_save()
@@ -48,6 +53,7 @@ func load_save() -> void:
 	upgrade_levels = {}
 	base_layout = {}
 	roster = []
+	seeded_ids = []
 	if SaveSlots.has_active_slot():
 		var slot_data: Dictionary = SaveSlots.read_slot(SaveSlots.active_slot)
 		if slot_data.is_empty():
@@ -58,6 +64,7 @@ func load_save() -> void:
 		upgrade_levels = slot_data.get("upgrades", {})
 		base_layout = slot_data.get("base_layout", {})
 		roster = _sanitize_roster(slot_data.get("roster", []))
+		seeded_ids = _sanitize_seeded(slot_data.get("seeded_ids", []))
 		_prune_unknown_resources()
 		ensure_roster()
 		return
@@ -71,10 +78,22 @@ func load_save() -> void:
 		upgrade_levels = parsed.get("upgrades", {})
 		base_layout = parsed.get("base_layout", {})
 		roster = _sanitize_roster(parsed.get("roster", []))
+		seeded_ids = _sanitize_seeded(parsed.get("seeded_ids", []))
 	else:
 		push_warning("[Meta] 存档损坏，已重置。")
 	_prune_unknown_resources()
 	ensure_roster()
+
+
+## seeded_ids 清洗：只留字符串、去重（存档手改过 / 半截写入都不能让它变成脏数组）
+func _sanitize_seeded(raw) -> Array:
+	var out: Array = []
+	if raw is Array:
+		for id in raw:
+			var s := str(id)
+			if s != "" and not out.has(s):
+				out.append(s)
+	return out
 
 
 ## 清理存档里已不存在于 config.resources 的废弃资源
@@ -97,7 +116,7 @@ func _prune_unknown_resources() -> void:
 
 func save_game() -> void:
 	if SaveSlots.has_active_slot():
-		SaveSlots.write_active(bank, upgrade_levels, base_layout, roster)
+		SaveSlots.write_active(bank, upgrade_levels, base_layout, roster, seeded_ids)
 		return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -105,7 +124,7 @@ func save_game() -> void:
 		return
 	f.store_string(JSON.stringify(
 			{"bank": bank, "upgrades": upgrade_levels, "base_layout": base_layout,
-			 "roster": roster}, "\t"))
+			 "roster": roster, "seeded_ids": seeded_ids}, "\t"))
 
 
 ## 记录某建筑的新位置（占地左上角格）到本存档槽并落盘。
@@ -250,22 +269,53 @@ func _next_uid() -> int:
 	return mx + 1
 
 
-## 名册为空（首次游玩 / 全员阵亡且允许补招）时按 progression.roster.starting 补人
+## 保证名册可用：
+##   · 空名册（首次游玩 / 全员阵亡且允许补招）→ 按 progression.roster.starting 建队
+##   · 老档（出厂名单建队之后才给 starting 加新原型）→ 见 _migrate_starting_units
 func ensure_roster() -> void:
-	if not roster.is_empty():
-		return
 	var starting = Config.get_value("progression.roster.starting", [])
-	if starting is Array and not (starting as Array).is_empty():
-		for id in starting:
-			recruit(str(id))
-	else:
-		recruit(str(Config.get_value("characters.default", "spearman")))
-	if not roster.is_empty():
-		var desc := ""
+	if roster.is_empty():
+		if starting is Array and not (starting as Array).is_empty():
+			for id in starting:
+				recruit(str(id))
+		else:
+			recruit(str(Config.get_value("characters.default", "spearman")))
+		if starting is Array:
+			seeded_ids = (starting as Array).map(func(id): return str(id))
+		if not roster.is_empty():
+			var desc := ""
+			for u in roster:
+				desc += "%s(Lv%d) " % [str(u.get("name", "?")), int(u.get("level", 0))]
+			print("[Meta] 名册初始化：%s" % desc.strip_edges())
+			save_game()
+		return
+	_migrate_starting_units(starting)
+
+
+## 出厂名单迁移：monk（2026-09-18）之前建的名册只有 3 人，新原型不会凭空出现。
+## 只补「从来没发过」的那些（seeded_ids 记着发过什么），所以阵亡除名的人不会被拉回来。
+func _migrate_starting_units(starting) -> void:
+	if not (starting is Array) or (starting as Array).is_empty():
+		return
+	if seeded_ids.is_empty():
+		# 加字段之前建的老档：没有标记可依，就把「现在名册里有人」当作已发过，
+		# 只补 starting 里缺的那几个（发过又阵亡的原型不在 starting 之外，不会被拉回）
 		for u in roster:
-			desc += "%s(Lv%d) " % [str(u.get("name", "?")), int(u.get("level", 0))]
-		print("[Meta] 名册初始化：%s" % desc.strip_edges())
-		save_game()
+			var id := str(u.get("id", ""))
+			if id != "" and not seeded_ids.has(id):
+				seeded_ids.append(id)
+	var added: Array = []
+	for raw in starting:
+		var id := str(raw)
+		if id in seeded_ids:
+			continue
+		seeded_ids.append(id)
+		if not recruit(id).is_empty():
+			added.append(id)
+	if added.is_empty():
+		return
+	save_game()
+	print("[Meta] 出厂名单已更新，补招新兵：%s" % ", ".join(added))
 
 
 ## 补招一名 0 级新兵。满编或原型不存在时返回 {}
@@ -347,6 +397,19 @@ func trait_defs() -> Dictionary:
 
 func trait_ids() -> Array:
 	return trait_defs().keys()
+
+
+## 扣减表 → 「攻击-7 移速-10」。属性名与顺序都取 progression.traits 那张表，
+## 与出击面板/升级提示同一套叫法。HUD 生存行与背包弹窗共用 —— 各写一份，
+## 改 traits 表时必然漏一边（空表时的兜底文案也一样）。
+func penalty_line(merged: Dictionary) -> String:
+	var out: Array = []
+	for id in trait_ids():
+		var v := float(merged.get(id, 0.0))
+		if v > 0.0:
+			var d: Dictionary = trait_defs().get(id, {})
+			out.append("%s-%d" % [str(d.get("name", id)), int(round(v))])
+	return " ".join(out) if not out.is_empty() else "无属性变化"
 
 
 ## 某特性的层数收益 = 层数 × per_stack（供面板显示用）

@@ -17,7 +17,7 @@ func _init(p_actor: Node = null) -> void:
 
 
 func enter(_msg: Dictionary = {}) -> void:
-	actor.stop_moving()
+	actor.halt_in_place()     # 只停脚：冲刺是躲一下，不是作废玩家的移动指令
 	actor.aim_at_mouse()
 	_dir = actor.facing
 	_timer = 0.0

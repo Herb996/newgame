@@ -6,7 +6,12 @@
 多份日志汇总成一张表。
 
 用法：
-    python tools/run_regression.py
+    python tools/run_regression.py            # 全部探针 + flow_test
+    python tools/run_regression.py --no-flow  # 只跑探针，不动 Data/config.json
+
+--no-flow 存在的理由：flow_test 要临时把 config.json 里的 flow_test 改成 true
+再改回来。中途别的会话要是写了这个文件，收尾那次"还原"会把人家的改动一起抹掉。
+只要探针结果时就加它。
 """
 import io
 import json
@@ -24,21 +29,41 @@ SUITES = [
     ("Dev/probe_player_anim.tscn", "_r_anim.log", ("[ProbeAnim]",)),
     ("Dev/probe_zoom.tscn", "_r_zoom.log", ("[ZoomProbe]",)),
     ("Dev/probe_terrain_map.tscn", "_r_terrain.log", ("[TerrainProbe]", "[Map]")),
+    ("Dev/probe_level.tscn", "_r_level.log", ("[probe_level]",)),
+    ("Dev/probe_supplies.tscn", "_r_supplies.log", ("[probe_supplies]",)),
+    ("Dev/probe_inventory.tscn", "_r_inventory.log", ("[probe_inventory]",)),
+    ("Dev/probe_click_move.tscn", "_r_clickmove.log", ("[probe_click_move]",)),
+    ("Dev/probe_second_launch.tscn", "_r_launch2.log", ("[probe_second_launch]",)),
+    ("Dev/probe_water_step.tscn", "_r_water.log", ("[WaterProbe]", "[Weather]")),
 ]
 
 BAD_MARKS = ("SCRIPT ERROR", "Parse Error", "Invalid call", "Invalid access",
              "Attempt to call", "Node not found", "Failed to load")
 
+# 单套探针的墙钟上限（秒）。必须有：探针是 Godot 进程，正常收尾会自己 quit()；
+# 一旦脚本中途报错就没机会退出，subprocess.run 会永远等下去 —— 上一轮回归就是这么
+# 卡死、三份日志互相覆盖的（根因见 Dev/probe_terrain_map.gd 的装饰 kind 写死 1~5）。
+TIMEOUT = 900
+
 
 def run(scene, logname, prefixes):
     log = os.path.join(OUT, logname)
+    timed_out = False
     with io.open(log, "wb") as f:
-        p = subprocess.run([GODOT, "--headless", "--path", PROJ, scene],
-                           stdout=f, stderr=subprocess.STDOUT)
+        try:
+            p = subprocess.run([GODOT, "--headless", "--path", PROJ, scene],
+                               stdout=f, stderr=subprocess.STDOUT, timeout=TIMEOUT)
+            rc = p.returncode
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            rc = -1
     text = io.open(log, encoding="utf-8", errors="replace").read()
     print("=" * 78)
-    print("%s   EXIT=%d" % (scene, p.returncode))
+    print("%s   EXIT=%d%s" % (scene, rc, "   <<< 超时 %ds，进程已杀（探针没走到 quit()）"
+                             % TIMEOUT if timed_out else ""))
     bad = 0
+    if timed_out:
+        bad += 1
     for line in text.splitlines():
         st = line.strip()
         if any(m in st for m in BAD_MARKS):
@@ -47,27 +72,35 @@ def run(scene, logname, prefixes):
         if st.startswith(prefixes):
             print("   %s" % st[:180])
     print("   异常行: %d" % bad)
-    return p.returncode, bad
+    if rc != 0:
+        print("   <<< 退出码 %d（探针自己的断言没全过；回归以退出码为准）" % rc)
+        bad += 1
+    return rc, bad
 
 
 def flow_test():
     """主流程自检：需要临时打开 debug.flow_test，跑完还原。"""
     cfg = os.path.join(PROJ, "Data/config.json")
-    s = io.open(cfg, encoding="utf-8", newline="").read()
+    # 本项目 config.json 带 UTF-8 BOM：读写都必须 utf-8-sig，否则 json.loads 报
+    # "Unexpected UTF-8 BOM"，且写回时用 utf-8 会把 BOM 抹掉。
+    s = io.open(cfg, encoding="utf-8-sig", newline="").read()
     if '"flow_test": false' not in s:
         print("!! config 里找不到 flow_test，跳过")
         return
-    io.open(cfg, "w", encoding="utf-8", newline="").write(
+    io.open(cfg, "w", encoding="utf-8-sig", newline="").write(
         s.replace('"flow_test": false', '"flow_test": true'))
-    json.loads(io.open(cfg, encoding="utf-8").read())
+    json.loads(io.open(cfg, encoding="utf-8-sig").read())
     try:
         log = os.path.join(OUT, "_r_flow.log")
         with io.open(log, "wb") as f:
-            p = subprocess.run([GODOT, "--headless", "--path", PROJ],
-                               stdout=f, stderr=subprocess.STDOUT)
+            try:
+                p = subprocess.run([GODOT, "--headless", "--path", PROJ],
+                                   stdout=f, stderr=subprocess.STDOUT, timeout=TIMEOUT)
+            except subprocess.TimeoutExpired:
+                p = None
         text = io.open(log, encoding="utf-8", errors="replace").read()
         print("=" * 78)
-        print("flow_test (3D 主流程)   EXIT=%d" % p.returncode)
+        print("flow_test (3D 主流程)   EXIT=%s" % (str(p.returncode) if p else "超时"))
         bad = 0
         for line in text.splitlines():
             st = line.strip()
@@ -78,8 +111,8 @@ def flow_test():
                 print("   %s" % st[:180])
         print("   异常行: %d" % bad)
     finally:
-        s2 = io.open(cfg, encoding="utf-8", newline="").read()
-        io.open(cfg, "w", encoding="utf-8", newline="").write(
+        s2 = io.open(cfg, encoding="utf-8-sig", newline="").read()
+        io.open(cfg, "w", encoding="utf-8-sig", newline="").write(
             s2.replace('"flow_test": true', '"flow_test": false'))
         print("   (flow_test 已还原为 false)")
 
@@ -91,6 +124,10 @@ if __name__ == "__main__":
     for scene, logname, prefixes in SUITES:
         rc, bad = run(scene, logname, prefixes)
         total_bad += bad
-    flow_test()
+    if "--no-flow" in sys.argv:
+        print("=" * 78)
+        print("flow_test 已跳过（--no-flow）：Data/config.json 一个字节没动")
+    else:
+        flow_test()
     print("=" * 78)
     print("全部异常行合计: %d" % total_bad)

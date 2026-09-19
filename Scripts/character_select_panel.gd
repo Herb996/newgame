@@ -35,10 +35,8 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	var panel := PanelContainer.new()
-	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	panel.custom_minimum_size = Vector2(720, 0)
-	add_child(panel)
+	# 遮罩 + 居中由 UiKit 统一处理：Control 直接挂在 CanvasLayer 下时 PRESET_CENTER 不生效
+	var panel := UiKit.centered_dialog(self, 720)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 8)

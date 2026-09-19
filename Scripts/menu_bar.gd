@@ -7,7 +7,9 @@ extends CanvasLayer
 ##         点它 = 给当前选中单位下一道指令（与点地图同义，巡逻设点也通用）
 ##   【中】指令面板 —— **内容随选中单位而变**：
 ##         显示单位名 / 武器 / 生命 / 观察视野 / 攻击距离，
-##         下面一排按钮由 characters.list[].command_set 查 menu_bar.command_sets 得到。
+##         下面一行「背包」明细 = 每人一份背包里的那个**具体某人**：
+##           右键弹出背包时跟着弹窗那个人（会指名），没弹窗时跟着被指挥的角色。
+##         再下面一排按钮由 characters.list[].command_set 查 menu_bar.command_sets 得到。
 ##         战斗单位（当前 4 名角色）的指令集 combat：
 ##           自动攻击开关 / 索敌·最近 / 索敌·最强 / 指定攻击 / 巡逻 / 取消指令
 ##   【右】噪音显示（2026-09-18 改成互相喂养的两路，见 noise_system.gd 与 §5.2.1）——
@@ -35,6 +37,9 @@ var _minimap: CanvasLayer
 # --- 指令面板 ---
 var _unit_title: Label
 var _unit_stats: Label
+## 背包明细行（2026-09-19 每人一份背包）：弹窗开着就跟着弹窗那个人，
+## 没开就跟着被指挥的那个角色 —— 与头顶弹窗同一份数据，两处显示不打架。
+var _bag_line: Label
 var _cmd_row: HBoxContainer
 var _cmd_status: Label
 var _cmd_hint: Label
@@ -42,6 +47,7 @@ var _buttons: Dictionary = {}      # 按钮 id -> Button
 var _stance_group: ButtonGroup
 var _built_set := ""               # 已构建的指令集 id（变了才重建按钮）
 var _had_selection := false
+var _popup: Control = null         # 背包弹窗（group "inventory_popup"）
 
 # --- 噪音表 ---
 var _noise_title: Label
@@ -199,6 +205,10 @@ func _build_ui() -> void:
 	_unit_stats = UiKit.dim("点画面里的角色即可指挥它（左键点角色选中 · 左键点地移动 · 右键取消指令）")
 	_cmd_col.add_child(_unit_stats)
 
+	_bag_line = UiKit.label("", 14, UiKit.COL_OK)
+	_bag_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_cmd_col.add_child(_bag_line)
+
 	_cmd_col.add_child(UiKit.spacer(2))
 
 	_cmd_row = UiKit.hbox(6)
@@ -312,7 +322,50 @@ func _selected_player():
 	return null
 
 
+## 背包弹窗（由 HUD 创建，见 inventory_popup.gd）；没建出来就返回 null
+func _inventory_popup() -> Control:
+	if _popup != null and is_instance_valid(_popup):
+		return _popup
+	_popup = get_tree().get_first_node_in_group("inventory_popup")
+	return _popup
+
+
+## 背包明细看**谁**：右键弹窗开着 → 弹窗那个人；没开 → 正被指挥的那个。
+## 注意只影响这一行 —— 上面的单位信息与下面的指令按钮始终归被指挥的角色，
+## 否则就成了"按钮打在甲身上、明细显示乙"这种两处状态各说各话。
+func _inspected_player() -> Node:
+	var ui := _inventory_popup()
+	if ui != null and bool(ui.is_open()):
+		var who: Node = ui.unit
+		return who
+	return _selected_player()
+
+
+func _refresh_bag_line(p: Node) -> void:
+	if p == null or not is_instance_valid(p):
+		_bag_line.text = ""
+		return
+	var ui := _inventory_popup()
+	var head := "背包"
+	if ui != null and bool(ui.is_open()) and ui.unit == p:
+		var nm := str(p.character_name)
+		head = "背包（%s）" % (nm if nm != "" else "角色")
+	var items: Array = []
+	for res_id in p.inventory.keys():
+		items.append("%s x%d" % [str(Config.get_value("resources.%s.name" % str(res_id),
+				str(res_id))), int(p.inventory[res_id])])
+	_bag_line.text = "%s %d/%d 格：%s" % [head, p.inventory.size(),
+			p.backpack_capacity(),
+			" · ".join(items) if not items.is_empty() else "空"]
+
+
+## 背包明细行的当前文本（探针断言「弹窗与菜单栏同步」用）
+func bag_line_text() -> String:
+	return _bag_line.text
+
+
 func _refresh_commands() -> void:
+	_refresh_bag_line(_inspected_player())
 	var p = _selected_player()
 	if p == null:
 		if _had_selection:

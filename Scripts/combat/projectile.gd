@@ -94,6 +94,9 @@ func _physics_process(delta: float) -> void:
 		# 命中点就在它脚下，拿它当声源等于没让它动）。见 enemy.gd::alert_from_attacker。
 		if origin != Vector2.ZERO and target.has_method("alert_from_attacker"):
 			target.call("alert_from_attacker", origin)
+		# 受击视觉反馈（白闪+挤压+击退）；origin 已在上面判过非零，方向=远离箭来向
+		if origin != Vector2.ZERO and target.has_method("play_hit_fx"):
+			target.call("play_hit_fx", origin)
 		_finish()
 		return
 	if blocked:

@@ -23,6 +23,7 @@ var mode: int = Mode.BASE
 # --- 命令行出图（见 _handle_cli / _process）---
 var _capture_path := ""            # --capture2d，非空 = 进局后截图到该路径再退出
 var _capture_delay := 3.0          # --capture-delay，进局后等多少秒再截
+var _capture_base_only := false    # --capture-base：只进基地不进局（拍基地用）
 var _capture_left := -1.0          # 倒计时，<0 = 未启用
 var _no_fog := false               # --no-fog，出图时关掉迷雾以便看清地图本体
 var _dump_atlas := ""              # --dump-atlas，把运行时图集另存 PNG（查地形贴图问题用）
@@ -126,6 +127,9 @@ func _handle_cli() -> bool:
 			"--capture2d":
 				i += 1
 				_capture_path = argv[i] if i < argv.size() else ""
+			"--capture-base":
+				# 只落基地不进局：配合 --capture2d 截基地全景（验收建筑摆放用）
+				_capture_base_only = true
 			"--capture-delay":
 				i += 1
 				_capture_delay = float(argv[i]) if i < argv.size() else 3.0
@@ -187,7 +191,8 @@ func _handle_cli() -> bool:
 		# 2D 实测截图：需要真实渲染（不能 --headless），进局后等画面稳定再截图
 		_capture_left = _capture_delay
 		_enter_base()
-		_enter_run()
+		if not _capture_base_only:
+			_enter_run()
 		if _walk_test:
 			var wd := WalkDriver.new()
 			wd.name = "WalkDriver"
@@ -428,6 +433,11 @@ func _enter_run() -> void:
 	# 菜单栏的噪音读数是「本局」的：开局清零，否则上一局的暴露度会带进来
 	NoiseSystem.reset()
 	get_tree().paused = false
+	# 重摆没结束也能出击（点大门走的是建筑交互，不经过放置模式的取消流程）。
+	# 这里必须主动收尾：_placement 挂在 game_root 下，下面 _clear_game_root() 会把它
+	# 连着释放，但字段仍指着那个已死节点 —— _overlay_open() 从此恒真（ESC 退不出去），
+	# _on_reposition_requested() 也跟着永久拒绝重摆。_enter_base() 同理，别只修一边。
+	_end_placement()
 	_clear_game_root()
 	run.start_run()
 	# 固定种子只给开发/对比用（0 = 每局随机）。**只 seed 一次**，
@@ -716,6 +726,7 @@ class WalkDriver extends Node:
 	var _player: Node2D = null
 	var _cells: Array = []
 	var _tile := 64.0
+	var _weather: Node = null
 
 	func start(map_data: Dictionary) -> void:
 		_tile = float(map_data.get("tile_size", 64))
@@ -739,10 +750,35 @@ class WalkDriver extends Node:
 	func _order() -> void:
 		if _cells.is_empty():
 			return
-		for _i in range(24):
-			var c: Vector2i = _cells[randi() % _cells.size()]
-			var p := Vector2(c) * _tile + Vector2(_tile * 0.5, _tile * 0.5)
-			if p.distance_to(_player.global_position) > _tile * 4.0 \
-					and p.distance_to(_player.global_position) < _tile * 10.0:
+		# 默认走自然随机路径 = 玩家实际会看到的东西。
+		# debug.walk_seek_wet=true 才优先挑湿地格（拍波纹特写时用）；它当默认值会
+		# 把"踩水根本不触发"这类 bug 从构造上遮掉，所以只作显式开关。
+		var seek := bool(Config.get_value("debug.walk_seek_wet", false))
+		var fallback := Vector2.INF
+		for _i in range(200):
+			var p := _pick()
+			if p == Vector2.INF:
+				continue
+			if seek and _is_wet(p):
 				_player.call("set_move_target", p)
 				return
+			if fallback == Vector2.INF:
+				fallback = p
+		if fallback != Vector2.INF:
+			_player.call("set_move_target", fallback)
+
+	## 随机取一个距角色 4~10 格的可达格中心。
+	func _pick() -> Vector2:
+		var c: Vector2i = _cells[randi() % _cells.size()]
+		var p := Vector2(c) * _tile + Vector2(_tile * 0.5, _tile * 0.5)
+		if p.distance_to(_player.global_position) <= _tile * 4.0 \
+				or p.distance_to(_player.global_position) >= _tile * 10.0:
+			return Vector2.INF
+		return p
+
+	func _is_wet(p: Vector2) -> bool:
+		if _weather == null or not is_instance_valid(_weather):
+			_weather = get_tree().get_first_node_in_group("weather_system")
+		if _weather == null:
+			return false
+		return bool(_weather.is_wet_at(p))

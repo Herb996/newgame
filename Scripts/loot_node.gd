@@ -5,8 +5,10 @@ extends Area2D
 ##   路径在 config 的 resources.<id>.sprite），脚下垫一圈资源色柔光表示"可拾取"。
 ## 玩家移动到拾取范围内自动拾取：默认获得 loot.amount_per_node（10）单位，
 ## 敌人掉落物通过 setup(res_id, amount, scale) 指定更小的数量与体积。
-## 资源点消失。背包格满时拾取失败（RunManager.add_loot 返回 false），
+## 归属（2026-09-19 起）：范围内**离它最近的那个活人**拿，直接进他自己那份背包
+## （player.add_item）。他的格子满 → 拾取失败返回 false，资源点留在原地，
 ## 短暂冷却后自动重试（玩家离开再回来也会再试）。
+## 角色阵亡时整包也是撒成这个场景（见 player.drop_inventory），队友走过来捡回去。
 ## 显隐由 fog_system 控制（与敌人一致的组机制，组: loot_nodes）。
 ## ============================================================
 
@@ -82,12 +84,33 @@ func _physics_process(delta: float) -> void:
 		return
 	if _run == null:
 		_run = get_tree().get_first_node_in_group("run_manager")
+	var t := _nearest_living_carrier()
+	if t == null:
+		return      # 范围内没有活人（压上来的全是尸体也算没有）：等活人过来
+	if _run != null and _run.state != _run.State.RUNNING:
+		return      # 本局已结算，地上的东西不再进包
+	if t.add_item(resource_id, _amount):
+		if _run != null:
+			_run.loot_pickup_feedback(t, resource_id, _amount)
+		queue_free()  # 拾取成功，资源点消失
+	else:
+		# 背包格满等原因拾取失败：0.5 秒后自动重试
+		_retry_cooldown = float(Config.get_value("loot.pickup_retry_seconds", 0.5))
+
+
+## 拾取归属（用户 2026-09-19 定）：压住这个资源点的角色里，**离它最近的那个活人**拿走。
+## 为什么要挑：小队 2~4 人挤在一起时 get_overlapping_bodies() 一次给好几个，
+## 按节点顺序发就会变成"先出生的那个永远通吃"，谁走到跟前谁拿到才讲得通。
+func _nearest_living_carrier() -> Node2D:
+	var best: Node2D = null
+	var best_d := INF
 	for body in get_overlapping_bodies():
-		if body.is_in_group("player"):
-			if _run != null and _run.add_loot(resource_id, _amount):
-				_run.loot_pickup_feedback(resource_id, _amount)
-				queue_free()  # 拾取成功，资源点消失
-			else:
-				# 背包格满等原因拾取失败：0.5 秒后自动重试
-				_retry_cooldown = float(Config.get_value("loot.pickup_retry_seconds", 0.5))
-			break
+		if not (body is Node2D) or not body.is_in_group("player"):
+			continue
+		if body.has_method("is_dead") and bool(body.is_dead()):
+			continue
+		var d: float = global_position.distance_squared_to(body.global_position)
+		if d < best_d:
+			best_d = d
+			best = body
+	return best

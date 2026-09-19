@@ -22,6 +22,14 @@ const MARK_COL := {
 	3: Color(0.65, 0.20, 0.85),   # 残骸
 	4: Color(0.00, 0.00, 0.00),   # 裂缝
 	5: Color(0.00, 0.85, 0.95),   # 河水
+	6: Color(0.25, 0.60, 0.30),   # 灌木
+}
+## 统计与出图覆盖的装饰 kind 全集。**必须与 MapGenerator.DECOR_* 同步**：
+## 早先这里写死 1~5，灌木（6）一加进来就抛 "Invalid access to key '6'"，
+## 而探针崩在半路就不会 quit()，整个回归套件跟着挂住（见 run_regression.py）。
+const KINDS := [1, 2, 3, 4, 5, 6]
+const KIND_NAME := {
+	1: "树", 2: "石", 3: "残骸", 4: "裂缝", 5: "河水", 6: "灌木",
 }
 
 
@@ -32,57 +40,83 @@ func _ready() -> void:
 		m["node"].free()
 
 	var terrain: Array = m["terrain"]
+	var walls: Array = m["walls"]
 	var biome: Array = m["biome"]
 	var decor: Array = m["decor"]
 	var h: int = terrain.size()
 	var w: int = terrain[0].size()
 	var nb: int = MapGenerator.biome_count()
 
-	# ---- 逐群系统计 ----
+	# ---- 逐群系统计（遍历 KINDS，不在表里的 kind 也会兜住）----
 	var cells := []
 	var dcount := []
 	for i in range(nb):
 		cells.append(0)
-		dcount.append({1: 0, 2: 0, 3: 0, 4: 0, 5: 0})
-	var floor_dcount := {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
-	var total_decor := {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+		var z := {}
+		for k in KINDS:
+			z[k] = 0
+		dcount.append(z)
+	var floor_dcount := {}
+	var total_decor := {}
+	for k in KINDS:
+		floor_dcount[k] = 0
+		total_decor[k] = 0
 	var floor_total := 0
 
 	for y in range(h):
 		for x in range(w):
 			var b: int = int(biome[y][x])
 			cells[b] = int(cells[b]) + 1
-			var k: int = int(decor[y][x])
-			if k != MapGenerator.DECOR_NONE:
-				dcount[b][k] = int(dcount[b][k]) + 1
-				total_decor[k] = int(total_decor[k]) + 1
-			if not terrain[y][x]:
+			# 地板 = 通行格（树/石所在格渲染成地板但 walls 里是障碍，所以这里
+			# 和 MapGenerator 的 floor_count 一样看 walls，不看 terrain —— terrain
+			# 是渲染用的图集列号，拿它当布尔会把「地板」量成「图集 0 列的格子」。）
+			var is_floor: bool = not bool(walls[y][x])
+			if is_floor:
 				floor_total += 1
-				if k != MapGenerator.DECOR_NONE:
-					floor_dcount[k] = int(floor_dcount[k]) + 1
+			var k: int = int(decor[y][x])
+			if k == MapGenerator.DECOR_NONE:
+				continue
+			if not total_decor.has(k):          # 新装饰类型没登记进 KINDS 也不崩
+				push_warning("[TerrainProbe] 未登记的装饰 kind=%d，已计入合计" % k)
+				total_decor[k] = 0
+				dcount[b][k] = 0
+			dcount[b][k] = int(dcount[b][k]) + 1
+			total_decor[k] = int(total_decor[k]) + 1
+			if is_floor:
+				if not floor_dcount.has(k):
+					floor_dcount[k] = 0
+				floor_dcount[k] = int(floor_dcount[k]) + 1
 
+	var all_kinds: Array = total_decor.keys()
+	all_kinds.sort()
 	print("=== [TerrainProbe] 地图 %dx%d 地板 %d 格 ===" % [w, h, floor_total])
-	print("%-8s %8s %7s | %6s %6s %6s %6s %6s" %
-			["群系", "格数", "占全图", "树", "石", "残骸", "裂缝", "河水"])
+	var head := "%-8s %8s %7s |" % ["群系", "格数", "占全图"]
+	for k in all_kinds:
+		head += " %6s" % KIND_NAME.get(k, "k%d" % k)
+	print(head)
 	for i in range(nb):
 		var c: int = int(cells[i])
-		print("%-8s %8d %6.1f%% | %6d %6d %6d %6d %6d" % [
-				MapGenerator.biome_name(i), c, 100.0 * float(c) / float(w * h),
-				dcount[i][1], dcount[i][2], dcount[i][3], dcount[i][4], dcount[i][5]])
-	print("合计装饰：树 %d / 石 %d / 残骸 %d / 裂缝 %d / 河水 %d" %
-			[total_decor[1], total_decor[2], total_decor[3], total_decor[4], total_decor[5]])
+		var line := "%-8s %8d %6.1f%% |" % [
+				MapGenerator.biome_name(i), c, 100.0 * float(c) / float(w * h)]
+		for k in all_kinds:
+			line += " %6d" % int(dcount[i].get(k, 0))
+		print(line)
+	var parts := []
+	for k in all_kinds:
+		parts.append("%s %d" % [str(KIND_NAME.get(k, "k%d" % k)), int(total_decor[k])])
+	print("合计装饰：" + " / ".join(parts))
 	print("--- 关键密度（占该群系格数的百分比）---")
 	for i in range(nb):
 		var c: int = maxi(1, int(cells[i]))
-		print("  %-8s 树 %.2f%%  石 %.2f%%  裂缝 %.2f%%  水 %.2f%%" % [
-				MapGenerator.biome_name(i),
-				100.0 * float(dcount[i][1]) / float(c),
-				100.0 * float(dcount[i][2]) / float(c),
-				100.0 * float(dcount[i][4]) / float(c),
-				100.0 * float(dcount[i][5]) / float(c)])
+		var seg := []
+		for k in all_kinds:
+			seg.append("%s %.2f%%" % [str(KIND_NAME.get(k, "k%d" % k)),
+					100.0 * float(dcount[i].get(k, 0)) / float(c)])
+		print("  %-8s %s" % [MapGenerator.biome_name(i), "  ".join(seg)])
 	print("--- 全图占地板比 ---")
-	for k in [1, 2, 3, 4, 5]:
-		print("  kind=%d 占地板 %.2f%%" % [k, 100.0 * float(floor_dcount[k]) / float(maxi(1, floor_total))])
+	for k in all_kinds:
+		print("  %-4s 占地板 %.2f%%" % [str(KIND_NAME.get(k, "k%d" % k)),
+				100.0 * float(floor_dcount.get(k, 0)) / float(maxi(1, floor_total))])
 
 	# ---- 示意图 ----
 	var img := Image.create(w * PX, h * PX, false, Image.FORMAT_RGB8)

@@ -3,11 +3,18 @@ extends Node
 ## 运行：Godot --headless --path . Dev/probe_registry.tscn
 ##
 ## 覆盖：
-##   A 群系：4 种（草地/荒原/森林/雪原）都出现，且草地占比最大（权重 3.4 → 大部分平地）
-##   B 装饰：树/石/残骸/裂缝/河水 计数与配置相符（裂缝/河水 > 0）
-##   C 矿脉：iron/gold/oil 全部生成，且**只落在限定群系**（荒原）
-##   D 地形减速：雪原格 speed<1、水格 speed≤river.slow、普通格 ==1
+##   A 群系：4 种（草地/荒原/森林/沼泽）都出现，且草地占比最大（出厂权重 3.4）
+##   B 装饰：树/石/残骸/灌木 计数 > 0（裂缝/河水已按需求从地图移除，见 map_generator
+##      里"河流与裂缝均已按需求移除"，这里只留"万一有人加回来别挡路"的守卫）
+##   C 矿脉：按 map.resource_clusters 里出现的每种都要生成，且只落在**该资源自己
+##      weight>0 的群系**（早期写死"只在荒原"，配置改成允许草地/森林后就成了假阳性）
+##      ⚠ gold 现在是真缺口：config 的 resource_clusters 没有 gold 条目 → 这条会红，
+##        补条目或确认"金矿只从战利品来"之后改探针，别当环境噪声忽略。
+##   D 地形减速：沼泽/雪原格 speed<1、水格 speed≤river.slow、普通格 ==1
 ##   E 注册表：build_from_map → harvest 扣减 → get_by_grid 反查 → 总储量一致
+##
+## 分布类断言验的是**出厂设计意图**，所以 _ready 里把 map.biome_weights 钉回出厂值 ——
+## 玩家设置面板会把它拉平（见 Dev 探针通用的 user://settings.json 覆盖问题）。
 ##
 ## 用 _check 收集失败而不是 assert：assert 会中断 _ready 导致进程不退出。
 
@@ -25,6 +32,13 @@ func _check(ok: bool, msg: String) -> void:
 
 
 func _ready() -> void:
+	# 分布断言验的是**出厂**设计意图。设置面板会把 map.biome_weights 拉平（这台机器
+	# 上就是 1.45/1.45/1.45/0.2），继承过来"草地格数最多""草地独占区间>0.4"必挂 ——
+	# 那是玩家的选择，不是地图坏了。逐个键钉回 Data/config.json 自己的值。
+	for i in range(MapGenerator.biome_count()):
+		var key := "map.biome_weights." + str(i)
+		Config.set_override(key, Config.get_base_value(key, 1.0))
+
 	var result: Dictionary = MapGenerator.generate()
 	ResourceRegistry.build_from_map(result)
 
@@ -62,7 +76,8 @@ func _probe_biomes(result: Dictionary) -> void:
 	print("[Probe] 群系分布：%s" % str(
 			_pairs(names, tally)))
 
-	_check(n == 4, "群系数 = 4（草地/荒原/森林/雪原），实际 %d" % n)
+	_check(n == 4, "群系数 = 4（草地/荒原/森林/%s），实际 %d"
+			% [MapGenerator.biome_name(3), n])
 	for i in range(n):
 		_check(int(tally[i]) > 0, "群系 %d「%s」有格数 %d（应 > 0）"
 				% [i, names[i], int(tally[i])])
@@ -107,6 +122,7 @@ func _probe_decor(result: Dictionary) -> void:
 		MapGenerator.DECOR_TREE: 0,
 		MapGenerator.DECOR_ROCK: 0,
 		MapGenerator.DECOR_DEBRIS: 0,
+		MapGenerator.DECOR_BUSH: 0,
 		MapGenerator.DECOR_CRACK: 0,
 		MapGenerator.DECOR_WATER: 0,
 	}
@@ -115,14 +131,14 @@ func _probe_decor(result: Dictionary) -> void:
 			var k: int = int(decor[y][x])
 			if tally.has(k):
 				tally[k] = int(tally[k]) + 1
-	print("[Probe] 装饰物：树 %d / 石 %d / 残骸 %d / 裂缝 %d / 河水 %d" % [
+	print("[Probe] 装饰物：树 %d / 石 %d / 残骸 %d / 灌木 %d / 裂缝 %d / 河水 %d" % [
 		int(tally[MapGenerator.DECOR_TREE]), int(tally[MapGenerator.DECOR_ROCK]),
-		int(tally[MapGenerator.DECOR_DEBRIS]), int(tally[MapGenerator.DECOR_CRACK]),
-		int(tally[MapGenerator.DECOR_WATER])])
+		int(tally[MapGenerator.DECOR_DEBRIS]), int(tally[MapGenerator.DECOR_BUSH]),
+		int(tally[MapGenerator.DECOR_CRACK]), int(tally[MapGenerator.DECOR_WATER])])
 
+	# 裂缝/河水不再要求出现（已按需求从地图移除），只保留下面"别挡路"的守卫。
 	for k in [MapGenerator.DECOR_TREE, MapGenerator.DECOR_ROCK,
-			MapGenerator.DECOR_DEBRIS, MapGenerator.DECOR_CRACK,
-			MapGenerator.DECOR_WATER]:
+			MapGenerator.DECOR_DEBRIS, MapGenerator.DECOR_BUSH]:
 		_check(int(tally[k]) > 0, "装饰 kind=%d 数量 %d（应 > 0）" % [k, int(tally[k])])
 
 	# 裂缝/河水必须**不阻挡通行**：有这些装饰的格 walls 必须为 false
@@ -146,19 +162,33 @@ func _probe_veins(result: Dictionary) -> void:
 	var biome: Array = result["biome"]
 	var by_res: Dictionary = {}
 	var out_of_biome := 0
-	var allowed: Array = [1]          # config veins 限定 biome 1（荒原）
+	# 每种矿脉允许落在哪些群系 = map.resource_clusters.<res>.weight 里值 >0 的那些。
+	# 以前写死 [1]（只有荒原），而配置早就允许 iron 落草地/森林，于是一跑就"越界 25 个"
+	# —— 那是探针过期，不是地图乱摆。
+	var clusters = Config.get_value("map.resource_clusters", {})
+	var allowed_by_res := {}
+	for rid in clusters:
+		var ok_b: Array = []
+		var wts = clusters[rid].get("weight", {})
+		for k in wts:
+			if int(wts[k]) > 0:
+				ok_b.append(int(str(k)))
+		allowed_by_res[str(rid)] = ok_b
 	for vd in veins:
 		var rid: String = str(vd.get("res_id", ""))
 		by_res[rid] = int(by_res.get(rid, 0)) + 1
+		if not allowed_by_res.has(rid):
+			continue
 		var b: int = int(biome[int(vd["gy"])][int(vd["gx"])])
-		if not allowed.has(b):
+		if not (allowed_by_res[rid] as Array).has(b):
 			out_of_biome += 1
 	print("[Probe] 矿脉：%s" % str(by_res))
 	for rid in ["iron", "gold", "oil"]:
-		_check(int(by_res.get(rid, 0)) > 0, "%s 矿脉节点数 %d（应 > 0）"
-				% [rid, int(by_res.get(rid, 0))])
+		_check(int(by_res.get(rid, 0)) > 0,
+				"%s 矿脉节点数 %d（应 > 0；为 0 通常是 map.resource_clusters 里没有 %s 条目）"
+				% [rid, int(by_res.get(rid, 0)), rid])
 	_check(out_of_biome == 0,
-			"矿脉只落在限定群系（越界 %d 个，应 0）" % out_of_biome)
+			"矿脉只落在各自配置的限定群系（越界 %d 个，应 0）" % out_of_biome)
 
 
 # ------------------------------------------------------------ D 减速
@@ -188,7 +218,7 @@ func _probe_speed(result: Dictionary) -> void:
 				water_n += 1
 				if sp > river_slow + 1e-6:
 					water_bad += 1
-			elif b == 3:                       # 雪原
+			elif b == 3:                       # 减速群系（配置里现在叫沼泽）
 				snow_n += 1
 				if sp >= 1.0:
 					snow_bad += 1
@@ -198,14 +228,17 @@ func _probe_speed(result: Dictionary) -> void:
 					plain_bad += 1
 
 	_check(snow_n > 0 and snow_bad == 0,
-			"雪原格 %d 全部 <1.0（异常 %d）" % [snow_n, snow_bad])
-	_check(water_n > 0 and water_bad == 0,
-			"河水格 %d 全部 ≤ %.2f（异常 %d）" % [water_n, river_slow, water_bad])
+			"%s格 %d 全部 <1.0（异常 %d）"
+			% [MapGenerator.biome_name(3), snow_n, snow_bad])
+	_check(water_bad == 0,
+			"河水格 %d 全部 ≤ %.2f（异常 %d；地图已移除河水，0 格视为通过）"
+			% [water_n, river_slow, water_bad])
 	_check(plain_n > 0 and plain_bad == 0,
 			"草地空格 %d 全部 ==1.0（异常 %d）" % [plain_n, plain_bad])
 
 	var snow_sp := float(MapGenerator.biome_speed(3))
-	_check(snow_sp < 1.0, "配置里雪原 speed = %.2f（应 < 1.0）" % snow_sp)
+	_check(snow_sp < 1.0, "配置里%s speed = %.2f（应 < 1.0）"
+			% [MapGenerator.biome_name(3), snow_sp])
 
 
 # ------------------------------------------------------------ E 注册表

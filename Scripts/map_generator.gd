@@ -1904,12 +1904,15 @@ static func ids_to_centers(ids: Array, tile_size: int) -> PackedVector2Array:
 ## （击退/冲刺把人推进树里、或点击点正好在树上）就"永远走不动"。
 ## 出发前先把两端吸附到最近的可走格，行为就稳定了。
 ## 半径写死成小值：太大会让"点树"变成"绕到很远的地方去"，反而迷惑。
+## **radius < 0 = 不限半径**：脱困兜底专用（角色陷在整片密林/沼泽中央，
+## 小半径找不到出口 —— 返回 -1 会让它从此点哪儿都不动，宁可指向全图最近的可走格）。
 static func nearest_open_cell(walls: Array, cell: Vector2i, radius: int) -> Vector2i:
 	var h: int = walls.size()
 	if h == 0:
 		return Vector2i(-1, -1)
 	var w: int = walls[0].size()
-	for r in range(0, radius + 1):
+	var max_r := maxi(h, w) if radius < 0 else radius
+	for r in range(0, max_r + 1):
 		for dy in range(-r, r + 1):
 			for dx in range(-r, r + 1):
 				if maxi(absi(dx), absi(dy)) != r:

@@ -36,6 +36,33 @@ func _ready() -> void:
 func apply_all() -> void:
 	apply_display()
 	apply_audio()
+	apply_locale()
+	apply_cursors()
+
+
+## 自定义鼠标指针（Tiny Swords Cursors）：箭头=普通、手=可点击、禁止=不可用。
+## 自动加载里设置一次全局生效；热区按 32px 缩放后的笔尖/指尖位置给。
+func apply_cursors() -> void:
+	if _is_headless():
+		return
+	var defs := {
+		Input.CURSOR_ARROW: ["cursor_arrow.png", Vector2(4, 2)],
+		Input.CURSOR_POINTING_HAND: ["cursor_hand.png", Vector2(9, 2)],
+		Input.CURSOR_FORBIDDEN: ["cursor_forbidden.png", Vector2(16, 16)],
+		Input.CURSOR_IBEAM: ["cursor_arrow.png", Vector2(4, 2)],
+	}
+	for shape in defs:
+		var tex: Texture2D = load("res://Assets/Art/UI/tsui/" + defs[shape][0])
+		if tex != null:
+			Input.set_custom_mouse_cursor(tex, shape, defs[shape][1])
+
+
+## 界面语言：设置 TranslationServer 后，Godot 的自动翻译按
+## Data/language/translations.csv 整体切换控件文本（中文是源语言，无需查表）。
+func apply_locale() -> void:
+	var locale := str(Config.get_value("language.current", "zh_CN"))
+	if TranslationServer.get_locale() != locale:
+		TranslationServer.set_locale(locale)
 
 
 func apply_display() -> void:

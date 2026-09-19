@@ -119,17 +119,22 @@ func _ready() -> void:
 			"小地图槽落在屏幕左下角（x=%.0f, y=%.0f，栏顶 y=%.0f）"
 			% [slot.position.x, slot.position.y, vp.y - expect_h])
 	var br: Rect2 = menu.bar_rect()
-	_check(is_equal_approx(br.end.y, vp.y), "整条栏贴屏幕底边（bottom=%.0f / 视口 %.0f）"
-			% [br.end.y, vp.y])
-	# 栏高只占「视口高」的一小部分：这一条是 2D 线真正要保证的观感
-	_check(br.size.y <= maxf(vp.y * 0.35, expect_h + 1.0),
-			"栏高不超过屏高 1/3（栏 %.0f / 屏 %.0f）" % [br.size.y, vp.y])
+	if real_viewport:
+		_check(is_equal_approx(br.end.y, vp.y), "整条栏贴屏幕底边（bottom=%.0f / 视口 %.0f）"
+				% [br.end.y, vp.y])
+		# 栏高只占「视口高」的一小部分：这一条是 2D 线真正要保证的观感
+		_check(br.size.y <= maxf(vp.y * 0.35, expect_h + 1.0),
+				"栏高不超过屏高 1/3（栏 %.0f / 屏 %.0f）" % [br.size.y, vp.y])
+	else:
+		_say("  （headless 视口 %.0f×%.0f 比栏本身还矮，贴底/占比两条只能在开窗那次量）"
+				% [vp.x, vp.y])
 
 	# 坐标换算：槽中心 ↔ 地图中心（点小地图导航镜头的前提）
-	var map_cells: float = float(int(Config.get_value("map.width", 128)))
+	var map_w: float = float(int(Config.get_value("map.width", 128)))
+	var map_h: float = float(int(Config.get_value("map.height", 128)))
 	var tile: float = float(int(Config.get_value("map.tile_size", 64)))
 	var center_world: Vector2 = minimap.world_pos_at(slot.size * 0.5)
-	var expect_center := Vector2(map_cells * tile * 0.5, map_cells * tile * 0.5)
+	var expect_center := Vector2(map_w * tile * 0.5, map_h * tile * 0.5)
 	_check(center_world.distance_to(expect_center) < 1.0,
 			"槽中心映射到地图中心（实得 %s / 期望 %s）" % [str(center_world), str(expect_center)])
 	var corner_world: Vector2 = minimap.world_pos_at(Vector2.ZERO)

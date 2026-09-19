@@ -22,6 +22,11 @@ signal close_requested
 ## 打开时默认停在第几页（截图验证用；正常进入是 0 = 画面）
 var initial_tab := 0
 
+## 行内控件（下拉框 / 改键按钮 / 执行按钮）与底部按钮的统一宽度：
+## 一列控件同宽，右缘才是一条直线
+const ROW_CONTROL_W := 220
+const _FOOTER_BTN_W := 150
+
 var _tab_bar: HBoxContainer
 var _content: VBoxContainer
 var _tabs: Array = []
@@ -40,6 +45,8 @@ var _dirty_label: Label = null
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# 皮肤贴图是像素画：整棵 UI 树用最近邻采样，避免放大发糊
+	texture_filter = UiKit.TS_NEAREST
 	# 面板由 StartMenu 用 .new() 造出来再挂到宿主上，裸 Control 的 rect 是 0×0 ——
 	# 不铺满的话里面的 CenterContainer 在 0×0 里居中，整个面板会缩到左上角。
 	UiKit.stretch(self)
@@ -55,22 +62,15 @@ func _ready() -> void:
 func _build_ui() -> void:
 	add_child(UiKit.overlay())
 
-	# 全屏：外层 Margin 撑满整屏并留边距，面板填满剩余区域。
-	var margin := MarginContainer.new()
-	UiKit.stretch(margin)
-	for side in ["margin_left", "margin_top", "margin_right", "margin_bottom"]:
-		margin.add_theme_constant_override(side, 28)
-	add_child(margin)
-
-	var panel := UiKit.panel(UiKit.COL_PANEL, 22)
-	margin.add_child(panel)
+	# 全屏骨架（10px 黑边 + 木框 + 石板芯）与存档/其他面板共用同一份实现
+	var panel := UiKit.fullscreen_panel(self)
 
 	var col := UiKit.vbox(10)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_child(col)
 
-	col.add_child(UiKit.title("参数配置"))
+	col.add_child(UiKit.ribbon_title("参数配置", 430, 28))
 
 	var sub := UiKit.dim("改动先暂存，点右下「确认应用」才生效并保存 · 标「下次进局」的项要重新进一局才读到")
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -84,10 +84,9 @@ func _build_ui() -> void:
 
 	var group := ButtonGroup.new()
 	for i in range(_tabs.size()):
-		var b := UiKit.button(str(_tabs[i]["name"]), 0, UiKit.FS_BODY)
+		var b := UiKit.small_button(str(_tabs[i]["name"]), 104)
 		b.toggle_mode = true
 		b.button_group = group
-		b.custom_minimum_size = Vector2(110, 34)
 		# 没有这一步的话首屏所有页签都是"未选中"外观，看不出当前在哪一页
 		if i == initial_tab:
 			b.button_pressed = true
@@ -100,7 +99,13 @@ func _build_ui() -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	col.add_child(scroll)
+	# 右侧留白：行尾的「默认 / 未确认」角标不贴着面板边框
+	var scroll_wrap := MarginContainer.new()
+	scroll_wrap.add_theme_constant_override("margin_right", 14)
+	scroll_wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll_wrap.add_child(scroll)
+	col.add_child(scroll_wrap)
 
 	_content = UiKit.vbox(10)
 	_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -108,34 +113,41 @@ func _build_ui() -> void:
 
 	col.add_child(UiKit.spacer(4))
 
-	# --- 底部 ---
+	# --- 底部：左侧弹性空隙，三个按钮等宽靠右排（确认应用 · 恢复默认设置 · 返回） ---
 	var footer := UiKit.hbox(10)
 	col.add_child(footer)
-
-	var reset := UiKit.button("恢复默认设置", 0, UiKit.FS_SMALL)
-	reset.pressed.connect(_on_reset_all)
-	footer.add_child(reset)
-
-	var open_file := UiKit.button("打开设置文件所在目录", 0, UiKit.FS_SMALL)
-	open_file.pressed.connect(func():
-		OS.shell_open(ProjectSettings.globalize_path("user://")))
-	footer.add_child(open_file)
 
 	footer.add_child(_expander())
 
 	_dirty_label = UiKit.label("", UiKit.FS_SMALL, UiKit.COL_AMBER)
 	footer.add_child(_dirty_label)
 
-	_confirm_btn = UiKit.button("确认应用", 140)
+	_confirm_btn = UiKit.button("确认应用", _FOOTER_BTN_W)
 	_confirm_btn.pressed.connect(_on_confirm)
 	_confirm_btn.disabled = true
 	footer.add_child(_confirm_btn)
 
-	var back := UiKit.button("返回", 120)
+	var reset := UiKit.button("恢复默认设置", _FOOTER_BTN_W)
+	reset.pressed.connect(_on_reset_all)
+	footer.add_child(reset)
+
+	var back := UiKit.button("返回", _FOOTER_BTN_W)
 	back.pressed.connect(_on_back)
 	footer.add_child(back)
 
 	_update_footer()
+
+	# 右上角关闭钮：贴在木框角上，等价于「返回」（有未确认改动会先询问）
+	var close_btn := UiKit.small_button("X", 0, UiKit.FS_HEADER)
+	close_btn.custom_minimum_size = Vector2(48, 48)
+	close_btn.tooltip_text = "关闭（返回菜单）"
+	close_btn.pressed.connect(_on_back)
+	close_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	close_btn.offset_left = -92.0
+	close_btn.offset_top = 40.0
+	close_btn.offset_right = -44.0
+	close_btn.offset_bottom = 88.0
+	add_child(close_btn)
 
 
 func _show_tab(index: int) -> void:
@@ -172,8 +184,9 @@ func _make_entry(entry: Dictionary) -> Control:
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(row)
 
+	# 名称列固定宽度：所有行的文字从同一条左基线开始（左对齐），控件列全部推到右侧
 	var name_label := UiKit.label(str(entry["label"]), UiKit.FS_BODY)
-	name_label.custom_minimum_size = Vector2(240, 0)
+	name_label.custom_minimum_size = Vector2(300, 0)
 	row.add_child(name_label)
 
 	# 数值行滑条自己撑满；其它类型加弹性空隙把控件推到右边 → 两边对齐
@@ -188,15 +201,15 @@ func _make_entry(entry: Dictionary) -> Control:
 		"number":
 			row.add_child(_make_number(entry))
 		"enum":
-			var o := UiKit.option(_enum_labels(entry), _enum_index(entry), 220)
+			var o := UiKit.option(_enum_labels(entry), _enum_index(entry), ROW_CONTROL_W)
 			o.item_selected.connect(func(i: int): _commit(entry, _enum_value(entry, i)))
 			row.add_child(o)
 		"key":
-			var b := UiKit.button(UiKit.key_name(int(_eff(path))), 160)
+			var b := UiKit.small_button(UiKit.key_name(int(_eff(path))), ROW_CONTROL_W)
 			b.pressed.connect(func(): _begin_key_capture(path, b))
 			row.add_child(b)
 		"action":
-			var b := UiKit.button(str(entry.get("button", "执行")), 160)
+			var b := UiKit.small_button(str(entry.get("button", "执行")), ROW_CONTROL_W)
 			if entry.get("handler") is Callable:
 				b.pressed.connect(entry["handler"])
 			row.add_child(b)
@@ -209,14 +222,11 @@ func _make_entry(entry: Dictionary) -> Control:
 			var pb := UiKit.label("未确认", UiKit.FS_SMALL, UiKit.COL_AMBER)
 			pb.custom_minimum_size = Vector2(52, 0)
 			row.add_child(pb)
-		elif Config.has_user_value(path):
-			var badge := UiKit.label("已改", UiKit.FS_SMALL, UiKit.COL_DIM)
-			badge.custom_minimum_size = Vector2(38, 0)
-			row.add_child(badge)
 
 	if str(entry.get("note", "")) != "":
 		var note := UiKit.note(str(entry["note"]))
-		note.custom_minimum_size = Vector2(840, 0)
+		# 说明文字随行宽撑满（左对齐、自动换行），不再固定 840px
+		note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		box.add_child(note)
 
 	return box
@@ -249,7 +259,7 @@ func _make_reset_button(entry: Dictionary) -> Button:
 	# 别用 "↺" 这类符号字符：默认字体里没有这个字形，屏上只剩一个"小方块/小三角"，
 	# 玩家根本不知道是什么按钮。用中文字更稳。
 	var path := str(entry["path"])
-	var b := UiKit.button("默认", 60, UiKit.FS_SMALL)
+	var b := UiKit.small_button("默认", 56, UiKit.FS_SMALL)
 	b.tooltip_text = "把这一项恢复成出厂值（点「确认应用」后生效）"
 	b.disabled = not (Config.has_user_value(path) or _pending_set.has(path) or _pending_clear.has(path))
 	b.pressed.connect(func():
@@ -330,7 +340,7 @@ func _update_footer() -> void:
 		_confirm_btn.disabled = not _any_dirty()
 	if _dirty_label != null:
 		var n := _pending_set.size() + _pending_clear.size()
-		_dirty_label.text = ("%d 处未确认" % n) if n > 0 else ""
+		_dirty_label.text = (tr("%d 处未确认") % n) if n > 0 else ""
 
 
 ## 确认应用：把暂存批量落盘 + 存盘 + 生效，然后关闭面板。
@@ -353,7 +363,7 @@ func _on_confirm() -> void:
 func _on_back() -> void:
 	if _any_dirty():
 		_confirm("放弃未确认的修改？",
-				"你有 %d 处改动还没点「确认应用」。\n返回会丢弃这些改动。确定返回？" % (_pending_set.size() + _pending_clear.size()),
+				tr("你有 %d 处改动还没点「确认应用」。\n返回会丢弃这些改动。确定返回？") % (_pending_set.size() + _pending_clear.size()),
 				"放弃并返回", func():
 					_pending_set.clear()
 					_pending_clear.clear()
@@ -722,9 +732,10 @@ func _schema_gameplay() -> Array:
 		{"path": "loot.density", "label": "资源点密度", "type": "number",
 			"min": 0.0, "max": 0.3, "step": 0.005, "fmt": "percent",
 			"note": "地上可拾取资源点的占比。调高会明显增加地图负担。"},
-		{"path": "survival.meal_interval_seconds", "label": "饥饿间隔", "type": "number",
+		{"path": "survival.meal_interval_seconds", "label": "物资消耗间隔", "type": "number",
 			"min": 10, "max": 600, "step": 10, "fmt": "duration",
-			"note": "每过这么久消耗 1 份食物。"},
+			"note": "每过这么久按 survival.supplies 逐项扣一次物资。"
+				+ "缺哪种就按配置降哪种属性，补上立刻还原（不会把人耗死）。"},
 
 		{"type": "divider", "label": "玩家与战斗"},
 		{"path": "combat.auto_attack.enabled", "label": "自动战斗", "type": "bool",
@@ -805,16 +816,12 @@ func _schema_controls() -> Array:
 
 func _schema_language() -> Array:
 	return [
-		{"type": "info", "label": "语言目前是占位：下拉可以选、选择会存进 user://settings.json，"
-			+ "但还没有接 i18n —— 没有翻译表，界面文案仍是代码里的中文。"},
-		{"path": "language.current", "label": "界面语言", "type": "enum",
+		{"type": "info", "label": "语言已接入 i18n：菜单与各面板支持简体中文 / English，下拉选择后点「确认应用」整体切换。"},
+		{"path": "language.current", "label": "界面语言", "type": "enum", "live": true,
 			"items": _language_items(),
-			"note": "标「未接线」的选了也不会改变界面文字，先把位置占上。"},
-		{"type": "divider", "label": "接真翻译要做什么"},
-		{"type": "info", "label": "1. 在 Data/language/<code>.po 里放译文；"
-			+ "2. 启动时 TranslationServer.set_locale(Config.get_value(\"language.current\"))；"
-			+ "3. 界面文字从字面量改成 tr(\"KEY\")；"
-			+ "4. 把 config 里 language.available 对应项的 ready 改成 true（下面就会显示「可用」）。"},
+			"note": "确认应用后界面文字整体切换；数据存进 user://settings.json。"},
+		{"type": "divider", "label": "如何新增语言"},
+		{"type": "info", "label": "1. 在 Data/language/translations.csv 加一列（表头写语言代码）；2. 在 Data/config.json 的 language.available 登记 code / name，ready 设为 true。"},
 	]
 
 

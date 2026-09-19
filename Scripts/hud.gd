@@ -9,6 +9,9 @@ extends CanvasLayer
 ## 本 HUD 在基地模式整体隐藏，而缩放提示两种模式都要可见。
 ## ============================================================
 
+## 右键角色弹出的背包面板（与 HUD 同层：基地模式跟着隐藏）
+const INVENTORY_POPUP := preload("res://Scripts/inventory_popup.gd")
+
 var _run: Node
 var _time_label: Label
 var _phase_label: Label
@@ -17,6 +20,7 @@ var _bag_label: Label
 var _hp_label: Label
 var _survival_label: Label
 var _survival: Node = null
+var _popup: Control = null
 
 ## 局内底部菜单栏占了最下面 1/5 屏（背包/血量/生存三行原本就在那一带），
 ## 必须整体上移让位，否则会被栏压住。高度与菜单栏同源（UiKit.menu_bar_height），
@@ -51,6 +55,11 @@ func _ready() -> void:
 	_survival_label = _bottom_label(15, 60.0, Control.PRESET_BOTTOM_LEFT)
 	_survival_label.offset_left = 12
 	_survival_label.add_theme_color_override("font_color", Color(0.55, 0.78, 0.45))
+	# 背包弹窗：右键角色 → 在他头顶弹出那一份背包（只读），菜单栏跟着同步。
+	# 谁被点中、什么时候收起都由它自己监听输入（见 inventory_popup.gd）。
+	_popup = INVENTORY_POPUP.new()
+	_popup.name = "InventoryPopup"
+	add_child(_popup)
 
 
 func _make_label(size: int, preset: int) -> Label:
@@ -120,30 +129,56 @@ func _refresh_hp() -> void:
 	_hp_label.text = "  |  ".join(parts)
 
 
-## 生存栏："食物 x30   下次进食 42s"（饥饿时标红并提示持续掉血）
+## 生存栏："物资 食物 x3   下次消耗 42s"
+## 数字是**全队背包总账**（每人一份，各吃各的 —— 见 survival_system.gd）。
+## 短缺时点名**谁缺**：扣的是他一个人的属性，队友不受牵连。
 func _refresh_survival() -> void:
 	if _survival == null or not is_instance_valid(_survival):
 		_survival = get_tree().get_first_node_in_group("survival_system")
-	if _survival == null:
+	var supplies: Array = Config.get_value("survival.supplies", [])
+	if _survival == null or not (supplies is Array) or supplies.is_empty():
 		_survival_label.text = ""
 		return
-	var food := int(_run.loot.get("food", 0))
-	var txt := "食物 x%d   下次进食 %ds" % [food, int(maxf(float(_survival.next_meal_in), 0.0))]
+	var total: Dictionary = _run.total_loot()
+	var parts: Array = []
+	for e in supplies:
+		if not (e is Dictionary):
+			continue
+		var id := str((e as Dictionary).get("id", ""))
+		if id == "":
+			continue
+		parts.append("%s x%d" % [str(Config.get_value("resources.%s.name" % id, id)),
+				int(total.get(id, 0))])
+	var txt := "物资 %s   下次消耗 %ds   每人各扣一份" % [" · ".join(parts),
+			int(maxf(float(_survival.next_meal_in), 0.0))]
 	if bool(_survival.starving):
-		txt += "   【饥饿！持续掉血，按 H 吃食物】"
+		txt += "   【短缺：%s · %s · 补上即恢复，不会死】" % [
+				"、".join(_survival.hungry_names()),
+				Meta.penalty_line(_survival.merged_penalties())]
 		_survival_label.add_theme_color_override("font_color", Color(0.95, 0.45, 0.35))
 	else:
 		_survival_label.add_theme_color_override("font_color", Color(0.55, 0.78, 0.45))
 	_survival_label.text = txt
 
 
-## 背包栏：左下角，"背包 3/10 格：木头 x20 铁 x10 ..."
+## 背包栏：左下角。背包现在**一人一份**，这里给全队总账 + 各人占几格；
+## 要看具体谁身上有什么 → 右键那个角色，头顶弹窗（底部菜单栏同步显示同一人）。
 func _refresh_bag() -> void:
-	if _run.loot.is_empty():
-		_bag_label.text = "背包 0/%d 格" % _run.backpack_capacity()
+	var total: Dictionary = _run.total_loot()
+	var who: Array = []
+	for p in get_tree().get_nodes_in_group("player"):
+		if not is_instance_valid(p):
+			continue
+		var nm := str(p.character_name)
+		if nm == "":
+			nm = "角色"
+		who.append("%s %d/%d格" % [nm, p.inventory.size(), p.backpack_capacity()])
+	var line := "　·　".join(who)
+	if total.is_empty():
+		_bag_label.text = "背包 空   %s" % line
 		return
-	_bag_label.text = "背包 %d/%d 格：%s" % [
-		_run.loot.size(), _run.backpack_capacity(), _format_loot(_run.loot)]
+	_bag_label.text = "背包 全队 %d 种：%s   ｜   %s" % [
+			total.size(), _format_loot(total), line]
 
 
 func _phase_text() -> String:
