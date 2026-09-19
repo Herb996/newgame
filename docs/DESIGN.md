@@ -194,7 +194,7 @@
 
 ### 3.3 设置面板（8 页，表驱动，`settings_panel.gd`）
 - 页签：**画面 / 性能 / 音频 / 玩法 / 资源 / 操作 / 语言 / 调试**。
-- **「资源」页**：上半「地形出现比例」= 四群系面积权重 `map.biome_weights.0~3`（越大越占地方）+「最小地块尺寸」`map.biome_min_region_cells`（被别的地形包住、小于此值的小地块并入周围，0=不去）；下半「地图资源成簇」= `total`（全图总簇数）+ 每类型 `share`（占总数比例）/`min_size`/`max_size`（每簇大小随机区间）/`biome_weight`（该类型在各群系的分布）。均下次生成地图生效。
+- **「资源」页**：上半「地形出现比例」= 一条**可拖比例尺**（通用控件 `Scripts/ratio_bar.gd`：把 100% 切成 4 段、段宽 ∝ `map.biome_weights.0~3`，段内实时显示各地形百分比）。条上有两类把手、**彼此解耦、互不约束**：**白色分界线**（段间，自由拖 = 在相邻两段间此消彼长改地形占比、总长恒 100%）；**每段一对暗铜色 `| |`**（= 该段占比的下限 / 上限 `map.biome_min_pct.0~3` / `map.biome_max_pct.0~3`，出厂统一 10/30；**这里的百分比是「占这段地形自身宽度」的比例、不是占整条**，所以两个把手永远落在该段 `[左边界, 右边界]` 之内、绝不越到相邻地形；且两把手的拖拽被硬夹在 `BAND_MIN=10%`~`BAND_MAX=30%`（`ratio_bar.gd` 常量）之间、拖不出这个范围；把手用面板主强调色 `UiKit.COL_AMBER` 暗铜细线（不用高饱和亮橙、无方块把手）、**线外侧标「下限 X%」「上限 X%」**（朝外错开不打架）、段底淡带示意允许区；**拖白色分界线改占比期间会暂时隐藏这对把手（含文字），松手后按新位置再显示**——`ratio_bar._suppress_bounds`）。上下限目前只作为参数存进 config 供地图生成使用，**不锁地形拖动**（早期做过「拖动被上下限夹 + 打开投影」，因四段 10~30 太紧会把分界线钉死、拖不动，已改回解耦自由拖）。其后是「最小地块尺寸」`map.biome_min_region_cells`（被别的地形包住、小于此值的小地块并入周围，0=不去）；下半「地图资源成簇」= `total`（全图总簇数）+ 每类型 `share`（占总数比例）/`min_size`/`max_size`（每簇大小随机区间）/`biome_weight`（该类型在各群系的分布）。均下次生成地图生效。
 - **「性能」页（降配提速）**：暴露此前未进面板、但被 2D 代码消费的降配杠杆——`enemy.ai_active_radius_cells`（休眠半径，每帧读取即生效）、`enemy.los_step_cells`（视线采样步长，即生效）、`player.vision_radius_cells`（迷雾揭示半径，下次进局）、`map.decor.shadow`（装饰投影，下次生成地图）；并给 **「性能优先」/「恢复均衡」一键预设**（`_PERF_BUNDLE`：一次性把 `decor.shadow/density`、`macro_light/grade.enabled`、`vision_radius`、`ai_active_radius`、`los_step`、`enemy.count`、`animals.count`、`loot.density`、`max_fps` 写入**用户层**，恢复均衡逐项清除回落出厂）。其余降配项散在「玩法」（资源点密度/敌人中立数量/装饰密度）与「画面」（明暗/调色/帧率上限/垂直同步）。
 - **暂存 + 确认生效**：面板内所有编辑先进内存暂存（`_pending_set`/`_pending_clear`），**点右下「确认应用」才批量落盘 `user://settings.json` 并 `DisplaySettings.apply_all()`**（`display.*`/`audio.*` 即时作用，其余项下次进局 / 生成地图读到）；未确认前不写盘、不生效。每行右上有「默认」把该项暂存回出厂值。
 - **界面形态**：全屏铺满（外层 Margin 留 28px）；每行标签左对齐、控件右对齐（两边对齐）；底部「确认应用」主按钮（无改动时禁用）+「N 处未确认」计数；「返回」若有未确认改动会弹二次确认再丢弃。
@@ -204,6 +204,7 @@
 ### 3.4 调试开关（真相：config + `--` 并存，见 §0.3）
 - config `debug.*`（当前出厂）：`auto_enter_run=true`（菜单进游戏时被覆盖为 false）、`time_scale=20.0`、`log_state_transitions=false`、`smoke_test/flow_test=false`、`map_preview=""`(配 `map_preview_cells=128`/`_scale=0.125`)、`main3d_*`（仅 3D 线消费）。`time_scale` / `log_state_transitions` / `auto_enter_run` 亦挂设置面板「调试」页可改。
 - CLI：`--seed`（压 `map.force_seed`）/ `--preview-map` / `--capture2d` / `--dump-atlas` / `--dump-biome` / `--zoom` / `--soak*` / `--weapon bow|sword|sniper` / `--no-fog` / `--no-macro` / `--menu-*`。
+- ⚠ **`debug.smoke_test` / `flow_test` / `map_preview` 会劫持整个进程**：`main3d.gd::_ready` 里这三条各自启动一段自检后 `return`，自检末尾 `get_tree().quit(失败数?1:0)`。⇒ 任何 `load("res://Scenes/Main3D.tscn")` 的探针都会被中途杀掉（自己的汇总永远打不出来，EXIT 反映的是 FlowTest 而不是本探针）。**探针必须自己 `Config.set_override` 钉成 false/""**（已这么做的：`probe_zoom.gd`、`probe_zoom_shot.gd`），别指望 config 里恰好是对的。同一原因反过来也咬人：这几个键留在 `true` 时，玩家正常开局跑的是自检不是游戏。2026-09-19 就撞过一次（`flow_test` 被别的会话留在 true）。
 
 ### 3.5 局内菜单栏（`menu_bar.gd` + `minimap.gd`，仅局内，占屏高 1/5）
 - **高度**：`menu_bar.height_ratio=0.2` × 视口高，夹在 `min_height_px 160` ~ `max_height_px 320`；公式只写一份（`UiKit.menu_bar_height()`），HUD 的背包/血量/生存三行与右下角视野提示**按同一公式上移让位**，否则会被栏压住。`menu_bar.enabled=false` 时既不铺栏也不让位。
@@ -398,6 +399,12 @@
 - **挨打也会动（2026-09-17，所有敌人通用）**：玩家造成伤害后，三个调用点（近战 `player.resolve_attack_hit`、箭 `combat/projectile.gd`、强弩 `player.fire_hitscan`）各补一句 `alert_from_attacker(攻击者位置)` ⇒ 该敌人 `noise_alertness += noise.sources.hurt(100)` 并把攻击者位置记为声源，下一帧就转 `investigate` 朝攻击者走（近战 = 玩家位置、箭 = **出膛点**，用命中点等于让它原地不动）。刻意**不塞进 `take_damage()` 签名**：那会逼探针里所有假敌人跟着改。`noise.sources.hurt = 0` 可整条关掉。
 - **成群（`ai.pack`，2026-09-17，目前只有劫掠者开）**：同 `type_id` 的敌人靠近到 `join_radius_px(176)` 内即结伙，全群**共享同一个字典** `{leader, members}`（引用语义）。**群主**按 `roam` 模式选目标；**成员**只跟队形（距群主 > `follow_distance_px(48)` 才启程，每 `repath_interval 0.4s` 重算路径）。每群硬上限 `max_members(5)`；个体只投奔**不小于自己**的群（否则小群互相拆伙、群主每秒换人）；群主死亡 → 同群下一个活着的自动接任（`_promote_pack_leader`，在读取处懒惰修复、不埋钩子）。
 - 追击速度 = `speed(360) × speed_mult(兵种) × chase_mult(1.35)`；最快 raider≈559 < 玩家 640，可风筝。伤害按兵种 `damage`（默认回落 `enemy.contact_damage`），出手节拍按 `enemy.attack.cooldown_seconds(1.0)` —— **只要挥了就进冷却**，打没打中都一样。
+- **水平朝向（2026-09-19 用户定「给左边也加一个方向」，上下明确不做）**：21 个兵种在 `player_animator.parse_spec` 里全是**写法 B**（扁平帧数组 → 8 方向共用同一批帧），素材本身也只画了侧身一个方向，所以「向左」在代码里只有一个合法实现：**`Sprite2D.flip_h` 镜像**（不用负 `scale.x`：`play_hit_fx` / `_fade_out` 要 tween `_body.scale`，动画器每物理帧重写 `_sprite.scale`，只有 `flip_h` 没人碰）。
+  - 朝向来源：`enemy.gd::_facing`，默认 `(0,1)`（= 改动前的表现，所以**没动过的敌人看起来一模一样**）。`follow_path()` 里跟着每步位移更新（巡逻/调查/追击/成群一个钩子全覆盖），`_start_attack()` 起手锁向目标。`facing()` / `set_facing()` 开放读改。
+  - ⚠ **素材不是整齐朝右的**：逐张拼表核对后，`ep_harpoon_shark` / `ep_paddle_shark` **画的是朝左**，`ep_cave` 是个静态石洞（无朝向）。一刀切 `if dir.x < 0: flip` 会把这两只鲨鱼**翻成背对敌人**。故按兵种标注：`enemy.gd::ART_FACING`（默认 `right`），可在兵种 config 里用 `art_facing` 覆盖。
+  - 判定在 `PlayerAnimator.flip_for(mode, facing, held, deadzone)`：`|facing.x| < sprite_flip_deadzone(0.25)` 时**保持上一帧**（斜上/斜下走时不许每帧抖）；`right` 模式＝`facing.x<0` 才镜像，`left` 模式相反。总开关 `enemy.flip_h_with_facing`（默认 true，关掉＝全部 `FLIP_NONE`）。⚠ 读它必须 `Config.get_value("enemy", {}).get(...)`：直接读不存在的键 `config_loader` 会 `push_warning`，一局刷上百条。
+  - **玩家真 8 方向素材不受影响**：镜像是**按 sprite set 开关**的，只有敌人 `_apply_type` 往 `view_cfg` 里塞 `sprite_flip_h`，枪兵/哥布林那套真方向集永远不翻（探针 D/E 段钉住）。
+  - 顺带修的旧 bug：受击压扁原先直接 tween `_body.scale`，被动画器下一物理帧的 `_sprite.scale` 覆盖 ⇒ 只有 1 帧可见。现在走 `PlayerAnimator.set_scale_mul()` 通道，与基准 scale 相乘；`_fade_out` 前会先杀掉还在跑的受击 tween。
 
 ### 5.2 噪音机制（`noise_system.gd` + `combat/fx_ring.gd`）
 - `emit(pos, intensity)`：① `intensity ≥ ring_min_intensity(35)` 才画环；② 遍历 `enemies` 组，`d > hear_radius(16×tile)` 跳过；③ 距离线性衰减 `att = 1 − d/hear_radius`；④ 隔墙 `att ×= wall_attenuation(0.5)`（独立 LOS 采样）；⑤ `received = intensity × att`，`≥ min_notice(4)` 才 `e.hear_noise()`。
@@ -442,6 +449,7 @@
 ### 5.3 撤离机制（`extraction_system.gd` / `extraction_point.gd`）
 - 30min 随机刷 3 点（限可达格 + `min_dist` 约束）；洗牌预定关闭顺序；45/55 各关 1；最后 1 点保持到超时。轮到点若有人站圈内则改关下一个（全有人本轮作废）。
 - 站 `trigger_radius 96` 圈 → `hold_progress += delta`，达 `hold 3s` 触发 `RunManager.extract()`；离开或点关闭清零。elapsed 按 `time_limit − remaining` 计，故 `time_scale` 同步加速整条时间线。
+- **3D 形态比逻辑晚一帧**（2026-09-19 定性 FlowTest 两条假红时查明）：圆环+光柱不在 `extraction_point.gd` 里，而是 `main3d._process` 每帧调 `EntityVisual3D.sync()` 时按组扫出来建的。而 `SceneTree.process_frame` 在节点 `_process` **之前**发出 —— 协程在「点刚生成」那一帧醒来时表现层天然还没跟上。任何「开点后立刻断言 3D 形态」的测试都得再等，且**等条件**（子节点数补齐）不等拍脑袋的帧数，见 `main3d.gd` 3b 段的 `ext_guard`。
 
 ### 5.4 掉落机制
 - 敌人死亡（`enemy.gd _spawn_drop`）：`randf > chance(1.0)` 则不掉；按 `drop.weights` 加权选种类，`randi_range(2,6)` 数量，生成**地面 LootNode**（视觉 ×0.8 区别地图资源点），走近 `pickup_radius 80` 才自动进背包 —— 2026-09-19 起背包**一人一份**，所以「进谁的包」有明确规则：**压住这个点的角色里最近的那个活人**（`loot_node.gd::_nearest_living_carrier()`，详见 §5.11）。

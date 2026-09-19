@@ -119,6 +119,19 @@ const DROP_SCENE := preload("res://Scenes/LootNode.tscn")
 ## 字符串必须与 noise_system.gd 里的同名常量一致（两边都写死，改动请一起改）。
 const GROUP_NOISE_AMPLIFIERS := "noise_amplifiers"
 
+## 素材原画朝哪个侧向 → 决定向左走时要不要水平镜像（PlayerAnimator.FLIP_*）。
+## 21 个兵种的 idle/walk/attack 全是扁平单侧帧（没有 left/right 两套），所以"朝左"
+## 只能镜像出来。逐兵种看过首帧（Dev/shot_enemy_facing.gd 有实拍）后分三类：
+##   left = 原画头朝左，镜像规则要反过来，否则它追人会朝右倒着跑；
+##   none = 没有"朝向"可言的静态物件（洞口），镜像只会让苔斑跳边。
+## 没列在这里的兵种 = 原画朝右（默认）。兵种自己写 `art_facing` 键可覆盖本表。
+const ART_FACING := {
+	"ep_harpoon_shark": "left",
+	"ep_paddle_shark": "left",
+	"ep_cave": "none",
+}
+const ART_FACING_DEFAULT := "right"
+
 var hp := 0
 var max_hp := 0
 var damage := 10                   # 单发伤害（由类型覆盖）
@@ -140,6 +153,8 @@ var _body: Sprite2D = null
 var _animator: PlayerAnimator = null
 var _hp_bar: Node = null           # 头顶血条（enemy_hp_bar.gd）；受伤才显示
 var _anim_state := PlayerAnimator.Anim.IDLE
+var _facing := Vector2(0.0, 1.0)   # 当前朝向（镜像判定用）。默认朝下 = 旧行为：不翻。
+var _flip_mode := 0                # 本兵种的 PlayerAnimator.FLIP_*，_apply_type 里算好
 var _attack_timer := 0.0           # >0 表示正在播攻击动作，播完回 idle/walk
 var _attack_frames := 0            # 该兵种 attack 帧数（用于按帧率算挥砍时长）
 var _attack_fps := 14.0            # 攻击帧率（与 PlayerAnimator.DEFAULT_FPS.attack 一致）
@@ -552,6 +567,8 @@ func _apply_type(type_cfg: Dictionary) -> void:
 	_attack_cd_seconds = float(atk.get("cooldown_seconds", 1.0))
 	_attack_windup = float(atk.get("windup_seconds", 0.18))
 	_attack_min_dur = float(atk.get("min_duration_seconds", 0.3))
+	# 镜像模式算在这里而不是下面的 Body 分支里：无 Body 的假敌人/无头探针也要能读到。
+	_flip_mode = resolve_flip_mode(type_cfg)
 
 	if _body == null:
 		return
@@ -567,6 +584,7 @@ func _apply_type(type_cfg: Dictionary) -> void:
 		"sprite_scale": view["scale"],
 		"sprite_offset_y": view["offset_y"],
 		"sprite_pixel_unit": view["pixel_unit"],
+		"sprite_flip_h": _flip_mode,
 	}
 	# 用 PlayerAnimator.Anim 的名字约定做键：idle / walk / attack
 	var spec := {}
@@ -593,6 +611,30 @@ func _apply_type(type_cfg: Dictionary) -> void:
 					_death_frames.append(tex)
 	_animator = PlayerAnimator.new(_body)
 	_animator.load_from_config(spec, view_cfg, "")   # 空 label = 不打印（100 个会刷屏）
+
+
+## 本兵种的镜像模式：兵种 art_facing 键 → ART_FACING 表 → 默认朝右。
+## 全局开关 `enemy.flip_h_with_facing`（出厂默认 true）：读整棵 enemy 子树再 Dictionary.get，
+## 不要写成 Config.get_value("enemy.flip_h_with_facing") —— 键没进 config 会每只怪刷一条
+## "[Config] 缺少配置项"，一局 100 只就把日志淹了。
+func resolve_flip_mode(type_cfg: Dictionary) -> int:
+	var e_cfg: Dictionary = Config.get_value("enemy", {})
+	if not bool(e_cfg.get("flip_h_with_facing", true)):
+		return PlayerAnimator.FLIP_NONE
+	var key := str(type_cfg.get("art_facing",
+			ART_FACING.get(str(type_cfg.get("id", "")), ART_FACING_DEFAULT)))
+	return PlayerAnimator.flip_mode_of(key)
+
+
+## 当前朝向（镜像判定用的那个向量）。探针与实拍读它。
+func facing() -> Vector2:
+	return _facing
+
+
+## 直接指定朝向（只给探针/实拍用；游戏内由 follow_path / _start_attack 驱动）
+func set_facing(dir: Vector2) -> void:
+	if dir.length_squared() > 0.000001:
+		_facing = dir.normalized()
 
 
 # ------------------------------------------------------------
@@ -726,8 +768,10 @@ func _update_anim(delta: float) -> void:
 	elif _has_target and not _path.is_empty():
 		st = PlayerAnimator.Anim.WALK
 	_anim_state = st
-	# 官方单位是正面单朝向帧，四向共用；朝向参数只影响无帧状态的程序化位移
-	_animator.update(delta, st, Vector2(0.0, 1.0))
+	# 素材是单侧帧（21 个兵种全如此），所以传进来的朝向只起两个作用：
+	# ① 水平镜像补出"朝左"（见 PlayerAnimator.FLIP_* 与 ART_FACING 表）；
+	# ② 无帧状态的程序化位移方向。上下朝向不做处理——素材没有正/背面。
+	_animator.update(delta, st, _facing)
 
 
 ## 受击视觉反馈：白闪 → 泛红回落（官方包没有受击帧，只能靠 modulate 闪一下）。
@@ -1073,7 +1117,11 @@ func follow_path(speed: float) -> bool:
 	if dir.length() < 4.0:
 		_path_index += 1
 		return _path_index >= _path.size()
-	global_position += dir.normalized() * speed * delta
+	# 朝向跟着实际挪动的方向走。巡逻/调查/追击/成群跟随全都经由此处，
+	# 所以这里更新一次就够，不必在每个状态里各写一遍。
+	var step := dir.normalized()
+	_facing = step
+	global_position += step * speed * delta
 	return false
 
 
@@ -1456,6 +1504,9 @@ func _fade_out() -> void:
 	if _body == null or dur <= 0.0:
 		queue_free()
 		return
+	# 受击回弹可能还在跑（它写 _body.position），会和下面的"下沉"抢同一个属性
+	if _hit_tween != null and _hit_tween.is_valid():
+		_hit_tween.kill()
 	set_physics_process(false)     # 停止一切逻辑，只留 tween
 	var tween := create_tween().set_parallel(true)
 	tween.tween_property(_body, "modulate", Color(0.45, 0.45, 0.45, 0.0), dur)
@@ -1546,10 +1597,15 @@ func play_hit_fx(from_pos: Vector2) -> void:
 	if _hit_tween != null and _hit_tween.is_valid():
 		_hit_tween.kill()
 	_hit_tween = create_tween()
-	# 挤压：横向压扁、纵向拉长（被打中的"肉感"），再弹性回弹到 1
-	_body.scale = Vector2(1.0 - squash, 1.0 + squash)
-	_hit_tween.tween_property(_body, "scale", Vector2.ONE, 0.16) \
-			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	# 挤压：横向压扁、纵向拉长（被打中的"肉感"），再弹性回弹。
+	# 走动画器的 scale_mul 通道而**不是**直接 tween _body.scale：动画器每个物理帧都
+	# 会按兵种自己的 scale 重写 _body.scale，直接写会被它盖掉 —— 结果就是 scale≠1 的
+	# 兵种（troll 0.5 / minotaur 0.6 / turtle 0.6 / bear 0.75）几乎看不到挤压。
+	if _animator != null:
+		var from_mul := Vector2(1.0 - squash, 1.0 + squash)
+		_animator.set_scale_mul(from_mul)
+		_hit_tween.tween_method(_set_squash_mul, from_mul, Vector2.ONE, 0.16) \
+				.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 	# 视觉击退：_body 局部位置从 0 推到 dir*kb，再弹性回弹 0（纯视觉，不碰碰撞体）
 	if dir != Vector2.ZERO and kb > 0.0:
 		_body.position = dir * kb
@@ -1559,6 +1615,12 @@ func play_hit_fx(from_pos: Vector2) -> void:
 	var stun := float(Config.get_value("enemy.hit_stun_seconds", 0.0))
 	if stun > 0.0:
 		_hit_stun = maxf(_hit_stun, stun)
+
+
+## 挤压倍数回调：只写动画器的 scale_mul，由它在每帧把倍数乘进 _body.scale。
+func _set_squash_mul(v: Vector2) -> void:
+	if _animator != null:
+		_animator.set_scale_mul(v)
 
 
 ## 被击退：按冲量做一段位移
@@ -1600,6 +1662,12 @@ func _tick_attack(_delta: float) -> void:
 ## 早期把两件事写在 `if body.take_damage(...)` 里，所以玩家防御叠满或有无敌帧时
 ## 敌人既不播动作也不进冷却，看上去就是"敌人根本不会攻击"。
 func _start_attack() -> void:
+	# 出手瞬间把朝向锁成"指向玩家"。追击状态进了射程就会停下不再挪，
+	# 而 _facing 只在 follow_path 里更新 —— 不锁的话这一刀会朝最后一次
+	# 挪动的方向挥，玩家绕到身后就是明显对着空气砍。
+	var p := _get_player()
+	if p != null:
+		set_facing(p.global_position - global_position)
 	# 按攻击帧数算挥砍时长（帧数/帧率），让整套挥砍完整播完；无攻击帧的兵种用保底时长。
 	_attack_timer = maxf(_attack_min_dur, _attack_frames / maxf(_attack_fps, 1.0))
 	_attack_cooldown = _attack_cd_seconds

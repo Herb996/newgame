@@ -204,6 +204,14 @@ func _ready() -> void:
 	_check(is_instance_valid(_main), "Main 没被顺手释放")
 
 	_say("--- B 段：最后一名也倒下 → 同样消失，本局照常结算 ---")
+	# 乙必须自己带一包：player.drop_inventory() 对空背包是直接 return 的，不给货这条
+	# 断言就成了「0 → 0 相等」的空测（上一轮回归那条红就是这么来的，不是掉货坏了）。
+	# 甲那三件撒在他自己脚下，离这儿 420px，乙捡不回来，不会串味。
+	b.add_item("wood", 4)
+	b.add_item("oil", 2)
+	await _pframes(3)
+	var inv_b: Dictionary = b.get("inventory")
+	_check(inv_b.size() == 2, "乙死前身上确实有 2 种货（否则下面这条是空断言）：%s" % str(inv_b))
 	var pos_b: Vector2 = b.global_position
 	var loot_b_before := _loot_near(pos_b, 60.0)
 	b.call("take_damage", 999999, Vector2.ZERO)
@@ -211,8 +219,8 @@ func _ready() -> void:
 	_say("  乙第 %d 帧消失（%s）" % [gone_b, _fmt(_read(b))])
 	_check(gone_b >= 0 and gone_b < GONE_LIMIT,
 			"弓兵同样在 %d 帧内消失（实际 %d）—— 不是只对枪兵成立" % [GONE_LIMIT, gone_b])
-	_check(_loot_near(pos_b, 60.0) >= loot_b_before + 1,
-			"全队阵亡时乙这一包也落在原地（掉前 %d → 掉后 %d）" % [
+	_check(_loot_near(pos_b, 60.0) >= loot_b_before + 2,
+			"全队阵亡时乙这一包也落在原地（掉前 %d → 掉后 %d，2 种资源）" % [
 			loot_b_before, _loot_near(pos_b, 60.0)])
 	_check(int(_run.state) != int(_run.State.RUNNING), "run 已结算（state=%s）" % str(_run.state))
 	_check(is_instance_valid(_main), "结算期间 Main 完好")

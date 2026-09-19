@@ -20,9 +20,6 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [autoload]
 
-; 顺序有讲究：SaveSlots 读 Config 取槽位数，又要在 Meta._ready() 之前就绪
-; （Meta.load_save 会问 SaveSlots 有没有激活槽），所以夹在两者中间。
-; DisplaySettings 只管窗口/音量，放前面是为了进主场景前就把画面设置应用上。
 Config="*res://Scripts/config_loader.gd"
 SaveSlots="*res://Scripts/save_slots.gd"
 DisplaySettings="*res://Scripts/display_settings.gd"
@@ -35,17 +32,14 @@ ResourceRegistry="*res://Scripts/resource_registry.gd"
 window/size/viewport_width=1920
 window/size/viewport_height=1080
 
-[rendering]
-
-renderer/rendering_method="forward_plus"
-renderer/rendering_method.mobile="mobile"
-
-anti_aliasing/quality/msaa_3d=2
-anti_aliasing/quality/use_taa=false
-textures/default_filters/anisotropic_filtering_level=4
-textures/default_filters/texture_mipmap_bias=-0.5
-environment/defaults/default_clear_color=Color(0.23, 0.18, 0.14, 1)
-
 [internationalization]
+
 locale/translations=PackedStringArray("res://Data/language/translations.en.translation")
 locale/fallback="zh_CN"
+
+[rendering]
+
+textures/default_filters/anisotropic_filtering_level=4
+anti_aliasing/quality/msaa_3d=2
+textures/default_filters/texture_mipmap_bias=-0.5
+environment/defaults/default_clear_color=Color(0.23, 0.18, 0.14, 1)

@@ -19,6 +19,8 @@ extends Control
 
 signal close_requested
 
+const RATIO_BAR_SCRIPT := preload("res://Scripts/ratio_bar.gd")
+
 ## 打开时默认停在第几页（截图验证用；正常进入是 0 = 画面）
 var initial_tab := 0
 
@@ -174,6 +176,32 @@ func _make_entry(entry: Dictionary) -> Control:
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		return l
+
+	if kind == "ratio_bar":
+		var rb := UiKit.vbox(4)
+		rb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var paths: Array = entry.get("paths", [])
+		var min_paths: Array = entry.get("min_paths", [])
+		var max_paths: Array = entry.get("max_paths", [])
+		var vals: Array = []
+		for p in paths:
+			vals.append(float(_eff(str(p))))
+		var mins: Array = []
+		for p in min_paths:
+			mins.append(float(_eff(str(p))))
+		var maxs: Array = []
+		for p in max_paths:
+			maxs.append(float(_eff(str(p))))
+		var bar = RATIO_BAR_SCRIPT.new()
+		bar.setup(_biome_bar_labels(paths.size()), _biome_bar_colors(paths.size()), vals, mins, maxs)
+		bar.changed.connect(func(new_vals: Array): _stage_ratio(paths, new_vals))
+		bar.bounds_changed.connect(func(new_mins: Array, new_maxs: Array): _stage_bounds(min_paths, max_paths, new_mins, new_maxs))
+		rb.add_child(bar)
+		if str(entry.get("note", "")) != "":
+			var n := UiKit.note(str(entry["note"]))
+			n.custom_minimum_size = Vector2(840, 0)
+			rb.add_child(n)
+		return rb
 
 	var box := UiKit.vbox(2)
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -776,17 +804,76 @@ func _schema_gameplay() -> Array:
 	]
 
 
+## 比例条拖动 → 把四段新权重写进暂存（对应 map.biome_weights.0~3），刷新页脚。
+func _stage_ratio(paths: Array, new_vals: Array) -> void:
+	for i in range(paths.size()):
+		if i < new_vals.size():
+			var p := str(paths[i])
+			_pending_set[p] = float(new_vals[i])
+			_pending_clear.erase(p)
+	_update_footer()
+
+
+func _stage_bounds(min_paths: Array, max_paths: Array, mins: Array, maxs: Array) -> void:
+	for i in range(min_paths.size()):
+		if i < mins.size():
+			var pm := str(min_paths[i])
+			_pending_set[pm] = float(mins[i])
+			_pending_clear.erase(pm)
+	for i in range(max_paths.size()):
+		if i < maxs.size():
+			var px := str(max_paths[i])
+			_pending_set[px] = float(maxs[i])
+			_pending_clear.erase(px)
+	_update_footer()
+
+
+func _biome_bar_labels(n: int) -> Array:
+	var out: Array = []
+	var biomes: Array = Config.get_value("map.biomes", [])
+	for i in range(n):
+		if i < biomes.size() and biomes[i] is Dictionary:
+			out.append(str((biomes[i] as Dictionary).get("name", "地形%d" % i)))
+		else:
+			out.append("地形%d" % i)
+	return out
+
+
+func _biome_bar_colors(n: int) -> Array:
+	var out: Array = []
+	var biomes: Array = Config.get_value("map.biomes", [])
+	for i in range(n):
+		var c := Color(0.5, 0.5, 0.5)
+		if i < biomes.size() and biomes[i] is Dictionary:
+			var f = (biomes[i] as Dictionary).get("floor", null)
+			if f is Array and (f as Array).size() >= 3:
+				c = Color(float(f[0]), float(f[1]), float(f[2]))
+		out.append(c.lightened(0.25))   # 提亮，深色面板上更好分辨
+	return out
+
+
 func _schema_resources() -> Array:
 	var out: Array = []
 	out.append({"type": "divider", "label": "地形出现比例（面积∝此值）"})
-	out.append({"type": "info", "label": "四个群系按这里的权重瓜分地图面积（相对值，不用归一；越大越占地方）。下次生成地图生效。"})
-	out.append({"path": "map.biome_weights.0", "label": "草地", "type": "number", "min": 0.1, "max": 8.0, "step": 0.05})
-	out.append({"path": "map.biome_weights.1", "label": "荒原", "type": "number", "min": 0.1, "max": 8.0, "step": 0.05})
-	out.append({"path": "map.biome_weights.2", "label": "森林", "type": "number", "min": 0.1, "max": 8.0, "step": 0.05})
-	out.append({"path": "map.biome_weights.3", "label": "沼泽", "type": "number", "min": 0.1, "max": 8.0, "step": 0.05})
+	out.append({"type": "ratio_bar", "label": "地形占比",
+		"paths": ["map.biome_weights.0", "map.biome_weights.1", "map.biome_weights.2", "map.biome_weights.3"],
+		"min_paths": ["map.biome_min_pct.0", "map.biome_min_pct.1", "map.biome_min_pct.2", "map.biome_min_pct.3"],
+		"max_paths": ["map.biome_max_pct.0", "map.biome_max_pct.1", "map.biome_max_pct.2", "map.biome_max_pct.3"],
+		"note": "拖白色分界线自由改地形占比（相邻两段此消彼长、总长恒 100%，段内实时显示各地形百分比）；拖每段两侧的橙色 | | 改该地形的占比下限 / 上限——这里的百分比是「占这段地形自身宽度」的比例，两个把手只能在 10%~30% 之间拖、拖不出这个范围，也不会跑到别的地形，把手上方标出各自的百分比。下次生成地图生效。"})
 	out.append({"path": "map.biome_min_region_cells", "label": "最小地块尺寸（格）", "type": "number",
 		"min": 0, "max": 200, "step": 5,
 		"note": "小于此格数的独立地形块会被并入周围地形（去掉过小的碎地块/被夹的小地块）；0 = 不去小地块。下次生成地图生效。"})
+	out.append({"type": "divider", "label": "群系边界混合"})
+	out.append({"type": "info", "label": "两个群系之间原本是一条 1 格宽的直角阶梯硬线（边界两侧什么都没画）。"
+		+ "开启后在边界两侧各铺 radius 格的「抖动带」：把对面群系的同一块地形按 1-bit 网点盖上来，"
+		+ "近看是细密网点、拉远（滚轮缩小）就被平均成一条柔和过渡。只改观感，碰撞/寻路/移速一律不动。下次生成地图生效。"})
+	out.append({"path": "map.biome_blend.enabled", "label": "启用边界混合", "type": "bool"})
+	out.append({"path": "map.biome_blend.radius_cells", "label": "混合带宽（格）", "type": "number",
+		"min": 1, "max": 4, "step": 1,
+		"note": "边界每侧铺几格。1 = 只化开一条紧贴原边界的窄带（推荐）；调到 3~4 群系区域会开始糊成一团、认不出边界。"})
+	out.append({"path": "map.biome_blend.dither", "label": "网点大小（像素）", "type": "enum",
+		"items": [["4", 4], ["8（推荐）", 8], ["16", 16]],
+		"note": "Bayer 网点周期。越小过渡越细，但满铺整张地面都会起网点；必须整除瓦片边长（64），否则相邻瓦片的网点对不上。"})
 	out.append({"type": "divider", "label": "地图资源成簇（树/石/铁/油）"})
 	out.append({"type": "info", "label": "全图一共放「总簇数」个簇，按各类型 share 比例分给树/石/铁/油；"
 		+ "每种类型的簇再按其 biome_weight 分到各群系；每簇大小在 [最小, 最大] 随机（最小调大即避免过小孤簇）。全部下次生成地图才生效。"})

@@ -6,6 +6,10 @@ const OUT := "C:/Users/Administrator/WorkBuddy/2026-09-14-22-35-14"
 
 
 func _ready() -> void:
+	# 同 probe_zoom：Main3D 开头那几个 debug 自检会接管进程并自己 quit()，实拍就跑完了
+	Config.set_override("debug.smoke_test", false)
+	Config.set_override("debug.flow_test", false)
+	Config.set_override("debug.map_preview", "")
 	var main: Node = load("res://Scenes/Main3D.tscn").instantiate()
 	add_child(main)
 	for i in range(60):

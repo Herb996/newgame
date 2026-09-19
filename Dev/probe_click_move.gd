@@ -121,9 +121,23 @@ func _a_repeated_clicks() -> void:
 	for i in range(CLICKS):
 		var start: Vector2 = _p.global_position
 		await _sync_cam()
-		var cell := _open_cell_near(start, 6, 16)
+		var cell_stats := {}
+		var cell := _open_cell_near(start, 6, 16, true, cell_stats)
 		if cell.x < 0:
-			_check(false, "A 角色周围 6~16 格内找不到「可走 + 可达 + 落在地图区」的格，无法继续复现")
+			var xf: Transform2D = get_viewport().get_canvas_transform()
+			# ⚠ 整条格式串先括号起来再 %：% 比 + 结合更紧，写成 "a" + "b%s" % [..]
+			#    只会把参数喂给中间那段，报 "not all arguments converted"。
+			_check(false, ("A 角色周围 6~16 格内找不到「可走 + 可达 + 落在地图区」的格"
+					+ "，无法继续复现（%s｜相机 %s pos=%s zoom=%s offset=%s anchor=%s"
+					+ " enabled=%s｜xf=%s｜角色投影 %s → %s，地图区 %s）") % [
+					str(cell_stats),
+					str(_cam),
+					str(_cam.global_position) if _cam != null else "-",
+					str(_cam.zoom) if _cam != null else "-",
+					str(_cam.offset) if _cam != null else "-",
+					str(_cam.anchor_mode) if _cam != null else "-",
+					str(_cam.enabled) if _cam != null else "-",
+					str(xf), str(start), str(xf * start), str(_map_band())])
 			return
 		var target := _center_of(cell)
 		var screen: Vector2 = _send_click(target)
@@ -319,21 +333,26 @@ func _c_order_survives_attack() -> void:
 # ------------------------------------------------------------
 # 工具
 # ------------------------------------------------------------
-## 把相机挪到角色身上并等画布变换定格。
-## 瞬移完必须抹掉位置平滑，再等一帧：get_canvas_transform() 拿到的是**上一帧
-## 定格**的值，用它推屏幕点、游戏却用新一帧的变换反算回去，落点能飘几百 px ——
-## 偶尔正好落在角色自己脚下，指令当场"已到达"被清，看起来就是"点了没反应"。
+## 把相机挪到角色身上，并**等它真的追上**再返回。
+## `get_canvas_transform()` 拿到的是上一帧定格的值：用它推屏幕点、游戏却用新一帧的
+## 变换反算回去，落点能飘几百 px —— 偶尔正好落在角色自己脚下，指令当场"已到达"被清，
+## 看起来就是"点了没反应"。
+## ⚠ 必须等**物理帧**：`camera_controller._physics_process` 才是搬相机的那个人，而无头
+## 里渲染帧能跑到几百 fps —— 之前只等 6 个 process_frame，读到的是相机还在半路上的
+## 陈旧变换，角色自己都被投影到视口外，A 段于是"满图找不到一个落在地图区的可走格"
+## （790 个候选、24 个采样全被判 off_map），红得毫无道理。
 func _sync_cam() -> void:
 	if _cam != null:
 		_cam.global_position = _p.global_position
 		_cam.call("reset_smoothing")
-	var xf: Transform2D = get_viewport().get_canvas_transform()
-	for _try in range(6):
-		await get_tree().process_frame
-		var now: Transform2D = get_viewport().get_canvas_transform()
-		if now == xf:
-			break
-		xf = now
+	for _i in range(40):
+		await get_tree().physics_frame
+		if _on_map(_p.global_position):
+			return
+	_say("  [警告] 40 个物理帧后角色仍在地图区外：pos=%s → 屏=%s（地图区 %s）" % [
+			str(_p.global_position),
+			str(get_viewport().get_canvas_transform() * _p.global_position),
+			str(_map_band())])
 
 
 ## 一次「左键点地」：press + release（SelectionController 是在**松开**时才下
@@ -370,7 +389,8 @@ func _press(world_pos: Vector2, pressed: bool) -> void:
 ## 那是产品行为而不是本探针要复现的"失控"。可达性也一样：地图上确实存在
 ## 与主通路断开的可走孤岛，点进孤岛走不到不是 bug。
 ## on_map：要走真实点击的调用必须为真 —— 投影落在底部菜单栏上的点会被栏吃掉。
-func _open_cell_near(from_pos: Vector2, min_c: int, max_c: int, on_map := true) -> Vector2i:
+func _open_cell_near(from_pos: Vector2, min_c: int, max_c: int, on_map := true,
+		stats = null) -> Vector2i:
 	var walls: Array = _p.get("_walls")
 	var tile: int = int(_p.get("_tile_size"))
 	var astar: AStarGrid2D = _p.get("_astar")
@@ -390,12 +410,28 @@ func _open_cell_near(from_pos: Vector2, min_c: int, max_c: int, on_map := true) 
 				continue
 			cand.append(Vector2i(x, y))
 	cand.shuffle()
+	# ⚠ 默认值不能写 {}：GDScript 的默认实参只求值一次，往里面写会污染所有调用方。
+	var st: Dictionary = stats if stats is Dictionary else {}
+	if not st.is_empty() or stats is Dictionary:
+		st["cand"] = cand.size()
+		st["unreachable"] = 0
+		st["off_map"] = 0
+	# 先按屏幕带筛（一次乘法），再对幸存者做 A*（贵）。反过来会只看前 24 个采样：
+	# 6~16 格这一圈里"落在地图区"的本来就只占一小撮，24 个全踩空就会报"找不到格"。
+	var on_screen: Array = []
+	if on_map:
+		for cell: Vector2i in cand:
+			if _on_map(_center_of(cell)):
+				on_screen.append(cell)
+			else:
+				st["off_map"] = int(st.get("off_map", 0)) + 1
+		st["on_screen"] = on_screen.size()
+		cand = on_screen
 	for attempt in range(mini(24, cand.size())):
 		var cell: Vector2i = cand[attempt]
 		if astar != null and astar.get_id_path(c, cell).is_empty():
+			st["unreachable"] = int(st.get("unreachable", 0)) + 1
 			continue
-		if on_map and not _on_map(_center_of(cell)):
-			continue          # 落在菜单栏上的点击会被栏吃掉，不算"点了没反应"
 		return cell
 	return Vector2i(-1, -1)
 

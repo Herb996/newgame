@@ -6,10 +6,12 @@ extends Node
 ##   A 群系：4 种（草地/荒原/森林/沼泽）都出现，且草地占比最大（出厂权重 3.4）
 ##   B 装饰：树/石/残骸/灌木 计数 > 0（裂缝/河水已按需求从地图移除，见 map_generator
 ##      里"河流与裂缝均已按需求移除"，这里只留"万一有人加回来别挡路"的守卫）
-##   C 矿脉：按 map.resource_clusters 里出现的每种都要生成，且只落在**该资源自己
-##      weight>0 的群系**（早期写死"只在荒原"，配置改成允许草地/森林后就成了假阳性）
-##      ⚠ gold 现在是真缺口：config 的 resource_clusters 没有 gold 条目 → 这条会红，
-##        补条目或确认"金矿只从战利品来"之后改探针，别当环境噪声忽略。
+##   C 矿脉：按 map.resource_clusters.types 里**配了份额又有允许群系**的每种矿脉都要
+##      生成，且只落在**该资源自己 biome_weight>0 的群系**（早期写死"只在荒原"，配置
+##      改成允许草地/森林后就成了假阳性）。2026-09-19 起形状是 {total, types}，探针跟着
+##      配置动态展开，不再写死名单。
+##      ⚠ gold 仍是真缺口：config 里没有 gold 簇条目 → 地图上不产金。这条**打印**出来
+##        但不算失败，等用户裁定（补条目 vs 确认"金只从战利品来"）后再决定要不要变红。
 ##   D 地形减速：沼泽/雪原格 speed<1、水格 speed≤river.slow、普通格 ==1
 ##   E 注册表：build_from_map → harvest 扣减 → get_by_grid 反查 → 总储量一致
 ##
@@ -162,33 +164,54 @@ func _probe_veins(result: Dictionary) -> void:
 	var biome: Array = result["biome"]
 	var by_res: Dictionary = {}
 	var out_of_biome := 0
-	# 每种矿脉允许落在哪些群系 = map.resource_clusters.<res>.weight 里值 >0 的那些。
-	# 以前写死 [1]（只有荒原），而配置早就允许 iron 落草地/森林，于是一跑就"越界 25 个"
-	# —— 那是探针过期，不是地图乱摆。
+	# map.resource_clusters 的新形状（2026-09-19 定形）：{total, types:{res:{share,
+	# min_size, max_size, biome_weight:{群系: 权重}}}}。旧探针按 {res:{weight}} 读，
+	# 第一个键就撞上 total（int）→ .get() 直接 SCRIPT ERROR，**整段断言一条没跑**，
+	# 而计数只在跑完之后才打，于是"30/30 全过"是假的。
 	var clusters = Config.get_value("map.resource_clusters", {})
+	var types: Dictionary = clusters.get("types", {}) if clusters is Dictionary else {}
+	_check(not types.is_empty(), "map.resource_clusters.types 有内容（空 = 整段无意义）")
+	# 每种资源允许落在哪些群系 = biome_weight 里值 >0 的那些。以前写死 [1]（只有荒原），
+	# 而配置早就允许 iron 落草地/森林，于是一跑就"越界 25 个"—— 那是探针过期。
 	var allowed_by_res := {}
-	for rid in clusters:
+	var vein_types: Array = []
+	for rid in types:
+		var tc: Dictionary = types[rid]
+		var bw: Dictionary = tc.get("biome_weight", {})
 		var ok_b: Array = []
-		var wts = clusters[rid].get("weight", {})
-		for k in wts:
-			if int(wts[k]) > 0:
+		for k in bw:
+			if int(bw[k]) > 0:
 				ok_b.append(int(str(k)))
 		allowed_by_res[str(rid)] = ok_b
+		# 该不该进 veins 数组由 map_generator 判定（tree/rock 进 decor），这里跟着它列清单，
+		# 并只把「配了份额 + 有允许群系」的类型当成必须出现 —— share=0 或全 0 权重不该有货。
+		if str(rid) in ["iron", "gold", "oil"] and int(tc.get("share", 0)) > 0 \
+				and not ok_b.is_empty():
+			vein_types.append(str(rid))
+	var stray := {}
 	for vd in veins:
 		var rid: String = str(vd.get("res_id", ""))
 		by_res[rid] = int(by_res.get(rid, 0)) + 1
 		if not allowed_by_res.has(rid):
+			stray[rid] = int(stray.get(rid, 0)) + 1
 			continue
 		var b: int = int(biome[int(vd["gy"])][int(vd["gx"])])
 		if not (allowed_by_res[rid] as Array).has(b):
 			out_of_biome += 1
 	print("[Probe] 矿脉：%s" % str(by_res))
-	for rid in ["iron", "gold", "oil"]:
+	for rid in vein_types:
 		_check(int(by_res.get(rid, 0)) > 0,
-				"%s 矿脉节点数 %d（应 > 0；为 0 通常是 map.resource_clusters 里没有 %s 条目）"
+				"%s 矿脉节点数 %d（应 > 0；为 0 通常是 map.resource_clusters.types 里没有 %s）"
 				% [rid, int(by_res.get(rid, 0)), rid])
+	_check(stray.is_empty(),
+			"veins 里不出现配置之外的 res_id（多余的 %s）" % str(stray))
 	_check(out_of_biome == 0,
 			"矿脉只落在各自配置的限定群系（越界 %d 个，应 0）" % out_of_biome)
+	if not types.has("gold"):
+		# 不是环境噪声，也别当失败：地图上没有金矿簇是**待用户裁定**的设计缺口
+		# （补 gold 条目 vs 确认"金只从战利品来"）。打印出来，别静默通过。
+		print("[Probe] -- 缺口：map.resource_clusters.types 没有 gold 条目 ⇒ 全图无金矿脉"
+				+ "（代码支持，见 map_generator.gd:1210 / VEIN_RES）")
 
 
 # ------------------------------------------------------------ D 减速

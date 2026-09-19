@@ -60,6 +60,20 @@ const SRC_TILE := 64            # Tiny Swords 官方瓦片边长（重采样前�
 const WALL_VARIANTS := 1        # 水面列数（官方水面只有一张可平铺瓦片）
 const ATLAS_SEED := 20260915    # 回退图集固定种子：外观稳定，不随地图变化
 
+# ---------- 群系边界混合层（2026-09-19）----------
+# 群系之间原本只有一条 1 格阶梯的纯色跳变 —— 边界两侧什么美术都没画。
+# 修法是**纹理抖动混合**：在边界两侧各 radius 格的带内，把"次主导群系"的同一块
+# blob 按 1-bit Bayer 网点盖在主图层上，覆盖率由 CPU 算出的权重场量化成 BLD_LEVELS 档。
+#
+# 【为什么把网点烘进图集，而不是在 shader 里算】
+#   网点必须钉在地图坐标上才会"看着属于地面"。TileMapLayer 的 canvas_item UV 是
+#   **图集 UV**、不是全图 UV，拿不到格坐标（VERTEX 语义在批处理下不保证），所以
+#   shader 路线要额外背一张全图 mask。而瓦片边长 64 恰好是网点周期 8 的整数倍 ——
+#   每格内嵌一个 8×8 相位，相邻瓦片的网点天然对齐成一张连续网，不需要任何坐标推导。
+#   于是图集多 7 行，换来零 shader、零 mask、结果可逐像素断言。
+const BLD_LEVELS := 7           # 覆盖率档位：1/8 … 7/8（0=不盖，8 永不使用）
+const BLD_DEFAULT_DITHER := 8   # 默认 Bayer 矩阵边长（像素），必须整除 tile_size
+
 # 生物群系数量与图集列布局：不再写死常量，改为运行时从 config.json 的
 # map.biomes 读取（biome_count()），因此【加一种地形只改配置、GDScript 零改码】：
 # 在 config 里加一项（含 tileset 字段指向某张 Tilemap_colorN.png）即可。
@@ -376,6 +390,7 @@ static var _decor_tex: Dictionary = {}     # 装饰物贴图缓存（kind -> Arr
 static var _decor_img: Dictionary = {}     # 装饰物原始 Image（kind -> Array[Image]，预览合成用）
 static var _decor_shadow_tex: Dictionary = {}  # 装饰物落地投影贴图缓存（按类别）
 static var _atlas_img: Image = null        # 瓦片图集 Image（预览合成用）
+static var _blend_atlas_img: Image = null  # 群系混合层图集 Image（预览合成用）
 static var _used_ai_atlas := false         # 本次图集是否来自官方素材（调试用）
 
 ## 关掉宏观明暗层（由 main.gd 的 `--no-macro` 设置）。
@@ -429,6 +444,8 @@ static func generate() -> Dictionary:
 	var border_jitter: float = float(Config.get_value("map.biome_border_jitter", 0.055))
 	var biome_spread: float = float(Config.get_value("map.biome_spread", 1.35))
 	var edge_blend: float = float(Config.get_value("map.biome_edge_blend", 0.45))
+	var blend_on: bool = bool(Config.get_value("map.biome_blend.enabled", true))
+	var blend_radius: int = int(Config.get_value("map.biome_blend.radius_cells", 1))
 	var macro_on: bool = bool(Config.get_value("map.macro_light.enabled", true))
 	var macro_strength: float = float(Config.get_value("map.macro_light.strength", 0.22))
 	var shadow_on: bool = bool(Config.get_value("map.decor.shadow", true))
@@ -569,6 +586,30 @@ static func generate() -> Dictionary:
 				layer.set_cell(Vector2i(x, y), 0,
 						Vector2i(b * BLOB_N + blob_index(terrain, x, y), 0))
 
+	# ---- 群系边界混合层 ----
+	# 必须在主图层的 blob 定完之后再算：混合层要照抄同一格的 blob 下标，
+	# 两层描出来的岸线/崖壁形状才会重合，而不是各描一份。
+	var blend_cells: Dictionary = {}
+	var blend_layer: TileMapLayer = null
+	if blend_on and biome_count() >= 2:
+		var t_blend: int = Time.get_ticks_msec()
+		blend_cells = _build_blend_cells(biome, terrain, width, height, blend_radius)
+		if not blend_cells.is_empty():
+			var dither := _blend_dither_size(tile_size)
+			blend_layer = TileMapLayer.new()
+			blend_layer.name = "BiomeBlendLayer"
+			blend_layer.tile_set = _build_blend_tileset(tile_size, dither)
+			# 必须最近邻：线性过滤会把 1-bit 网点糊成半透明灰膜，
+			# 那就退化成当初被否掉的"颜色 lerp = 脏泥"。
+			blend_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			for pos in blend_cells:
+				var e: Dictionary = blend_cells[pos]
+				blend_layer.set_cell(pos, 0,
+						blend_atlas_pos(int(e["alt"]), int(e["k"]), int(e["lv"])))
+			print("[Map] 群系边界混合：%d 格（带宽 %d 格，网点 %d×%d），耗时 %d ms"
+					% [blend_cells.size(), blend_radius, dither, dither,
+					   Time.get_ticks_msec() - t_blend])
+
 	# ---- 装饰层 ----
 	# 按 DECOR_RENDER_ORDER 分趟绘制：先铺地表特征（河水 → 裂缝），再放立体物件
 	# （碎石 → 灌木 → 树 → 石）。同层 add 顺序即绘制顺序，保证水在最底、物件压在最上。
@@ -685,6 +726,8 @@ static func generate() -> Dictionary:
 	var root := Node2D.new()
 	root.name = "MapRoot"
 	root.add_child(layer)
+	if blend_layer != null:
+		root.add_child(blend_layer)   # 夹在主图层与装饰层之间：盖住地面，不盖物件
 	root.add_child(decor_root)
 
 	# ---- 阻挡型装饰的碰撞体（2026-09-15 修「人物卡到树里」）----
@@ -758,7 +801,7 @@ static func generate() -> Dictionary:
 	return {"node": root, "spawn": spawn, "spawn_cell": center,
 			"walls": walls, "reachable": reachable, "reachable_ratio": ratio,
 			"terrain": terrain, "decor": decor, "biome": biome, "tile_size": tile_size,
-			"veins": veins, "macro": macro_img,
+			"veins": veins, "macro": macro_img, "blend_cells": blend_cells,
 			"speed_mult": speed_mult, "river_slow": river_slow}
 
 
@@ -828,6 +871,19 @@ static func build_preview(result: Dictionary, cells: int) -> Image:
 					col = b * BLOB_N + blob_index(terrain, gx, gy)
 				out.blit_rect(_atlas_img, Rect2i(col * ts, 0, ts, ts),
 						Vector2i(x * ts, y * ts))
+
+	# 群系边界混合层：与运行时同序（地面之后、装饰之前）。网点是 1-bit 的，
+	# 所以直接走 _blend —— 透明处跳过、实心处照抄，等价于游戏里的 NEAREST 叠加。
+	var blend_cells: Dictionary = result.get("blend_cells", {})
+	if _blend_atlas_img != null and not blend_cells.is_empty():
+		for y in range(mini(cells, h)):
+			for x in range(mini(cells, w)):
+				var e: Dictionary = blend_cells.get(Vector2i(x0 + x, y0 + y), {})
+				if e.is_empty():
+					continue
+				var ap := blend_atlas_pos(int(e["alt"]), int(e["k"]), int(e["lv"]))
+				_blend(out, _blend_atlas_img.get_region(Rect2i(ap.x * ts, ap.y * ts, ts, ts)),
+						x * ts, y * ts)
 
 	# 装饰层：按 y 递增绘制（等价于 y_sort，下方的遮上方的）
 	var shadow_on: bool = bool(Config.get_value("map.decor.shadow", true))
@@ -1364,6 +1420,188 @@ static func _build_tileset(tile_size: int) -> TileSet:
 			Vector2(-half, -half), Vector2(half, -half),
 			Vector2(half, half), Vector2(-half, half),
 		]))
+	return ts
+
+
+# ------------------------------------------------------------
+# 群系边界混合层
+#
+# 数据流：biome 网格 →（箱式模糊成每个群系的占比场）→ 每格取"次主导群系"及其
+# 相对占比 w → w 量化成 1..BLD_LEVELS 档覆盖率 → 混合层在 (格) 处放一块
+# "次主导群系的同一 blob、按 Bayer 网点镂空"的瓦片，盖在主图层上。
+# 主图层与碰撞完全不动，所以寻路、通行、速度场一律不受影响。
+# ------------------------------------------------------------
+
+## 混合层图集列数：与主图集同序（b * BLOB_N + k），blob 下标可以直接复用。
+static func blend_atlas_cols() -> int:
+	return BLOB_N * biome_count()
+
+
+## 混合层图集里的瓦片坐标：群系 b 的第 k 块 blob、覆盖率第 lv 档（1..BLD_LEVELS）。
+static func blend_atlas_pos(b: int, k: int, lv: int) -> Vector2i:
+	return Vector2i(b * BLOB_N + k, lv - 1)
+
+
+## 递归构造 n×n 有序 Bayer 矩阵（n 为 2 的幂）：B(2n) = [[4B+0, 4B+2],[4B+3, 4B+1]]
+static func _bayer(n: int) -> Array:
+	var m: Array = [[0]]
+	var sz := 1
+	while sz < n:
+		var nm: Array = []
+		for y in range(sz * 2):
+			var row: Array = []
+			for x in range(sz * 2):
+				var quad: int = (0 if y < sz else 2) + (0 if x < sz else 1)
+				row.append(int(m[y % sz][x % sz]) * 4 + [0, 2, 3, 1][quad])
+			nm.append(row)
+		m = nm
+		sz *= 2
+	return m
+
+
+## 网点边长。必须是 2 的幂、且整除 tile_size —— 后者是关键：只有整除，每格内嵌的
+## 网点相位才会在瓦片边界处接上，相邻瓦片的网点连成一张连续的网而不是各画各的。
+static func _blend_dither_size(tile_size: int) -> int:
+	var d: int = int(Config.get_value("map.biome_blend.dither", BLD_DEFAULT_DITHER))
+	if d >= 2 and d <= tile_size and tile_size % d == 0 and (d & (d - 1)) == 0:
+		return d
+	push_warning("[Map] map.biome_blend.dither 需为 2 的幂且整除 tile_size，收到 %d → 用 %d"
+			% [d, BLD_DEFAULT_DITHER])
+	return BLD_DEFAULT_DITHER
+
+
+## 对 [y][x] 的浮点场做两遍 separable 箱式模糊（窗口 2r+1，越界按实际宽度归一）。
+static func _box_blur(src: Array, r: int, w: int, h: int) -> Array:
+	var tmp: Array = []
+	for y in range(h):
+		var row: PackedFloat32Array = src[y]
+		var pre := PackedFloat32Array()
+		pre.resize(w + 1)
+		for i in range(w):
+			pre[i + 1] = pre[i] + row[i]
+		var out := PackedFloat32Array()
+		out.resize(w)
+		for x in range(w):
+			var a: int = maxi(0, x - r)
+			var c: int = mini(w, x + r + 1)
+			out[x] = (pre[c] - pre[a]) / float(c - a)
+		tmp.append(out)
+	var res: Array = []
+	res.resize(w)
+	for x in range(w):
+		var pre := PackedFloat32Array()
+		pre.resize(h + 1)
+		for i in range(h):
+			pre[i + 1] = pre[i] + tmp[i][x]
+		var out := PackedFloat32Array()
+		out.resize(h)
+		for y in range(h):
+			var a: int = maxi(0, y - r)
+			var c: int = mini(h, y + r + 1)
+			out[y] = (pre[c] - pre[a]) / float(c - a)
+		res[x] = out
+	var final: Array = []
+	for y in range(h):
+		var row := PackedFloat32Array()
+		row.resize(w)
+		for x in range(w):
+			row[x] = res[x][y]
+		final.append(row)
+	return final
+
+
+## 混合带上的每一格：{Vector2i(格) -> {"alt":次主导群系, "k":blob 下标, "lv":档位, "w":占比}}
+## 只统计可走格 —— 水面不参与占比，否则岸边会被水"稀释"出一条假混合带。
+static func _build_blend_cells(biome: Array, terrain: Array, width: int, height: int,
+		radius: int) -> Dictionary:
+	var nb: int = biome_count()
+	if nb < 2:
+		return {}
+	var r: int = clampi(radius, 1, 6)
+	var fields: Array = []
+	for b in range(nb):
+		var ind: Array = []
+		for y in range(height):
+			var row := PackedFloat32Array()
+			row.resize(width)
+			for x in range(width):
+				row[x] = 1.0 if (not bool(terrain[y][x]) and int(biome[y][x]) == b) else 0.0
+			ind.append(row)
+		fields.append(_box_blur(ind, r, width, height))
+	var steps: int = BLD_LEVELS + 1
+	var cells := {}
+	for y in range(height):
+		for x in range(width):
+			if bool(terrain[y][x]):
+				continue
+			var own: int = int(biome[y][x])
+			var own_w: float = fields[own][y][x]
+			var alt: int = -1
+			var alt_w: float = 0.0
+			for b in range(nb):
+				if b != own and fields[b][y][x] > alt_w:
+					alt_w = fields[b][y][x]
+					alt = b
+			var denom: float = own_w + alt_w
+			if alt < 0 or denom <= 0.0:
+				continue
+			var w: float = alt_w / denom
+			var lv: int = clampi(int(w * float(steps) + 0.5), 0, BLD_LEVELS)
+			if lv <= 0:
+				continue
+			cells[Vector2i(x, y)] = {"alt": alt, "k": blob_index(terrain, x, y),
+					"lv": lv, "w": w}
+	return cells
+
+
+## 组装混合层图集：列 = b*BLOB_N+k（与主图集同序，群系 tint 已在主图集乘过），
+## 行 = 覆盖率档 lv-1。每格像素照抄主图集同一块 blob，只把 alpha 换成 1-bit 网点。
+static func _build_blend_image(tile_size: int, dither: int) -> Image:
+	var cols: int = blend_atlas_cols()
+	var img := Image.create(cols * tile_size, BLD_LEVELS * tile_size, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var bay: Array = _bayer(dither)
+	var n2: float = float(dither * dither)
+	# 先把"第 lv 档下每个网点相位亮不亮"查成表，省掉内层循环里的浮点比较
+	var lit: Array = []
+	for lv in range(BLD_LEVELS):
+		var tbl := PackedByteArray()
+		tbl.resize(dither * dither)
+		var thr: float = float(lv + 1) / float(BLD_LEVELS + 1)
+		for yy in range(dither):
+			for xx in range(dither):
+				tbl[yy * dither + xx] = 1 \
+						if (float(int(bay[yy][xx])) + 0.5) / n2 <= thr else 0
+		lit.append(tbl)
+	for lv in range(BLD_LEVELS):
+		var tbl: PackedByteArray = lit[lv]
+		var row0: int = lv * tile_size
+		for c in range(cols):
+			for y in range(tile_size):
+				var ty: int = (y % dither) * dither
+				for x in range(tile_size):
+					if tbl[ty + (x % dither)] == 0:
+						continue
+					img.set_pixel(c * tile_size + x, row0 + y,
+							_atlas_img.get_pixel(c * tile_size + x, y))
+	return img
+
+
+## 混合层的 TileSet。刻意**不带任何碰撞**：它只是盖在地面上的一层皮，
+## 加了碰撞就会把玩家挡在视觉边界之外（寻路用的 walls 也不认它）。
+static func _build_blend_tileset(tile_size: int, dither: int) -> TileSet:
+	var img := _build_blend_image(tile_size, dither)
+	_blend_atlas_img = img.duplicate()
+	_blend_atlas_img.convert(Image.FORMAT_RGBA8)
+	var ts := TileSet.new()
+	ts.tile_size = Vector2i(tile_size, tile_size)
+	var src := TileSetAtlasSource.new()
+	src.texture = ImageTexture.create_from_image(img)
+	src.texture_region_size = Vector2i(tile_size, tile_size)
+	for row in range(BLD_LEVELS):
+		for c in range(blend_atlas_cols()):
+			src.create_tile(Vector2i(c, row))
+	ts.add_source(src, 0)
 	return ts
 
 

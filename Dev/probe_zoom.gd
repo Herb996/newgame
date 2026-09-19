@@ -21,6 +21,17 @@ func _check(ok: bool, msg: String) -> void:
 
 
 func _ready() -> void:
+	# B 段要实例化真 Main3D，而 main3d.gd 开头那几个 debug 自检会**接管整个进程**
+	# （跑完自己 get_tree().quit()）：debug.flow_test=true 时 B 段在 B1 之后就被
+	# FlowTest 的退出码掐死，本探针的汇总行根本没机会打 —— 看着像 zoom 挂了，
+	# 其实是自检在替它说话。探针要的是自己的结论，一律钉回关闭。
+	Config.set_override("debug.smoke_test", false)
+	Config.set_override("debug.flow_test", false)
+	Config.set_override("debug.map_preview", "")
+	# B5 断的是**基地模式**下 HUD 该整体隐藏；debug.auto_enter_run=true 会让 Main3D
+	# 开局直接进战斗（main3d.gd:89 → _enter_run 把 hud.visible 设回 true），那 B5 量的
+	# 就不是同一件事了。这台机器上它现在确实是 true（别的会话留的）。
+	Config.set_override("debug.auto_enter_run", false)
 	await _part_a()
 	await _part_b()
 	print("=== [ZoomProbe] 共 %d 项断言，失败 %d 项 ===" % [_n, _fails.size()])

@@ -47,6 +47,15 @@ SUITES = [
     # 2026-09-19「敌人不会攻击」那条 bug 的守卫：出手改成按射程判定，探针实算
     # 「射程 > 分离层最小间距」这条几何不等式，另盯冷却/前摇/挥空/挡下仍出手/掉落/死亡画面。
     ("Dev/probe_enemy_attack.tscn", "_r_enemylk.log", ("[EnemyAttackProbe]",)),
+    # 2026-09-19 群系边界混合层：它是纯外观层，所以守卫的是「不许影响玩法」——
+    # 同一颗种子开/关两次，terrain/walls/biome/decor 四张网格必须逐格相同，
+    # 关掉后树里不许留节点；另查网点覆盖率确实按 lv/8 量化、混合格只长在边界上。
+    ("Dev/probe_biome_blend.tscn", "_r_blend.log", ("[BlendProbe]",)),
+    # 2026-09-19 敌人朝向：素材是「单侧画 + 8 方向复用同一批帧」，所以「向左」只能靠
+    # Sprite2D.flip_h 镜像。守卫三件事：① 玩家枪兵的真 8 方向素材不许被镜像（默认关）；
+    # ② 素材本身朝左的两只鲨鱼要反着判（一刀切 dir.x<0 就翻）；③ 受击压扁走
+    # animator 的 scale_mul 通道，不再和每物理帧重写 _sprite.scale 的代码抢方向盘。
+    ("Dev/probe_enemy_facing.tscn", "_r_facing.log", ("[EnemyFacingProbe]",)),
 ]
 
 BAD_MARKS = ("SCRIPT ERROR", "Parse Error", "Invalid call", "Invalid access",

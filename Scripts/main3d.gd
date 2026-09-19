@@ -747,7 +747,11 @@ func _flow_test() -> void:
 	_check(fails, _player != null, "进入基地：玩家已装配")
 	_check(fails, _base_render != null, "进入基地：3D 地形已渲染")
 	_check(fails, _entity_visual != null, "进入基地：实体表现层已装配")
-	_check(fails, bld_count == 3, "进入基地：建筑 %d 栋（期望 3）" % bld_count)
+	# 建筑栋数按配置现算：base.buildings 早就从 3 栋长到 12 栋（靶场/兵营/塔/农舍…），
+	# 这里再写死 3 只会每次自检都红一条，掩盖真正要看的「有没有重复装配」。
+	var want_bld: int = (Config.get_value("base.buildings", []) as Array).size()
+	_check(fails, want_bld > 0 and bld_count == want_bld,
+			"进入基地：建筑 %d 栋（配置 base.buildings = %d）" % [bld_count, want_bld])
 	_check(fails, not _fog.is_active(), "进入基地：迷雾关闭")
 	_check(fails, not hud.visible, "进入基地：HUD 隐藏")
 	_check(fails, logic_root.get_child_count() == base_logic_n and base_logic_n >= 4,
@@ -810,14 +814,26 @@ func _flow_test() -> void:
 			spawn_at / 60.0, ext_after])
 	_check(fails, open_n == ext_after, "撤离点开启：%d 个全部处于开放状态" % open_n)
 	_check(fails, minimap.visible, "撤离点开启：小地图自动弹出")
-	_check(fails, _entity_visual.get_child_count() == 2 + ext_after,
-			"撤离点开启：3D 表现层已建出 %d 个撤离点节点" % (ext_after))
+	# 3D 撤离点形态是 _process → EntityVisual3D.sync() 里建的，而 process_frame 信号
+	# 在节点 _process **之前**发出：协程在「撤离点刚生成」那一帧醒来时，表现层天然还
+	# 差一帧。所以断言前先等它跟上 —— 等条件，不等魔法帧数（真不建就会超时并报帧数）。
+	var ext_guard := 0
+	while _entity_visual.get_child_count() < 2 + ext_after and ext_guard < 30:
+		ext_guard += 1
+		await get_tree().process_frame
+	var ev_n: int = _entity_visual.get_child_count()
+	_check(fails, ev_n == 2 + ext_after,
+			"撤离点开启：3D 表现层子节点 %d（期望 2 个 MultiMesh + %d 个撤离点形态，等了 %d 帧）"
+			% [ev_n, ext_after, ext_guard])
 	var vis_v: Node = null
 	var first_pt: Node = get_tree().get_nodes_in_group("extraction_points")[0]
+	var want_name := "?"
 	if first_pt is Node2D:
-		vis_v = _entity_visual.get_node_or_null(
-				"Extract_%d" % (first_pt as Node2D).get_instance_id())
-	_check(fails, vis_v != null, "撤离点开启：对应的 3D 形态已建立")
+		want_name = "Extract_%d" % (first_pt as Node2D).get_instance_id()
+		vis_v = _entity_visual.get_node_or_null(want_name)
+	_check(fails, vis_v != null,
+			"撤离点开启：对应的 3D 形态已建立（找 %s，首点类型 %s）"
+			% [want_name, first_pt.get_class()])
 
 	# ---------------- 4) 超时结算 → 回基地 ----------------
 
@@ -848,8 +864,9 @@ func _flow_test() -> void:
 	_check(fails, get_tree().get_nodes_in_group("loot_nodes").size() == 0, "回基地：资源点无残留")
 	_check(fails, get_tree().get_nodes_in_group("extraction_points").size() == 0,
 			"回基地：撤离点无残留")
-	_check(fails, get_tree().get_nodes_in_group("buildings").size() == 3,
-			"回基地：建筑重新建好 %d 栋" % get_tree().get_nodes_in_group("buildings").size())
+	_check(fails, get_tree().get_nodes_in_group("buildings").size() == want_bld,
+			"回基地：建筑重新建好 %d 栋（配置 %d）" % [
+					get_tree().get_nodes_in_group("buildings").size(), want_bld])
 	var logic_after: int = logic_root.get_child_count()
 	_check(fails, logic_after == base_logic_n,
 			"回基地：LogicRoot 子节点 %d == 首次 %d（逻辑层无泄漏）" % [logic_after, base_logic_n])

@@ -168,6 +168,15 @@ func _handle_cli() -> bool:
 				# 与 --seed 同样的理由：config 全程只读，中途崩了也不会留脏配置。
 				i += 1
 				_weapon_override = argv[i] if i < argv.size() else ""
+			"--set":
+				# 通用覆盖：--set map.biome_blend.enabled false
+				# 只写进 Config 的内存覆盖层，Data/config.json 与 user://settings.json
+				# 一律不动 —— 出"关掉某功能"的负对照图靠它，不然只能改配置文件再改回来。
+				if i + 2 < argv.size():
+					var v = _cli_value(str(argv[i + 2]))
+					Config.set_override(str(argv[i + 1]), v)
+					print("[CLI] 覆盖 %s = %s" % [str(argv[i + 1]), str(v)])
+				i += 2
 		i += 1
 	if seed_override != 0:
 		_seed_override = seed_override
@@ -222,6 +231,20 @@ func _handle_cli() -> bool:
 	_free_map_node(result)
 	get_tree().quit()
 	return true
+
+
+## --set 的值从命令行来永远是字符串，这里还原成 config 里该有的类型。
+static func _cli_value(raw: String):
+	match raw:
+		"true":
+			return true
+		"false":
+			return false
+	if raw.is_valid_int():
+		return int(raw)
+	if raw.is_valid_float():
+		return float(raw)
+	return raw
 
 
 ## 把运行时组装的图集另存为 PNG（--dump-atlas）。

@@ -16,6 +16,9 @@ extends RefCounted
 ##      attack/dodge/hit/dead 播完停在末帧（一次性动作）；
 ##   4) **只有"没配帧序列"的状态**才叠加程序化运动（呼吸/挥击前冲/冲刺拉伸/受击抖动/死亡倾倒）——
 ##      配了帧序列的状态以帧本身为准，避免"帧在动、代码又动"叠加成抖动。
+##   5) **水平镜像**：素材只画了一个侧向时（敌人 21 个兵种全是扁平单侧帧），
+##      靠 Sprite2D.flip_h 补出另一半方向。默认关闭（FLIP_NONE），只在 view_cfg 显式
+##      配 sprite_flip_h 时才生效，所以玩家的 8 向枪兵绝不会被二次镜像。见 FLIP_* 。
 ##
 ## 缺帧容错链：该状态该方向无帧 → 复用同方向 idle 帧 → idle 也缺 → 保留当前贴图。
 ## （方向层面还有一条更早的回退：斜向 → 主方向，见 DIR_FALLBACK / parse_spec。）
@@ -74,10 +77,27 @@ const DEFAULT_SPRITE_OFFSET_Y := -24.0
 const DEFAULT_SPRITE_SCALE := 0.5
 const DEFAULT_PIXEL_UNIT := 2.0
 
+## 水平镜像的三档。写在 config/view_cfg 的 `sprite_flip_h`，值可以是字符串或 int。
+##   none  = 永不镜像（玩家的 8 向素材、静态物件如 ep_cave 洞口）
+##   right = 素材原画朝右 → 朝左看时镜像（敌人绝大多数兵种）
+##   left  = 素材原画朝左 → 朝右看时镜像（ep_harpoon_shark / ep_paddle_shark 头在左边，
+##           按 right 的规则翻正好翻反，所以必须有这一档）
+const FLIP_NONE := 0
+const FLIP_RIGHT := 1
+const FLIP_LEFT := 2
+## 朝向的水平分量小于这个值 = 正上/正下走，此时**保持上一次镜像**不改。
+## 没有死区的话，竖着走时 facing.x 在 0 附近抖，精灵会一帧朝左一帧朝右地抽风。
+const FLIP_DEADZONE_X := 0.25
+
 var _sprite: Sprite2D
 var _offset_y := DEFAULT_SPRITE_OFFSET_Y   # 脚底对齐偏移（锚点=画布底边中心）
 var _scale := DEFAULT_SPRITE_SCALE         # 画布缩放
 var _pixel_unit := DEFAULT_PIXEL_UNIT      # 程序化位移的"1 像素"等于多少屏幕单位
+var _flip_mode := FLIP_NONE                # 见 FLIP_* ；默认关，老素材集行为不变
+var _flip_deadzone := FLIP_DEADZONE_X
+## 外部叠加的整体缩放倍数（受击挤压）。本类每帧都会把 _scale * _scale_mul 写进
+## _sprite.scale，所以外部只改这个倍数、不要去直接改 _sprite.scale —— 会被这里盖掉。
+var _scale_mul := Vector2.ONE
 var _frames: Dictionary = {}      # _frames[anim_name][dir] = Array[Texture2D]
 var _fps: Dictionary = {}         # _fps[anim_name] = float（帧/秒）
 var _frame_t: Dictionary = {}     # _frame_t[anim_name] = float（该动画已播放秒数）
@@ -159,6 +179,37 @@ static func primary_dir(dir: StringName) -> StringName:
 	return v
 
 
+## `sprite_flip_h` 的取值 → FLIP_*。config 写字符串（"right"/"left"/"none"），
+## 探针和内部代码也可以直接传 int。认不出的值一律当 none：**宁可不动画**，
+## 也不要在装载路径里 push_warning —— 一局 100 个敌人会把日志刷爆。
+static func flip_mode_of(v) -> int:
+	if v is int or v is float:
+		var n := int(v)
+		if n >= FLIP_NONE and n <= FLIP_LEFT:
+			return n
+		return FLIP_NONE
+	var s := str(v).strip_edges().to_lower()
+	if s == "right":
+		return FLIP_RIGHT
+	if s == "left":
+		return FLIP_LEFT
+	return FLIP_NONE
+
+
+## 纯函数版镜像判定（探针直接测它，不用造一个真 Sprite2D）。
+## `held` = 上一次的镜像状态：死区内（正上/正下走、或还没朝过任何方向）原样保持。
+static func flip_for(mode: int, facing: Vector2, held: bool, deadzone: float) -> bool:
+	if mode == FLIP_NONE:
+		return false
+	if facing.length_squared() < 0.000001 or absf(facing.x) < deadzone:
+		return held
+	if mode == FLIP_RIGHT:
+		return facing.x < 0.0
+	if mode == FLIP_LEFT:
+		return facing.x > 0.0
+	return held
+
+
 ## idle 帧的绝对兜底路径（与 03 命名规范一致）。
 ## 只保证 4 个主方向的文件存在，斜向先归一化再取。
 static func _idle_path_for(dir: StringName) -> String:
@@ -190,6 +241,9 @@ func load_from_config(sprites_cfg: Dictionary, view_cfg: Dictionary = {},
 	_scale = float(view_cfg.get("sprite_scale", DEFAULT_SPRITE_SCALE))
 	_offset_y = float(view_cfg.get("sprite_offset_y", DEFAULT_SPRITE_OFFSET_Y))
 	_pixel_unit = float(view_cfg.get("sprite_pixel_unit", DEFAULT_PIXEL_UNIT))
+	_flip_mode = flip_mode_of(view_cfg.get("sprite_flip_h", "none"))
+	_flip_deadzone = float(view_cfg.get("sprite_flip_deadzone", FLIP_DEADZONE_X))
+	_scale_mul = Vector2.ONE
 
 	var spec := parse_spec(sprites_cfg)
 	var anims: Dictionary = spec["anims"]
@@ -252,6 +306,10 @@ func _summary() -> String:
 ## 变成"多帧状态"，从而丢掉挥击前冲/受击抖动/死亡倾倒这些反馈（这个坑踩过）。
 func update(delta: float, anim: int, facing: Vector2) -> void:
 	_time += delta
+	# 镜像放在最前面，且在下面 frames.is_empty() 提前 return **之前**：
+	# 只配了 idle 帧的兵种（如无 walk 的 ep_cave）也要能跟着转向。
+	# FLIP_NONE 时 flip_for 恒返回 false，玩家那套真 8 向素材永远不会被二次镜像。
+	_sprite.flip_h = flip_for(_flip_mode, facing, _sprite.flip_h, _flip_deadzone)
 	var anim_name := anim_name_of(anim)
 	var dir := dir_from_facing(facing)
 	var own_per_dir: Dictionary = _frames.get(anim_name, {})
@@ -334,8 +392,19 @@ static func anim_name_of(anim: int) -> StringName:
 func _apply_frame_pose(anim: int) -> void:
 	_sprite.offset = Vector2(0.0, _offset_y)
 	_sprite.rotation = 0.0
-	_sprite.scale = Vector2(_scale, _scale)
+	_sprite.scale = Vector2(_scale * _scale_mul.x, _scale * _scale_mul.y)
 	_sprite.modulate = tint_for(anim)
+
+
+## 外部叠加缩放倍数（受击挤压走这条通道）。**不要**去直接 tween _sprite.scale ——
+## 本类每个物理帧都会按 _scale * _scale_mul 重写它，直接写会被盖掉，
+## 而 scale≠1 的兵种（troll 0.5 / minotaur 0.6）因此根本看不到挤压。
+func set_scale_mul(v: Vector2) -> void:
+	_scale_mul = v
+
+
+func get_scale_mul() -> Vector2:
+	return _scale_mul
 
 
 ## 状态染色（受击泛红 / 死亡变暗 / 冲刺半透明）
@@ -353,7 +422,7 @@ static func tint_for(anim: int) -> Color:
 func _apply_motion(anim: int, facing: Vector2) -> void:
 	var off := Vector2(0.0, _offset_y)
 	var rot := 0.0
-	var sc := Vector2(_scale, _scale)
+	var sc := Vector2(_scale * _scale_mul.x, _scale * _scale_mul.y)
 	var mod := Color(1, 1, 1)
 	var t := _time
 

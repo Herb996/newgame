@@ -13,11 +13,29 @@
     "biome_smooth_iterations": 3,
     "biome_remove_islands": true,
     "biome_min_region_cells": 40,
+    "biome_blend": {
+      "_comment": "群系边界混合层：把两群系之间那条 1 格阶梯的纯色跳变化开。做法是 CPU 侧对 biome 网格做箱式模糊得到每格各群系占比，取次主导群系的占比 w，量化成 1..7 档覆盖率，再用第二层 TileMapLayer 把「次主导群系的同一块 blob」按 1-bit Bayer 网点盖在主图层上。只影响观感——碰撞、寻路 walls、速度场一律不动。下次生成地图才生效。",
+      "enabled": false,
+      "radius_cells": 1,
+      "dither": 8
+    },
     "biome_weights": {
       "0": 3.4,
       "1": 1.05,
       "2": 1.25,
       "3": 0.95
+    },
+    "biome_min_pct": {
+      "0": 10,
+      "1": 10,
+      "2": 10,
+      "3": 10
+    },
+    "biome_max_pct": {
+      "0": 30,
+      "1": 30,
+      "2": 30,
+      "3": 30
     },
     "biomes": [
       {
@@ -256,7 +274,10 @@
     "weapon": "sword",
     "sprite_scale": 0.6,
     "sprite_offset_y": -38.0,
-    "sprite_pixel_unit": 10.0
+    "sprite_pixel_unit": 10.0,
+    "box_select_threshold_px": 6.0,
+    "box_select_line_color": "#99E699",
+    "box_select_fill_alpha": 0.14
   },
   "characters": {
     "_comment": "出发大门的选人表（鼠标点大门弹面板，**可多选**组成小队，点「出击」才进局）。weapon 指向 combat.weapons 的 id —— 贴图集跟着武器走（spear → sprites_lancer 8 向枪兵；sword → sprites_ts 战士；bow → 锁 sprites_archer 弓兵），所以角色 = 选武器/打法。default 是无人选择路径（命令行/无头回归/auto_enter_run）的兜底单人；选择名单只存会话内存不落盘。进图后 RTS 点选指挥：点角色选中，左键点地移动、空格闪避，**攻击全自动**（敌人进入『观察视野 ∩ 攻击距离』即自动起手，够不着不追），未选中的成员同样自动战斗；全员站入撤离圈才可撤离，全队倒下才算失败。新增角色往 list 里加即可，面板自动多一行。**强弩（sniper）已于 2026-09-17 从名单移除**（AI 立绘风格不统一、与另外三人割裂，用户定）；武器/贴图/探针/代码全部保留，加回来只需在 list 里插一条。command_set = 局内菜单栏里这个单位的指令集 id（见顶层 menu_bar.command_sets）—— 换单位就换整套指令面板。",
@@ -690,7 +711,8 @@
         "gold": 1,
         "oil": 1
       }
-    }
+    },
+    "flip_h_with_facing": true
   },
   "noise": {
     "hear_radius_cells": 16,
@@ -879,7 +901,8 @@
       "hit_direction_peak_alpha": 0.85,
       "hit_direction_color": "#ff5a4a",
       "hit_direction_max_marks": 4,
-      "hit_direction_segments": 12
+      "hit_direction_segments": 12,
+      "death_fade_seconds": 0.45
     },
     "hit_stop": {
       "_comment": "命中微冻（hitstop）：命中那一瞬把 Engine.time_scale 压到 time_scale，停 seconds 秒后再弹回。这是打击感的第一个来源——没有它，白闪/挤压做得再花也『打不动人』。cooldown_seconds 之内不叠加：连发武器会把画面钉住。挨打比打人停得久一点（on_receive_damage），因为『我被打中』要更贵。注意 Engine.time_scale 只被这一处占用；debug.time_scale 是局内倒计时的独立乘数，两者别混。",
@@ -930,7 +953,8 @@
     "pickup_radius_px": 80.0,
     "pickup_retry_seconds": 0.5,
     "icon_px": 44,
-    "ring_radius_px": 26
+    "ring_radius_px": 26,
+    "drop_spread_px": 22.0
   },
   "storage": {
     "max_slots": 20,
@@ -1298,6 +1322,12 @@
       }
     }
   },
+  "inventory_popup": {
+    "_comment": "右键角色的头顶背包弹窗（inventory_popup.gd）。纯表现参数，不碰数值。",
+    "head_offset_px": 44.0,
+    "viewport_margin_px": 8.0,
+    "min_width_px": 210.0
+  },
   "menu": {
     "_comment": "开始菜单。game_scene = 新建/历史存档后进入的场景，**本项目只做 2D 线**，所以固定指 res://Scenes/Main.tscn（3D 场景不在计划内，保留只为随时 F6 回看）；save_slots = 存档槽位数（user://saves/slot_NN.json）。",
     "title": "王国废墟：拾荒撤离",
@@ -1361,7 +1391,7 @@
       -150
     ],
     "smoke_test": false,
-    "flow_test": true,
+    "flow_test": false,
     "auto_enter_run": true,
     "main3d_start": "base",
     "time_scale": 20.0,
@@ -4224,7 +4254,9 @@
       "_comment": "幻影分身（弓手 phantom_double）的全局调节。enabled=false → 分到该特性的弓手不再召唤分身（本体照常行动、照常挨打），调试/平衡用。单只本体的分身上限配在特性里（max_phantoms_per_owner=8）；max_live_phantoms 是**全场的硬兜底**（0 = 不限），2026-09-17 从 40 下调到 16 —— 100 只敌里十几只弓手、每只最多 8 具，理论上一局能到 100 具以上，这个兜底才是真正决定「同屏能看到几具幻影」的那个数，嫌多/嫌少先调它。",
       "enabled": true,
       "max_live_phantoms": 16,
-      "max_phantoms_per_owner": 8
+      "max_phantoms_per_owner": 8,
+      "hp_ratio_of_owner": 0.2,
+      "resummon_interval_seconds": 5.0
     },
     "noise_amplify": {
       "_comment": "噪音放大的全局封顶（特性 burst_drum「爆裂鼓手」用，见 enemy_types.types[cultist].traits[0].noise_amplify）。多只邪术师的增幅叠加后统一夹在 max_multiplier 之内；enabled=false 可整体关掉放大（调试/平衡用）。",
