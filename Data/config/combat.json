@@ -1,0 +1,155 @@
+{
+  "combat": {
+    "weapons": {
+      "_comment": "武器表。kind = melee 走原来的扇形 Hitbox；kind = ranged 在判定帧发射弹道（见 Scripts/combat/projectile.gd）。sprite_set = \"\" 表示『跟随 player.sprite_set』；近战 sword/spear 已各自锁 sprites_ts / sprites_lancer，弓必须锁 sprites_archer，因为拉弓动作只存在于弓手素材。四项 timing 与 damage/range/arc/max_targets 都是**按武器**覆盖 combat.attack 的同名键；缺键就回落到 combat.attack，所以老行为不变。noise 覆盖 noise.sources.attack（弓比剑安静，潜行时是可利用的差异）。",
+      "sword": {
+        "name": "剑",
+        "kind": "melee",
+        "sprite_set": "sprites_ts",
+        "damage": 25,
+        "range_px": 120.0,
+        "arc_degrees": 200,
+        "max_targets": 3,
+        "windup_seconds": 0.12,
+        "active_seconds": 0.08,
+        "recovery_seconds": 0.2,
+        "noise": 120,
+        "fx_attack": "slash_sword",
+        "fx_hit": "hit_sword"
+      },
+      "spear": {
+        "name": "长枪",
+        "kind": "melee",
+        "sprite_set": "sprites_lancer",
+        "damage": 26,
+        "range_px": 180.0,
+        "arc_degrees": 120,
+        "max_targets": 2,
+        "windup_seconds": 0.15,
+        "active_seconds": 0.08,
+        "recovery_seconds": 0.25,
+        "noise": 110,
+        "fx_attack": "thrust_spear",
+        "fx_hit": "hit_pierce"
+      },
+      "staff": {
+        "_comment": "法杖（2026-09-18 随「僧侣」加入）。**kind 复用现成的 melee**（扇形 Hitbox），一行 combat 代码都不改 —— 这轮的边界就是「只加外观、能选能打」，治疗机制留作后续任务。数值定位刻意做成**低伤低噪的中距近战**：伤害 18（低于剑 25 / 枪 26）、射程 140（夹在剑 120 与枪 180 之间）、扇形 140° 打 2 个，噪音 60 是四把武器里最小的（比弓的 70 还安静）—— 施法声本就不该像刀剑碰撞那么响，也给日后「奶妈不该引怪」留出空间。三段时间（0.2/0.1/0.35 = 0.65s）刻意放慢，去贴 Heal 动画那 11 帧的施法韵律（14fps ≈ 0.79s，动画略长于判定，末帧停留等待 recovery）。",
+        "name": "法杖",
+        "kind": "melee",
+        "sprite_set": "sprites_monk",
+        "damage": 18,
+        "range_px": 140.0,
+        "arc_degrees": 140,
+        "max_targets": 2,
+        "windup_seconds": 0.2,
+        "active_seconds": 0.1,
+        "recovery_seconds": 0.35,
+        "noise": 60,
+        "fx_attack": "cast_staff",
+        "fx_hit": "hit_holy"
+      },
+      "bow": {
+        "name": "弓",
+        "kind": "ranged",
+        "sprite_set": "sprites_archer",
+        "damage": 20,
+        "range_px": 0.0,
+        "arc_degrees": 0,
+        "max_targets": 1,
+        "windup_seconds": 0.3,
+        "active_seconds": 0.06,
+        "recovery_seconds": 0.18,
+        "noise": 70,
+        "projectile": {
+          "_comment": "箭矢：直线飞行，撞墙/超射程/命中即消失。hit_radius_px 是判定半径（点到飞行线段的最近距离，天然防穿透）。Arrow.png 实测 43x12、在 64x64 画布里居中（中心偏移 -0.5,0），所以按速度角旋转时不用额外补偿。",
+          "texture": "res://Assets/Art/Sprites/Projectiles/arrow.png",
+          "speed": 900.0,
+          "max_distance_px": 640.0,
+          "hit_radius_px": 16.0,
+          "scale": 1.0,
+          "muzzle_offset_px": 22.0,
+          "max_targets": 1,
+          "fx_impact": "hit_arrow",
+          "fx_miss": "puff_dust"
+        }
+      }
+    },
+    "auto_attack": {
+      "_comment": "2026-09-17 起战斗全自动：角色有两个独立属性 —— 观察视野（player.vision_radius_cells × 格宽）与攻击距离（近战 range_px / 远程 projectile.max_distance_px）。自动索敌只在『视野内 ∩ 有效攻击距离内』选最近敌人，够不着的不追、不打（角色原地不动）。有效攻击距离 = min(攻击距离, 观察视野)，所以无论怎么配数值都不会打到看不见的目标；设计上观察视野预期大于攻击距离。enabled=false 可整套关掉回到纯手动移动。",
+      "enabled": true,
+      "scan_interval_seconds": 0.15
+    },
+    "input": {
+      "_comment": "2026-09-17 起没有手动攻击键/攻击鼠标键（战斗全自动），只保留冲刺键；buffer_seconds 仍服务于冲刺等缓冲输入。",
+      "buffer_seconds": 0.25,
+      "dodge_key": 32
+    },
+    "player": {
+      "_comment": "hitstun_seconds=挨一发后定住多久；invincible_after_hit_seconds=受击后的无敌帧；knockback_speed=击退初速（像素/秒，硬直内线性衰减到 0）。dodge_cancel_*：硬直满 dodge_cancel_after_seconds 后允许用冲刺键取消（手感优先，代价是硬直的惩罚变弱；关掉=老行为，硬直期间完全不吃输入）。hit_direction_*：受击方向指示（实现在 hit_direction_indicator.gd），在**挨打那名角色的屏幕位置**朝攻击者画一道红楔，fade_seconds 内淡掉；radius_px=楔的中线到该角色屏幕位置的距离、band_px=环带厚度（都是视口像素，视口固定 960x540，改窗口大小不影响），arc_degrees=张角，peak_alpha=峰值不透明度，max_marks=同屏最多记几个方向（小队多人同时挨打）。segments=楛的细分段数（越大越圆，12 已看不出折角）。",
+      "max_hp": 100,
+      "hitstun_seconds": 0.25,
+      "invincible_after_hit_seconds": 0.4,
+      "knockback_speed": 560.0,
+      "dodge_cancel_enabled": true,
+      "dodge_cancel_after_seconds": 0.08,
+      "hit_direction_enabled": true,
+      "hit_direction_radius_px": 150.0,
+      "hit_direction_band_px": 46.0,
+      "hit_direction_arc_degrees": 46.0,
+      "hit_direction_fade_seconds": 0.7,
+      "hit_direction_peak_alpha": 0.85,
+      "hit_direction_color": "#ff5a4a",
+      "hit_direction_max_marks": 4,
+      "hit_direction_segments": 12,
+      "death_fade_seconds": 0.45
+    },
+    "hit_stop": {
+      "_comment": "命中微冻（hitstop）：命中那一瞬把 Engine.time_scale 压到 time_scale，停 seconds 秒后再弹回。这是打击感的第一个来源——没有它，白闪/挤压做得再花也『打不动人』。cooldown_seconds 之内不叠加：连发武器会把画面钉住。挨打比打人停得久一点（on_receive_damage），因为『我被打中』要更贵。注意 Engine.time_scale 只被这一处占用；debug.time_scale 是局内倒计时的独立乘数，两者别混。",
+      "enabled": true,
+      "cooldown_seconds": 0.1,
+      "on_deal_damage": {
+        "seconds": 0.045,
+        "time_scale": 0.06
+      },
+      "on_receive_damage": {
+        "seconds": 0.075,
+        "time_scale": 0.05
+      }
+    },
+    "attack": {
+      "windup_seconds": 0.12,
+      "active_seconds": 0.08,
+      "recovery_seconds": 0.2,
+      "cancel_window_seconds": 0.08,
+      "damage": 25,
+      "range_px": 120.0,
+      "arc_degrees": 200,
+      "max_targets": 3,
+      "_comment_damage": "伤害结算三件套（2026-09-20 接通 DamagePipeline，详见 DESIGN.md §5.8）：crit_chance = 每次**命中**抽中暴击的概率（0.15 = 15%；一剑砍中三个敌人是三次独立抽样，不是起手定一次），crit_multiplier = 抽中时的倍率，variance = 随机浮动幅度（0.1 = ±10%，最后向下取整）。三项都能在武器表里按武器覆盖（combat.weapons.<武器>.crit_chance），没写就回落这里的全局值 —— 与 damage/range_px/arc_degrees 同一套回落链。出厂 crit_chance 与 variance 都是 0 ⇒ 一刀一个准数，与接通之前逐位相同：接这条管线的意义是把旋钮摆出来（配合 F9 调试栏现场试），不是改平衡。",
+      "crit_chance": 0.0,
+      "crit_multiplier": 1.5,
+      "variance": 0.0,
+      "fx_hit": "spark_hit",
+      "fx_hit_comment": "fx_hit = 我方近战**砍中目标**时在身上放的星芒（武器自己写了 fx_hit 就听武器的）。出手那一刀的弧光是另一件事，写在 combat.weapons.<武器>.fx_attack。"
+    },
+    "dodge": {
+      "duration_seconds": 0.22,
+      "speed_multiplier": 3.0,
+      "invincible": true,
+      "cooldown_seconds": 0.8
+    },
+    "separation": {
+      "_comment": "碰撞方案 A（用户 2026-09-19 定）：敌人/动物仍是 Area2D 传感器、follow_path() 照旧直接写坐标，只在每物理帧收尾加一层圆-圆互推（实现在 unit_separation.gd，由 main.gd 每局挂进 game_root）。这是**软阻挡**：能消掉「一队人叠成一个点」，但窄门口仍会挤过去 —— 要门口真堵住得换 CharacterBody2D 或网格占位。radius_px 必须 ≤ map.tile_size（当前 64）的一半：分离层按地图格分桶、只查 3x3 邻格，圆再大就漏配对（探针会按这条实算卡住）。strength=一次推开重叠量的比例（1=一帧就完全分开，会抖；越小越软）；max_push_px_per_frame=单帧位移上限，防止一帧瞬移穿墙；clamp_to_walkable=把推出来的落点夹回可走格（只管中心格，与 animal.gd::_can_stand 同规则）；player_is_wall=玩家当不可动的墙：单位独自承担整份重叠，玩家本身绝不被人群推着走（它是 CharacterBody2D，有自己的 move_and_slide）。",
+      "enabled": true,
+      "strength": 0.55,
+      "max_push_px_per_frame": 8.0,
+      "clamp_to_walkable": true,
+      "player_is_wall": true,
+      "radius_px": {
+        "enemies": 22.0,
+        "animals": 18.0,
+        "player": 20.0
+      }
+    }
+  }
+}

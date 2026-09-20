@@ -1,0 +1,222 @@
+{
+  "sprites_ts": {
+    "_comment": "Tiny Swords Warrior（Blue 阵营）。官方单位是正面朝向的单向序列帧，四个方向共用同一套帧（素材本身就是正视视角，左右翻转反而别扭）。数组形式 = 四向共用，见 player_animator.gd 的 parse_spec。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -41.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 12,
+      "attack": 12,
+      "dodge": 16,
+      "hit": 12,
+      "dead": 8
+    },
+    "idle": [
+      "res://Assets/Art/Sprites/Units/blue_warrior/idle_00.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/idle_01.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/idle_02.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/idle_03.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/idle_04.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/idle_05.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/idle_06.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/idle_07.png"
+    ],
+    "walk": [
+      "res://Assets/Art/Sprites/Units/blue_warrior/run_00.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/run_01.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/run_02.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/run_03.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/run_04.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/run_05.png"
+    ],
+    "attack": [
+      "res://Assets/Art/Sprites/Units/blue_warrior/attack1_00.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/attack1_01.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/attack1_02.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/attack1_03.png"
+    ],
+    "dodge": [
+      "res://Assets/Art/Sprites/Units/blue_warrior/attack2_00.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/attack2_01.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/attack2_02.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/attack2_03.png"
+    ],
+    "hit": [
+      "res://Assets/Art/Sprites/Units/blue_warrior/guard_00.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/guard_01.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/guard_02.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/guard_03.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/guard_04.png",
+      "res://Assets/Art/Sprites/Units/blue_warrior/guard_05.png"
+    ],
+    "dead": []
+  },
+  "sprites_ts_purple": {
+    "_comment": "等级档位配色：purple 档（素材包 Purple Units/Warrior）。与 sprites_ts 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -41.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 12,
+      "attack": 12,
+      "dodge": 16,
+      "hit": 12,
+      "dead": 8
+    },
+    "idle": [
+      "res://Assets/Art/Sprites/Units/purple_warrior/idle_00.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/idle_01.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/idle_02.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/idle_03.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/idle_04.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/idle_05.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/idle_06.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/idle_07.png"
+    ],
+    "walk": [
+      "res://Assets/Art/Sprites/Units/purple_warrior/run_00.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/run_01.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/run_02.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/run_03.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/run_04.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/run_05.png"
+    ],
+    "attack": [
+      "res://Assets/Art/Sprites/Units/purple_warrior/attack1_00.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/attack1_01.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/attack1_02.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/attack1_03.png"
+    ],
+    "dodge": [
+      "res://Assets/Art/Sprites/Units/purple_warrior/attack2_00.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/attack2_01.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/attack2_02.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/attack2_03.png"
+    ],
+    "hit": [
+      "res://Assets/Art/Sprites/Units/purple_warrior/guard_00.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/guard_01.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/guard_02.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/guard_03.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/guard_04.png",
+      "res://Assets/Art/Sprites/Units/purple_warrior/guard_05.png"
+    ],
+    "dead": []
+  },
+  "sprites_ts_black": {
+    "_comment": "等级档位配色：black 档（素材包 Black Units/Warrior）。与 sprites_ts 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -41.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 12,
+      "attack": 12,
+      "dodge": 16,
+      "hit": 12,
+      "dead": 8
+    },
+    "idle": [
+      "res://Assets/Art/Sprites/Units/black_warrior/idle_00.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/idle_01.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/idle_02.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/idle_03.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/idle_04.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/idle_05.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/idle_06.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/idle_07.png"
+    ],
+    "walk": [
+      "res://Assets/Art/Sprites/Units/black_warrior/run_00.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/run_01.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/run_02.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/run_03.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/run_04.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/run_05.png"
+    ],
+    "attack": [
+      "res://Assets/Art/Sprites/Units/black_warrior/attack1_00.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/attack1_01.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/attack1_02.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/attack1_03.png"
+    ],
+    "dodge": [
+      "res://Assets/Art/Sprites/Units/black_warrior/attack2_00.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/attack2_01.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/attack2_02.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/attack2_03.png"
+    ],
+    "hit": [
+      "res://Assets/Art/Sprites/Units/black_warrior/guard_00.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/guard_01.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/guard_02.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/guard_03.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/guard_04.png",
+      "res://Assets/Art/Sprites/Units/black_warrior/guard_05.png"
+    ],
+    "dead": []
+  },
+  "sprites_ts_gold": {
+    "_comment": "等级档位配色：gold 档（素材包 Yellow Units/Warrior）。与 sprites_ts 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -41.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 12,
+      "attack": 12,
+      "dodge": 16,
+      "hit": 12,
+      "dead": 8
+    },
+    "idle": [
+      "res://Assets/Art/Sprites/Units/yellow_warrior/idle_00.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/idle_01.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/idle_02.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/idle_03.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/idle_04.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/idle_05.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/idle_06.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/idle_07.png"
+    ],
+    "walk": [
+      "res://Assets/Art/Sprites/Units/yellow_warrior/run_00.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/run_01.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/run_02.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/run_03.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/run_04.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/run_05.png"
+    ],
+    "attack": [
+      "res://Assets/Art/Sprites/Units/yellow_warrior/attack1_00.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/attack1_01.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/attack1_02.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/attack1_03.png"
+    ],
+    "dodge": [
+      "res://Assets/Art/Sprites/Units/yellow_warrior/attack2_00.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/attack2_01.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/attack2_02.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/attack2_03.png"
+    ],
+    "hit": [
+      "res://Assets/Art/Sprites/Units/yellow_warrior/guard_00.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/guard_01.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/guard_02.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/guard_03.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/guard_04.png",
+      "res://Assets/Art/Sprites/Units/yellow_warrior/guard_05.png"
+    ],
+    "dead": []
+  }
+}

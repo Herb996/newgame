@@ -107,7 +107,7 @@ func _ready() -> void:
 
 ## 解析 `--` 之后的用户参数。返回值 = "已接管本次启动"（调用方应直接 return）。
 ##
-## 为什么要有这条通道：老做法是「临时改写 Data/config.json → 跑 Godot → 还原」，
+## 为什么要有这条通道：老做法是「临时改写 Data/config/ → 跑 Godot → 还原」，
 ## 一旦中途崩在写完之后，工程就留着一份被改过的配置，下次跑会莫名其妙固定种子。
 ## 走命令行参数就没有这个问题：config 全程只读。
 func _handle_cli() -> bool:
@@ -179,7 +179,7 @@ func _handle_cli() -> bool:
 				_weapon_override = argv[i] if i < argv.size() else ""
 			"--set":
 				# 通用覆盖：--set map.biome_blend.enabled false
-				# 只写进 Config 的内存覆盖层，Data/config.json 与 user://settings.json
+				# 只写进 Config 的内存覆盖层，Data/config/ 与 user://settings.json
 				# 一律不动 —— 出"关掉某功能"的负对照图靠它，不然只能改配置文件再改回来。
 				if i + 2 < argv.size():
 					var v = _cli_value(str(argv[i + 2]))
@@ -462,6 +462,10 @@ func _enter_base() -> void:
 	statue_panel.close()
 	character_panel.close()
 	_clear_selection()
+	# 大门选人面板的"上次小队"记忆只保留到回基地为止：不清的话，上一局小队里
+	# 已阵亡的 uid 会让面板只勾"幸存者"，勾选数一会 1 个一会 4 个看着像 bug。
+	# 清空后面板回落"没选过 → 全选名册"，每次打开数量都可预期（2026-09-20 用户定 A）。
+	_selected_units.clear()
 	_clear_game_root()
 	base_system.setup(game_root)
 	var tile_size: int = int(Config.get_value("map.tile_size", 16))

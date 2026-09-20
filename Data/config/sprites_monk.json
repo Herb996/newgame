@@ -1,0 +1,186 @@
+{
+  "sprites_monk": {
+    "_comment": "Tiny Swords Monk（僧侣，Blue 阵营）。2026-09-18 加入出击名单。\n            **Monk 是免费包里唯一没有 Attack 帧的单位** —— 官方只给了 Idle 6 帧 / Run 4 帧 / Heal 11 帧 / Heal_Effect 11 帧，\n            所以这套素材的「攻击动作」就是 Heal（施法）。先例早就存在：敌人邪术师 cultist 用的\n            `red_monk/attack1_00..10` 正是同一批 Heal 帧（见 enemy_types.cultist.attack），本段沿用这一约定 ——\n            材料-Heal 与 attack1 是**同一批像素的两份命名**（attack 用 attack1_*；将来做治疗时 heal_* 归治疗语义），\n            由 tools/slice_monk.py 一次切出。\n            Heal_Effect（`heal_fx_*`）是**纯特效层**，画在受术者身上而不是施法者身上，故不进任何动作序列。\n            单向素材（正视视角），四向共用同一套帧 → 数组形式（同 sprites_ts 的扁平写法）。\n            不透明包围盒下沿实测 134（比 Warrior/Archer 的 136 高 2px），故 sprite_offset_y = -(134 - 96) = -38；\n            sprite_scale 0.6 / sprite_pixel_unit 10 与另外三个角色一致，保证小队体型统一。\n            dodge / hit / dead 官方无帧 → 留空，走 player_animator 的程序化抖动/冲刺拉伸/死亡倾倒。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -38.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 10,
+      "attack": 14,
+      "dodge": 12,
+      "hit": 12,
+      "dead": 8
+    },
+    "idle": [
+      "res://Assets/Art/Sprites/Units/blue_monk/idle_00.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/idle_01.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/idle_02.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/idle_03.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/idle_04.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/idle_05.png"
+    ],
+    "walk": [
+      "res://Assets/Art/Sprites/Units/blue_monk/run_00.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/run_01.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/run_02.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/run_03.png"
+    ],
+    "attack": [
+      "res://Assets/Art/Sprites/Units/blue_monk/attack1_00.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/attack1_01.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/attack1_02.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/attack1_03.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/attack1_04.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/attack1_05.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/attack1_06.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/attack1_07.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/attack1_08.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/attack1_09.png",
+      "res://Assets/Art/Sprites/Units/blue_monk/attack1_10.png"
+    ],
+    "dodge": [],
+    "hit": [],
+    "dead": []
+  },
+  "sprites_monk_purple": {
+    "_comment": "Tiny Swords Monk（僧侣，Purple 阵营）。2026-09-18 加入出击名单。\n            **Monk 是免费包里唯一没有 Attack 帧的单位** —— 官方只给了 Idle 6 帧 / Run 4 帧 / Heal 11 帧 / Heal_Effect 11 帧，\n            所以这套素材的「攻击动作」就是 Heal（施法）。先例早就存在：敌人邪术师 cultist 用的\n            `red_monk/attack1_00..10` 正是同一批 Heal 帧（见 enemy_types.cultist.attack），本段沿用这一约定 ——\n            材料-Heal 与 attack1 是**同一批像素的两份命名**（attack 用 attack1_*；将来做治疗时 heal_* 归治疗语义），\n            由 tools/slice_monk.py 一次切出。\n            Heal_Effect（`heal_fx_*`）是**纯特效层**，画在受术者身上而不是施法者身上，故不进任何动作序列。\n            单向素材（正视视角），四向共用同一套帧 → 数组形式（同 sprites_ts 的扁平写法）。\n            不透明包围盒下沿实测 134（比 Warrior/Archer 的 136 高 2px），故 sprite_offset_y = -(134 - 96) = -38；\n            sprite_scale 0.6 / sprite_pixel_unit 10 与另外三个角色一致，保证小队体型统一。\n            dodge / hit / dead 官方无帧 → 留空，走 player_animator 的程序化抖动/冲刺拉伸/死亡倾倒。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -38.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 10,
+      "attack": 14,
+      "dodge": 12,
+      "hit": 12,
+      "dead": 8
+    },
+    "idle": [
+      "res://Assets/Art/Sprites/Units/purple_monk/idle_00.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/idle_01.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/idle_02.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/idle_03.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/idle_04.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/idle_05.png"
+    ],
+    "walk": [
+      "res://Assets/Art/Sprites/Units/purple_monk/run_00.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/run_01.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/run_02.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/run_03.png"
+    ],
+    "attack": [
+      "res://Assets/Art/Sprites/Units/purple_monk/attack1_00.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/attack1_01.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/attack1_02.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/attack1_03.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/attack1_04.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/attack1_05.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/attack1_06.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/attack1_07.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/attack1_08.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/attack1_09.png",
+      "res://Assets/Art/Sprites/Units/purple_monk/attack1_10.png"
+    ],
+    "dodge": [],
+    "hit": [],
+    "dead": []
+  },
+  "sprites_monk_black": {
+    "_comment": "Tiny Swords Monk（僧侣，Black 阵营）。2026-09-18 加入出击名单。\n            **Monk 是免费包里唯一没有 Attack 帧的单位** —— 官方只给了 Idle 6 帧 / Run 4 帧 / Heal 11 帧 / Heal_Effect 11 帧，\n            所以这套素材的「攻击动作」就是 Heal（施法）。先例早就存在：敌人邪术师 cultist 用的\n            `red_monk/attack1_00..10` 正是同一批 Heal 帧（见 enemy_types.cultist.attack），本段沿用这一约定 ——\n            材料-Heal 与 attack1 是**同一批像素的两份命名**（attack 用 attack1_*；将来做治疗时 heal_* 归治疗语义），\n            由 tools/slice_monk.py 一次切出。\n            Heal_Effect（`heal_fx_*`）是**纯特效层**，画在受术者身上而不是施法者身上，故不进任何动作序列。\n            单向素材（正视视角），四向共用同一套帧 → 数组形式（同 sprites_ts 的扁平写法）。\n            不透明包围盒下沿实测 134（比 Warrior/Archer 的 136 高 2px），故 sprite_offset_y = -(134 - 96) = -38；\n            sprite_scale 0.6 / sprite_pixel_unit 10 与另外三个角色一致，保证小队体型统一。\n            dodge / hit / dead 官方无帧 → 留空，走 player_animator 的程序化抖动/冲刺拉伸/死亡倾倒。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -38.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 10,
+      "attack": 14,
+      "dodge": 12,
+      "hit": 12,
+      "dead": 8
+    },
+    "idle": [
+      "res://Assets/Art/Sprites/Units/black_monk/idle_00.png",
+      "res://Assets/Art/Sprites/Units/black_monk/idle_01.png",
+      "res://Assets/Art/Sprites/Units/black_monk/idle_02.png",
+      "res://Assets/Art/Sprites/Units/black_monk/idle_03.png",
+      "res://Assets/Art/Sprites/Units/black_monk/idle_04.png",
+      "res://Assets/Art/Sprites/Units/black_monk/idle_05.png"
+    ],
+    "walk": [
+      "res://Assets/Art/Sprites/Units/black_monk/run_00.png",
+      "res://Assets/Art/Sprites/Units/black_monk/run_01.png",
+      "res://Assets/Art/Sprites/Units/black_monk/run_02.png",
+      "res://Assets/Art/Sprites/Units/black_monk/run_03.png"
+    ],
+    "attack": [
+      "res://Assets/Art/Sprites/Units/black_monk/attack1_00.png",
+      "res://Assets/Art/Sprites/Units/black_monk/attack1_01.png",
+      "res://Assets/Art/Sprites/Units/black_monk/attack1_02.png",
+      "res://Assets/Art/Sprites/Units/black_monk/attack1_03.png",
+      "res://Assets/Art/Sprites/Units/black_monk/attack1_04.png",
+      "res://Assets/Art/Sprites/Units/black_monk/attack1_05.png",
+      "res://Assets/Art/Sprites/Units/black_monk/attack1_06.png",
+      "res://Assets/Art/Sprites/Units/black_monk/attack1_07.png",
+      "res://Assets/Art/Sprites/Units/black_monk/attack1_08.png",
+      "res://Assets/Art/Sprites/Units/black_monk/attack1_09.png",
+      "res://Assets/Art/Sprites/Units/black_monk/attack1_10.png"
+    ],
+    "dodge": [],
+    "hit": [],
+    "dead": []
+  },
+  "sprites_monk_gold": {
+    "_comment": "Tiny Swords Monk（僧侣，Yellow 阵营）。2026-09-18 加入出击名单。\n            **Monk 是免费包里唯一没有 Attack 帧的单位** —— 官方只给了 Idle 6 帧 / Run 4 帧 / Heal 11 帧 / Heal_Effect 11 帧，\n            所以这套素材的「攻击动作」就是 Heal（施法）。先例早就存在：敌人邪术师 cultist 用的\n            `red_monk/attack1_00..10` 正是同一批 Heal 帧（见 enemy_types.cultist.attack），本段沿用这一约定 ——\n            材料-Heal 与 attack1 是**同一批像素的两份命名**（attack 用 attack1_*；将来做治疗时 heal_* 归治疗语义），\n            由 tools/slice_monk.py 一次切出。\n            Heal_Effect（`heal_fx_*`）是**纯特效层**，画在受术者身上而不是施法者身上，故不进任何动作序列。\n            单向素材（正视视角），四向共用同一套帧 → 数组形式（同 sprites_ts 的扁平写法）。\n            不透明包围盒下沿实测 134（比 Warrior/Archer 的 136 高 2px），故 sprite_offset_y = -(134 - 96) = -38；\n            sprite_scale 0.6 / sprite_pixel_unit 10 与另外三个角色一致，保证小队体型统一。\n            dodge / hit / dead 官方无帧 → 留空，走 player_animator 的程序化抖动/冲刺拉伸/死亡倾倒。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -38.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 10,
+      "attack": 14,
+      "dodge": 12,
+      "hit": 12,
+      "dead": 8
+    },
+    "idle": [
+      "res://Assets/Art/Sprites/Units/yellow_monk/idle_00.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/idle_01.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/idle_02.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/idle_03.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/idle_04.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/idle_05.png"
+    ],
+    "walk": [
+      "res://Assets/Art/Sprites/Units/yellow_monk/run_00.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/run_01.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/run_02.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/run_03.png"
+    ],
+    "attack": [
+      "res://Assets/Art/Sprites/Units/yellow_monk/attack1_00.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/attack1_01.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/attack1_02.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/attack1_03.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/attack1_04.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/attack1_05.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/attack1_06.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/attack1_07.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/attack1_08.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/attack1_09.png",
+      "res://Assets/Art/Sprites/Units/yellow_monk/attack1_10.png"
+    ],
+    "dodge": [],
+    "hit": [],
+    "dead": []
+  }
+}

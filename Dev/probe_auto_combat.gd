@@ -4,13 +4,13 @@ extends Node
 ##
 ## 验五件事：
 ##   A) 两个属性算得对：观察视野 = vision_radius_cells × 格宽；
-##      攻击距离按武器分型取（近战 range_px / 远程弹道 / 瞬狙射线）；
+##      攻击距离按武器分型取（近战 range_px / 远程弹道 max_distance_px）；
 ##      有效攻击距离 = min(攻击距离, 观察视野)；近战判定框半径 = 有效距离。
 ##   B) 视野外（700px > 视野 640px）的敌人不锁定、不攻击。
 ##   C) 视野内但够不着（300px > 剑的 120px）不锁定、**不追击**（原地不动）。
 ##   D) 进入攻击距离（90px）自动锁定 → 自动进 attack 状态 → 真的打出伤害。
-##   E) 强弩表上 900px 比视野远：有效射程被截断到 640px，
-##      实测打不到 800px（视野外）的目标、打得到 500px（视野内）的。
+##   E) 弹射程临时顶到 900px 也比视野远：有效射程截断到 640px，
+##      视野外的目标不再被锁定，箭身上带的射程就是截断后的那个数。
 ##
 ## 为什么 headless 能跑：判定全是纯数据（位置距离 + 节点组），不依赖渲染。
 ## ============================================================
@@ -123,24 +123,29 @@ func _ready() -> void:
 	await _frames(60)
 	_check(t.hp < 100.0, "自动攻击真的打出伤害（目标 hp = %.0f/100）" % t.hp)
 
-	_say("--- E 段：强弩射程超出视野时被截断 ---")
-	p.switch_weapon(&"sniper")
+	_say("--- E 段：武器射程超出视野时被截断 ---")
+	p.switch_weapon(&"bow")
 	await _frames(5)
+	# 弹射程临时顶到 900（> 视野 640）：模拟"武器比眼睛远"的那种配置
+	Config.set_override("combat.weapons.bow.projectile.max_distance_px", 900.0)
 	var rng2: float = p.attack_range_px()
 	var eff2: float = p.effective_attack_range_px()
-	_check(is_equal_approx(rng2, 900.0), "强弩表上射程 = 900px（实得 %.0f）" % rng2)
+	_check(is_equal_approx(rng2, 900.0), "弓表上弹射程 = 900px（实得 %.0f）" % rng2)
 	_check(is_equal_approx(eff2, 640.0), "有效射程被观察视野截断到 640px（实得 %.0f）" % eff2)
-	# 关掉自动索敌干扰，直接测射线：视野外 800px 应该打不到
 	p.set("facing", Vector2.RIGHT)
 	t.global_position = p.global_position + Vector2(800.0, 0.0)
-	t.hp = 100.0
-	var hits_far: int = p.fire_hitscan()
-	_check(hits_far == 0 and is_equal_approx(t.hp, 100.0),
-			"打不到 800px（视野外）的目标：命中 %d、目标 hp %.0f" % [hits_far, t.hp])
-	t.global_position = p.global_position + Vector2(500.0, 0.0)
-	var hits_near: int = p.fire_hitscan()
-	_check(hits_near >= 1 and t.hp < 100.0,
-			"打得到 500px（视野内）的目标：命中 %d、目标 hp %.0f" % [hits_near, t.hp])
+	await _frames(15)   # 索敌是节流的（scan_interval_seconds），等它把旧锁定刷掉
+	_check(p.auto_target() == null, "800px 的目标在视野外：自动索敌不选它")
+	# 箭自己飞多远 = 截断后的那个数，所以"配置上打得着、画面上看不见"不会发生
+	_check(bool(p.fire_projectile()), "fire_projectile 发射成功")
+	var arrow: Node = p.get_parent().get_node_or_null("Projectile")
+	_check(arrow != null, "父层找到 Projectile 节点")
+	if arrow != null:
+		_check(is_equal_approx(float(arrow.get("max_distance")), eff2),
+				"箭的射程 = 有效攻击距离 %.0f（实得 %.0f）"
+				% [eff2, float(arrow.get("max_distance"))])
+		arrow.free()
+	Config.clear_override("combat.weapons.bow.projectile.max_distance_px")
 
 	_finish()
 

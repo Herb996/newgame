@@ -9,7 +9,7 @@ extends Node2D
 ##   B) 生成器行为：位置/朝向/缩放/层级照配置落位；additive 走 CanvasItemMaterial
 ##      （4.7 的 CanvasItem **没有** blend_mode，这是实测踩出来的）；播完自行
 ##      queue_free；空 id / 未知 id / fx.enabled=false 一律 null；上限硬生效。
-##   C) 我方引用：武器写了 fx_attack 才出弧光，没写就不出（弓/弩没有挥砍动作，
+##   C) 我方引用：武器写了 fx_attack 才出弧光，没写就不出（弓没有挥砍动作，
 ##      空串在这里是正确结果）；受击星芒从 combat.attack.fx_hit 回落。
 ##   D) 敌人 + 弹道：兵种专属 id → 空串回落到 enemy.attack.fx_attack；弹道收尾
 ##      的特效挂在**父节点**上（挂自己身上会同帧消失 = 一帧都看不见）。
@@ -82,7 +82,7 @@ func _ready() -> void:
 	_stage = self
 	await _frames(2)
 	_check(_stage.is_inside_tree() and _stage.is_node_ready(), "测试台（探针自身）已入树并 ready")
-	_table()
+	await _table()
 	await _spawn_behaviour()
 	await _live_run()
 	_finish()
@@ -93,7 +93,7 @@ func _ready() -> void:
 # ------------------------------------------------------------
 func _table() -> void:
 	var effects: Dictionary = Config.get_value("fx.effects", {})
-	_check(effects.size() == 8, "fx.effects 有 8 条（实得 %d）" % effects.size())
+	_check(effects.size() == 28, "fx.effects 有 28 条（实得 %d）" % effects.size())
 	var bad_tex: Array = []
 	var bad_geom: Array = []
 	for id in effects.keys():
@@ -120,6 +120,28 @@ func _table() -> void:
 	_check(bad_geom.is_empty(),
 			"贴图尺寸 == frames×%d：%s" % [CELL_PX,
 			"全通过" if bad_geom.is_empty() else str(bad_geom)])
+
+	# 表里每一条都要**真建得出节点**：第二批 20 条只写了配置，没被任何实拍路径覆盖之前，
+	# "存在且尺寸对" 不等于 "生成器认得它"。逐条 spawn 一次，顺手核对 hframes。
+	var bad_spawn: Array = []
+	# queue_free 是延迟的：循环里这 28 个都还算「在场」，不放宽上限后半截会被
+	# max_simultaneous 直接拒生成，看起来像表坏了。上限本身由 B 段单独守。
+	Config.set_override("fx.max_simultaneous", 64)
+	for id in effects.keys():
+		var s: Node2D = EffectLibrary.spawn(str(id), _stage, Vector2.ZERO)
+		if s == null:
+			bad_spawn.append(str(id))
+		elif s.hframes != int((effects[id] as Dictionary)["frames"]):
+			bad_spawn.append("%s hframes=%d" % [str(id), s.hframes])
+		else:
+			_tick(s, float(s.frames) / float(s.fps) + float(s.fade_out) + 0.05, &"_process")
+		if s != null:
+			s.queue_free()
+	Config.clear_override("fx.max_simultaneous")
+	await get_tree().process_frame
+	_check(bad_spawn.is_empty(),
+			"表里 %d 条逐条生成通过：%s" % [effects.size(),
+			"全通过" if bad_spawn.is_empty() else str(bad_spawn)])
 	_say("  条目：" + ", ".join(effects.keys()) + "（素材目录 " + FX_DIR + "）")
 
 
@@ -229,10 +251,10 @@ func _live_run() -> void:
 	await _frames(2)
 
 
-## 武器 → 出手弧光。武器没写 fx_attack 就不出：弓/弩本就没有挥砍动作。
+## 武器 → 出手弧光。武器没写 fx_attack 就不出：弓本就没有挥砍动作。
 func _weapons(player: Node) -> void:
 	var expect := {"sword": "slash_sword", "spear": "thrust_spear",
-			"staff": "cast_staff", "bow": "", "sniper": ""}
+			"staff": "cast_staff", "bow": ""}
 	for wid in expect.keys():
 		player.set("current_weapon", StringName(wid))
 		var got := str(player.call("fx_attack_id"))
@@ -241,8 +263,18 @@ func _weapons(player: Node) -> void:
 	player.set("current_weapon", &"sword")
 	_check(str(player.call("fx_attack_id")) == "slash_sword",
 			"切回 sword 后弧光仍是 slash_sword（回落链没串台）")
-	_check(str(player.call("fx_hit_id")) == "spark_hit",
-			"武器没写 fx_hit → 回落到 combat.attack.fx_hit = spark_hit")
+
+	## 命中星芒：第二批给三把近战各写了自己的 fx_hit，弓**故意不写**
+	## （它没有近战判定帧，命中特效挂在弹道的 fx_impact 上），
+	## 所以它才是「回落到 combat.attack.fx_hit」这条链的活样本。
+	var expect_hit := {"sword": "hit_sword", "spear": "hit_pierce",
+			"staff": "hit_holy", "bow": "spark_hit"}
+	for wid in expect_hit.keys():
+		player.set("current_weapon", StringName(wid))
+		var got := str(player.call("fx_hit_id"))
+		_check(got == str(expect_hit[wid]),
+				"%s 命中特效 =「%s」（实得「%s」）" % [wid, str(expect_hit[wid]), got])
+	player.set("current_weapon", &"sword")
 
 	# 弧光落在「朝向前方半个射程」，朝向跟 facing —— 武器与特效唯一的几何耦合
 	var p0: Vector2 = player.get("global_position")
@@ -270,10 +302,28 @@ func _enemies() -> void:
 	## 兵种专属优先，写空串（或压根没这个键）才回落到通用值。
 	## 临时实例调 _apply_numeric 就够：那一段刻意写在 `if _body == null: return`
 	## 之前，无 Body 也算得出来 —— 这正是探针能跑的前提。
-	var cases := {"ep_spear_goblin": "thrust_spear", "ep_hex_shaman": "cast_hex",
-			"ep_torch_goblin": "spark_arrow", "ep_bear": "slash_claw",
-			"ep_snake": default_fx}
-	for tid in cases.keys():
+	## 第二批之后 21 个兵种全都有专属 id，所以这里改成**全覆盖**：
+	## 接线写错（拼错 id）在运行时是「静默不出特效」，实拍很难发现，靠这里兜。
+	var expect := {
+		"ep_bear": "slash_claw", "ep_cave": "bash_rock", "ep_lizard": "slash_tail",
+		"ep_snake": "slash_bite", "ep_spider": "spit_web", "ep_turtle": "slam_ring",
+		"ep_hex_shaman": "cast_hex", "ep_pig": "burst_charge", "ep_pig_rider": "slash_sabre",
+		"ep_spear_goblin": "thrust_spear", "ep_torch_goblin": "spark_arrow",
+		"ep_bomb_fish": "splash_bomb", "ep_harpoon_shark": "thrust_harpoon",
+		"ep_paddle_shark": "sweep_fin", "ep_gnoll": "slash_rend", "ep_gnome": "shred_bolt",
+		"ep_minotaur": "slash_claw", "ep_panda": "slam_paw", "ep_skull": "spike_bone",
+		"ep_thief": "slash_shadow", "ep_troll": "slash_claw",
+	}
+	var effects: Dictionary = Config.get_value("fx.effects", {})
+	var unknown: Array = []
+	for tid in expect.keys():
+		if not effects.has(str(expect[tid])):
+			unknown.append("%s → %s" % [tid, str(expect[tid])])
+	_check(unknown.is_empty(),
+			"21 个兵种接的 id 全在 fx.effects 表里：%s"
+			% ["全通过" if unknown.is_empty() else str(unknown)])
+
+	for tid in expect.keys():
 		var cfg = by_id.get(tid, null)
 		if cfg == null:
 			_check(false, "config 里有兵种 %s" % tid)
@@ -282,10 +332,22 @@ func _enemies() -> void:
 		_stage.add_child(e)
 		e.call("_apply_numeric", cfg)
 		var got := str(e.get("_fx_attack"))
-		_check(got == str(cases[tid]),
-				"%s 出手特效 = %s（实得 %s）" % [tid, str(cases[tid]), got])
+		_check(got == str(expect[tid]),
+				"%s 出手特效 = %s（实得 %s）" % [tid, str(expect[tid]), got])
 		e.queue_free()
-	await _frames(2)
+
+	# 回落链还得活着：现在没有兵种留空，所以拿一份真配置抹掉 fx_attack 来验。
+	var probe_cfg: Dictionary = (by_id.get("ep_bear", {}) as Dictionary).duplicate(true)
+	probe_cfg.erase("fx_attack")
+	if not probe_cfg.is_empty():
+		var e2: Node = load(ENEMY_SCRIPT).new()
+		_stage.add_child(e2)
+		e2.call("_apply_numeric", probe_cfg)
+		_check(str(e2.get("_fx_attack")) == default_fx,
+				"兵种不写 fx_attack → 回落到 enemy.attack.fx_attack（实得 %s）"
+				% str(e2.get("_fx_attack")))
+		e2.queue_free()
+	await _frames(3)
 
 	var live: Array = []
 	for n in get_tree().get_nodes_in_group("enemies"):
@@ -308,14 +370,14 @@ func _enemies() -> void:
 ## 弹道： setup 收下命中/落空两种 id；飞满射程时把落空特效挂在**父节点**上。
 func _projectile() -> void:
 	var cfg: Dictionary = Config.get_value("combat.weapons.bow.projectile", {})
-	_check(str(cfg.get("fx_impact", "")) == "spark_arrow"
+	_check(str(cfg.get("fx_impact", "")) == "hit_arrow"
 			and str(cfg.get("fx_miss", "")) == "puff_dust",
 			"弓的弹道配置带了命中/落空两种特效")
 	var p: Node2D = load(PROJECTILE).new()
 	_stage.add_child(p)
 	p.global_position = Vector2(4000.0, 4000.0)     # 甩到地图外，路上不会有任何目标
 	p.call("setup", cfg, Vector2.RIGHT, 20, [], 16)
-	_check(str(p.get("_fx_impact")) == "spark_arrow"
+	_check(str(p.get("_fx_impact")) == "hit_arrow"
 			and str(p.get("_fx_miss")) == "puff_dust",
 			"setup 把两种特效 id 收到了弹道上")
 	var base := _fx_under(_stage)

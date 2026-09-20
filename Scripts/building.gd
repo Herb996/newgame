@@ -1,7 +1,7 @@
 extends Area2D
 ## ============================================================
 ## Building — 基地建筑（占 base.building_cells 格见方，默认 4x4）
-## 数据由 base_system 按 Data/config.json 的 base.buildings 注入：
+## 数据由 base_system 按 Data/config/ 的 base.buildings 注入：
 ##   building_id / display_name / hint（按 E 提示文本）/ sprite（Tiny Swords 建筑图）
 ## 玩家靠近时头顶显示提示，按 E 发出 interacted 信号（由 main 路由）。
 ##

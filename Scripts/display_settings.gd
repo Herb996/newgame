@@ -7,9 +7,9 @@ extends Node
 ## 这样手动编辑 user://settings.json 也能生效。
 ##
 ## 分工（避免两处真相）：
-##   · Data/config.json 的 display.*        —— 本项目新增的窗口/帧率/缩放项
-##   · Data/config.json 的 audio.*          —— 音量
-##   · Data/config.json 的 camera.*、map.grade.*、map.macro_light.*
+##   · Data/config/ 的 display.*        —— 本项目新增的窗口/帧率/缩放项
+##   · Data/config/ 的 audio.*          —— 音量
+##   · Data/config/ 的 camera.*、map.grade.*、map.macro_light.*
 ##     —— **本来就是 config 的键**，设置面板直接写它们，游戏各系统自己会读；
 ##        本文件不重复接管，只在需要即时刷新时补一刀。
 ##

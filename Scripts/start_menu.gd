@@ -247,7 +247,7 @@ func _launch_game() -> void:
 	var scene := str(Config.get_value("menu.game_scene", "res://Scenes/Main.tscn"))
 	# 从菜单进游戏必须落在**基地**：main.gd 那句 auto_enter_run 是给无头回归
 	# 跳过基地用的（config 里默认 true），不压掉的话点开游戏就直接在局内了。
-	# 用运行时覆盖而不是改写 config.json —— 命令行回归不受影响，退出即忘。
+	# 用运行时覆盖而不是改写出厂配置 —— 命令行回归不受影响，退出即忘。
 	if bool(Config.get_value("menu.enter_base_from_menu", true)):
 		Config.set_override("debug.auto_enter_run", false)
 	print("[Menu] 进入游戏：%s（槽 %d）" % [scene, SaveSlots.active_slot])

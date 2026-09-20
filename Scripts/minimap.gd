@@ -24,7 +24,7 @@ extends CanvasLayer
 ## 撤离点画在雾下面，未探索处自然看不见。所以别把 _draw_fog 提到前面，
 ## 也别把 _draw_squad 放到它前面 —— 那两种改法都会让迷雾形同虚设。
 ##
-## 数值来自 Data/config.json 的 extraction.minimap 与 menu_bar.minimap。
+## 数值来自 Data/config/ 的 extraction.minimap 与 menu_bar.minimap。
 ## ============================================================
 
 signal map_clicked(world_pos: Vector2)

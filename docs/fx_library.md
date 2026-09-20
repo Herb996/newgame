@@ -8,8 +8,19 @@
 可视化版本：`C:\Users\Administrator\Downloads\特效\fx_gallery.html` —— 浏览器直接打开，331 格缩略图按类别/用途可筛选、可搜索、点开看原图。
 它由 `python _gallery.py` 从**本文档第三节 + `_inventory.tsv`** 生成（文字明细以本文档为准，图里不重复维护一份）。
 
-**当前状态：已切 8 条进 `Assets/Art/Sprites/FX/`（128px 格 = 源 64px 放大 2 倍），
+**当前状态：已切 28 条进 `Assets/Art/Sprites/FX/`（128px 格 = 源 64px 放大 2 倍），
 由 `Data/config.json` 的 `fx.effects` 按 id 引用；换素材/加条目改 `tools/cut_fx.py` + 配置，不改脚本。**
+第一批 8 条是我方出手 + 通用命中；第二批 20 条（2026-09-20）= 15 个兵种专属出手 + 5 把武器专属命中，
+全部走**现成挂点**（`enemy_types.types[].fx_attack` / `combat.weapons.<w>.fx_hit`），一行 `.gd` 都没改。
+
+加条目时的两个坑（第二批实测踩到，别再踩）：
+- **配色行序不能按文档记的号数取**。第 4 节记的"0橙/1粉/2蓝/3绿/4棕橙/5白/6土黄/7红/8紫"只是每张表的
+  大致倾向 —— Part 23 的第 6 行渲染成淡紫、Part 17 的第 6 行才是土黄。**必须先用
+  `python tools/sheet_fx.py <out.png>` 把候选条带铺在草地绿上看一眼**（形状 + 颜色一起验），
+  光看清单文字选出来的东西有一半在草地上根本看不见。
+- **新切的 PNG 在 `ResourceLoader` / `load()` 眼里不存在**，直到有 `.import` 边车为止。
+  补一句 `Godot_console.exe --headless --path . --import` 再跑探针，否则会看到"贴图路径对、
+  文件在盘上、探针却说找不到"这种莫名其妙。
 
 ---
 

@@ -1,0 +1,126 @@
+{
+  "menu_bar": {
+    "_comment": "局内底部菜单栏（占屏高 height_ratio，即最下面 1/5），三槽：**左**=小地图（常驻，开局就有；地形/资源/撤离点/小队都画在上面，点它能给选中单位下令移动）、**中**=当前选中单位的指令面板（显示哪些按钮由 characters.list[].command_set 查 command_sets 决定，所以换单位就换一整套指令）、**右**=噪音显示（当前噪音 + 本局累积噪音 + 被惊动的敌人数）。只在局内显示，基地自动隐藏。整条栏是 mouse_filter=STOP 的控件 —— 压在它上面的鼠标不会误给世界下移动令，代价是**贴底那一边的边缘滚屏在栏区域内失效**（左右上三边与 WASD 照常）。",
+    "enabled": true,
+    "height_ratio": 0.2,
+    "min_height_px": 160,
+    "max_height_px": 320,
+    "padding_px": 8,
+    "noise_slot_px": 300,
+    "patrol_wait_seconds": 0.6,
+    "designate_pick_radius_px": 96.0,
+    "default_command_set": "combat",
+    "command_sets": {
+      "_comment": "指令集：id -> 按钮 id 列表。按钮本身长什么样、点了干什么写在 menu_bar.gd 的 _button_defs()，这里只决定「这个单位显示哪几个」。当前 4 名角色都是战斗单位，共用 combat。将来加工程/采集/医疗单位时，在 characters.list 里把它的 command_set 指到新集合（并在 _button_defs 里补按钮）即可，不需要改菜单栏布局代码。",
+      "combat": [
+        "auto_attack",
+        "stance_nearest",
+        "stance_strongest",
+        "attack_designated",
+        "patrol",
+        "cancel"
+      ]
+    },
+    "minimap": {
+      "_comment": "小地图槽 = 正方形，边长随栏高自适应（栏高 - 2×内边距）。资源点（树→木、石→石、矿脉）在地图生成后**一次性烘焙进底图**，运行时不再逐点重画。小队/撤离点是每帧实时画的（会动）。",
+      "show_resources": true,
+      "resource_colors": {
+        "wood": "#7a4a22",
+        "stone": "#8f979e",
+        "iron": "#7b8fa8",
+        "gold": "#d8b437",
+        "oil": "#6f45c8",
+        "food": "#66b85c"
+      }
+    }
+  },
+  "inventory_popup": {
+    "_comment": "右键角色的头顶背包弹窗（inventory_popup.gd）。纯表现参数，不碰数值。",
+    "head_offset_px": 44.0,
+    "viewport_margin_px": 8.0,
+    "min_width_px": 210.0,
+    "build_button": {
+      "_comment": "右键角色弹出的背包右侧那一列（Scripts/inventory_popup.gd）。enabled=false 整列不建；min_width_px 是按钮的最小宽度。按钮目前只发 build_requested(unit) 信号，建筑选项还没接（2026-09-20 用户定）。",
+      "enabled": true,
+      "min_width_px": 64.0
+    }
+  },
+  "menu": {
+    "_comment": "开始菜单。game_scene = 新建/历史存档后进入的场景，**本项目只做 2D 线**，所以固定指 res://Scenes/Main.tscn（3D 场景不在计划内，保留只为随时 F6 回看）；save_slots = 存档槽位数（user://saves/slot_NN.json）。",
+    "title": "王国废墟：拾荒撤离",
+    "subtitle": "SteamPunk Extraction",
+    "version_label": "开发版 · Tiny Swords 2D 线",
+    "game_scene": "res://Scenes/Main.tscn",
+    "save_slots": 6,
+    "enter_base_from_menu": true,
+    "hint": "ESC 返回上一级 · 设置改动即时保存到 user://settings.json"
+  },
+  "language": {
+    "_comment": "界面语言：中文是源语言（代码原文），en 走 Data/language/translations.csv；ready=false 的项在下拉里标「 (not wired)」。切换写入 user://settings.json 的 language.current，确认应用时 TranslationServer.set_locale。",
+    "current": "zh_CN",
+    "available": [
+      {
+        "code": "zh_CN",
+        "name": "简体中文",
+        "ready": true
+      },
+      {
+        "code": "zh_TW",
+        "name": "繁體中文",
+        "ready": false
+      },
+      {
+        "code": "en",
+        "name": "English",
+        "ready": true
+      },
+      {
+        "code": "ja",
+        "name": "日本語",
+        "ready": false
+      }
+    ]
+  },
+  "audio": {
+    "_comment": "音量 0~1，作用于对应 AudioBus。项目目前还没有音频资源，Music/SFX 总线也不存在——由设置面板在应用时按需创建，属于提前把线接好。",
+    "master": 1.0,
+    "music": 0.8,
+    "sfx": 0.9,
+    "mute": false
+  },
+  "display": {
+    "_comment": "只放「project.godot 里没有、又必须让玩家改」的项。window_mode: windowed/fullscreen/borderless；vsync: disabled/enabled/adaptive；stretch_mode: disabled/canvas_items/viewport（2D 缩放策略，disabled=1:1 不缩放，与 project.godot 的默认一致）；stretch_aspect: ignore/keep/keep_width/keep_height/expand。相机/迷雾/染色不在这里——它们本来就是 config 的 camera.* / fog3d.enabled / map.grade.* / map.macro_light.*，设置面板直接写那些键，避免两处真相。",
+    "window_mode": "windowed",
+    "resolution": [
+      1920,
+      1080
+    ],
+    "vsync": "enabled",
+    "max_fps": 0,
+    "stretch_mode": "disabled",
+    "stretch_aspect": "keep"
+  },
+  "debug": {
+    "_comment": "stat_panel_* = 局内右侧「数值调试」栏（Scripts/debug_stat_panel.gd）。出厂 enabled=false：调试构建（OS.is_debug_build()）里 F9 随时能开，导出包不创建这个节点。改数值写的是 Config 的**运行时覆盖层**（只存内存，退出即忘），既不碰本文件也不碰 user://settings.json —— 想留下哪个值，点面板顶部「打印改动」照那张表手改这里。stat_panel_key 存**物理键码**（4194340 = F9），与项目里其它改键一致。",
+    "stat_panel_enabled": false,
+    "stat_panel_key": 4194340,
+    "walk_seek_wet": false,
+    "force_player_hit": false,
+    "force_player_hit_offset": [
+      260,
+      -150
+    ],
+    "smoke_test": false,
+    "flow_test": false,
+    "auto_enter_run": true,
+    "main3d_start": "base",
+    "time_scale": 20.0,
+    "log_state_transitions": false,
+    "map_preview": "",
+    "map_preview_cells": 128,
+    "main3d_capture": "",
+    "main3d_capture_delay": 3.0,
+    "main3d_capture_frames": 4,
+    "map_preview_scale": 0.125
+  }
+}

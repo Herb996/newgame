@@ -25,7 +25,7 @@ extends Node
 ## 同名队友得各算各的，人离场（阵亡/回基地）后那格也该自动作废。
 ##
 ## 计时走局内时间轴（乘 debug.time_scale），与倒计时/撤离点调度一致。
-## 所有数值在 Data/config.json 的 survival 节点。
+## 所有数值在 Data/config/ 的 survival 节点。
 ## accesses：Player（背包、血量、属性），不自己开倒计时；
 ## RunManager 只用来判「本局还在跑」。
 ## ============================================================

@@ -6,7 +6,7 @@ extends Control
 ## 表驱动：所有条目写在 _make_schema() 里，每项一行，加参数只改那张表。
 ##
 ## 值怎么存：写进 Config 的**用户层** → user://settings.json。
-## 不去改 Data/config.json —— 导出后 res:// 只读，而且会和版本管理打架。
+## 不去改 Data/config/ —— 导出后 res:// 只读，而且会和版本管理打架。
 ## 每行右上角的 ↺ 只重置该项，底部「恢复默认设置」清空整个用户层。
 ##
 ## 生效时机：标 live=true 的（窗口/帧率/音量）改完立即作用；
@@ -402,7 +402,7 @@ func _on_back() -> void:
 
 func _on_reset_all() -> void:
 	_confirm("恢复默认设置",
-			"将清空 user://settings.json 里全部自定义项，\n所有参数回到 Data/config.json 的出厂值。确定吗？",
+			"将清空 user://settings.json 里全部自定义项，\n所有参数回到 Data/config/ 的出厂值。确定吗？",
 			"恢复默认", func():
 				Config.reset_user_settings()
 				_pending_set.clear()
@@ -601,10 +601,9 @@ func _schema_display() -> Array:
 
 		{"path": "player.weapon", "label": "当前武器", "type": "enum",
 			"items": [["剑士（剑·近战）", "sword"], ["枪手（长枪·近战）", "spear"],
-				["弓兵（弓·远程）", "bow"], ["强弩（穿透）", "sniper"]],
+				["弓兵（弓·远程）", "bow"]],
 			"note": "决定攻击方式与动作：剑士 = 原来的扇形挥击（战士贴图）；枪手 = 长枪突刺（枪兵 8 向贴图，射程更长）；"
-				+ "弓 = 判定帧发射箭矢（会飞、撞墙消失、命中结算）；强弩 = 瞬间命中 + 曳光，高伤穿透 2 个目标、射程 900，"
-				+ "但上弦慢、后摇长、声响极大（240）。「弓」会强制使用弓兵贴图集；「强弩」用完整角色帧（弩画在手里，blue_crossbowman）。"
+				+ "弓 = 判定帧发射箭矢（会飞、撞墙消失、命中结算），并且强制使用弓兵贴图集。"
 				+ "下次进局生效。"},
 
 		{"path": "player.sprite_set", "label": "玩家贴图集（近战用）", "type": "enum",
@@ -642,7 +641,7 @@ func _schema_display() -> Array:
 
 
 ## 「性能优先」预设一次性写入的一组用户层覆盖（键 → 流畅档取值）。
-## 只写用户层，不碰 Data/config.json；「恢复均衡」逐项清掉即回到出厂值。
+## 只写用户层，不碰 Data/config/；「恢复均衡」逐项清掉即回到出厂值。
 const _PERF_BUNDLE: Dictionary = {
 	"map.decor.shadow": false,
 	"map.decor.density": 0.6,
@@ -669,7 +668,7 @@ func _schema_performance() -> Array:
 			"note": "把资源点/装饰/敌人数量与视野等一次性降到流畅档。开局明显掉帧时用；会改变本局体感，但不动出厂配置。"},
 		{"type": "action", "label": "恢复均衡", "button": "清除降配",
 			"handler": Callable(self, "_clear_perf_preset"),
-			"note": "清掉「性能优先」写下的全部用户层覆盖，回到 Data/config.json 的出厂值。"},
+			"note": "清掉「性能优先」写下的全部用户层覆盖，回到 Data/config/ 的出厂值。"},
 
 		{"type": "divider", "label": "AI 开销（每帧读取 · 即时生效）"},
 		{"path": "enemy.ai_active_radius_cells", "label": "敌人 AI 活跃半径（格）", "type": "number",
@@ -917,7 +916,7 @@ func _schema_language() -> Array:
 			"items": _language_items(),
 			"note": "确认应用后界面文字整体切换；数据存进 user://settings.json。"},
 		{"type": "divider", "label": "如何新增语言"},
-		{"type": "info", "label": "1. 在 Data/language/translations.csv 加一列（表头写语言代码）；2. 在 Data/config.json 的 language.available 登记 code / name，ready 设为 true。"},
+		{"type": "info", "label": "1. 在 Data/language/translations.csv 加一列（表头写语言代码）；2. 在 Data/config/ 的 language.available 登记 code / name，ready 设为 true。"},
 	]
 
 

@@ -1,0 +1,191 @@
+{
+  "session": {
+    "time_limit_seconds": 3600,
+    "extraction_hold_seconds": 3
+  },
+  "survival": {
+    "_comment": "局内每分钟物资消耗。supplies = 消耗表（2026-09-18 从「只有食物一个键」改成结构化列表，为的是以后加一种物资只加一行、不改代码）：per_meal = 每 meal_interval_seconds 扣几份；shortage_debuff = **短缺时**扣的属性点数，正数表示扣这么多，键名复用 progression.traits 的属性 id（attack 点 / defense 点 / move_speed px每秒 / vision px / attack_range px / attack_speed 百分点 / projectile_speed px每秒）。**补上物资立刻全额还原**，扣减不进存档；hp 故意不支持——中途缩上限会牵动已有血量与血条语义。短缺**不致死**：饥饿仍按 starvation_interval_seconds 掉 starvation_damage 血，但血量封在 starvation_hp_floor 之上，最后一滴只能由敌人补刀。",
+    "meal_interval_seconds": 60,
+    "supplies": [
+      {
+        "_comment": "口粮。饿肚子掉的是**输出和腿速**（攻击 -7 = 正好一层攻击特性；移速 -10 px/s 相对出厂 player.speed 640 只有 1.6%，是「脚步发沉」的手感而非硬惩罚）—— 打不动、跑不快，但死不了人。",
+        "id": "food",
+        "per_meal": 1,
+        "shortage_debuff": {
+          "attack": 7,
+          "move_speed": 10
+        }
+      }
+    ],
+    "starvation_damage": 5,
+    "starvation_interval_seconds": 30,
+    "starvation_hp_floor": 1,
+    "heal_per_food": 25,
+    "eat_cooldown_seconds": 1.0,
+    "eat_key": 72
+  },
+  "extraction": {
+    "count": 3,
+    "spawn_at_minutes": 30,
+    "close_one_at_minutes": [
+      45,
+      55
+    ],
+    "min_distance_from_spawn_cells": 24,
+    "min_distance_between_points_cells": 28,
+    "trigger_radius": 96.0,
+    "minimap": {
+      "duration_seconds": 60,
+      "warn_before_close_seconds": 60,
+      "size_px": 220
+    }
+  },
+  "base": {
+    "map_size": 64,
+    "fit_camera_on_enter": true,
+    "building_cells": 4,
+    "floor_3d": "wall_plate.png",
+    "floor_uv_scale": 0.22,
+    "wall_height": 1.8,
+    "interact_radius_cells": 4.5,
+    "player_spawn_cell": [
+      32,
+      32
+    ],
+    "buildings": [
+      {
+        "_comment": "基地建筑表（2026-09-18 全量换上 Tiny Swords Blue Buildings 素材，8 栋齐）。**建筑渲染全自动**：Building.gd 按贴图尺寸等比缩放到 4×4 格框（屋顶可向上探出 1.4 倍）、脚底对齐占地底边，贴图缺失时保底一块 id 配色方块不消失。cell = 占地**左上角**格、占 4×4；玩家重摆过的位置存在 Meta.base_layout 优先于这里的 cell（新增 id 不在存档里 → 直接用配置值）。hint 为空 = 纯装饰（点击只 push_warning 不会崩，main 的 match 有 default 分支）。",
+        "id": "warehouse",
+        "name": "仓库",
+        "cell": [
+          10,
+          30
+        ],
+        "hint": "按 E 查看仓库",
+        "h3d": 2.6,
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_house1.png"
+      },
+      {
+        "id": "statue",
+        "name": "修道院",
+        "cell": [
+          38,
+          30
+        ],
+        "hint": "按 E 进行升级",
+        "h3d": 3.4,
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_monastery.png"
+      },
+      {
+        "id": "gate",
+        "name": "出发大门",
+        "cell": [
+          24,
+          30
+        ],
+        "hint": "按 E 选择角色出发",
+        "h3d": 2.2,
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_castle.png"
+      },
+      {
+        "id": "archery",
+        "name": "箭术场",
+        "cell": [
+          38,
+          16
+        ],
+        "hint": "",
+        "h3d": 2.6,
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_archery.png"
+      },
+      {
+        "id": "barracks",
+        "name": "兵营",
+        "cell": [
+          52,
+          16
+        ],
+        "hint": "",
+        "h3d": 2.6,
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_barracks.png"
+      },
+      {
+        "id": "tower",
+        "name": "瞭望塔",
+        "cell": [
+          52,
+          30
+        ],
+        "hint": "",
+        "h3d": 3.2,
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_tower.png"
+      },
+      {
+        "id": "house2",
+        "name": "民居",
+        "cell": [
+          10,
+          44
+        ],
+        "hint": "",
+        "h3d": 2.0,
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_house2.png"
+      },
+      {
+        "id": "house3",
+        "name": "民居",
+        "cell": [
+          24,
+          44
+        ],
+        "hint": "",
+        "h3d": 2.0,
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_house3.png"
+      },
+      {
+        "id": "farm",
+        "name": "谷仓",
+        "cell": [
+          10,
+          16
+        ],
+        "hint": "",
+        "h3d": 2.6,
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_farm.png"
+      },
+      {
+        "id": "quarry",
+        "name": "采石场",
+        "cell": [
+          38,
+          44
+        ],
+        "hint": "",
+        "h3d": 2.6,
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_quarry.png"
+      },
+      {
+        "id": "portal",
+        "name": "传送门",
+        "cell": [
+          24,
+          16
+        ],
+        "hint": "",
+        "h3d": 3.4,
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_portal.png"
+      },
+      {
+        "id": "catapult",
+        "name": "弩车",
+        "cell": [
+          52,
+          44
+        ],
+        "hint": "",
+        "h3d": 1.6,
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_catapult.png"
+      }
+    ]
+  }
+}

@@ -22,11 +22,13 @@
 | 美术 | Tiny Swords Free Pack，64px 格，Nearest 采样（像素锐利） |
 | 入口 | `project.godot: run/main_scene = StartMenu.tscn`；`menu.game_scene = res://Scenes/Main.tscn` |
 | Autoload 顺序 | `Config → SaveSlots → DisplaySettings → Meta → NoiseSystem → ResourceRegistry`（`SaveSlots` 夹在 `Config` 与 `Meta` 之间：`Meta.load` 需先问有无激活槽）|
-| 地图 | 运行时按 `config.json` 程序生成，128×128 格 × 64px = 8192×8192 px |
+| 地图 | 运行时按 `Data/config/` 域文件程序生成，128×128 格 × 64px = 8192×8192 px |
 | 存档 | `user://saves/slot_NN.json`（6 槽）+ `user://saves/state.json`（记 last_slot/migrated）；用户设置 `user://settings.json` |
 
 ### 0.3 提前定死的规范
-- **配置驱动、两处真相分离（三层优先级）**：`_overrides(内存) > _user(user://settings.json) > _data(Data/config.json)`（`config_loader.gd`）。出厂数值全在 `Data/config.json`；玩家在设置面板改的落**用户层**，**绝不回写 `Data/config.json`**（res:// 导出后只读，且会与版本管理打架）。「恢复默认」＝删用户层键回落出厂值。
+- **配置驱动、两处真相分离（三层优先级）**：`_overrides(内存) > _user(user://settings.json) > _data(Data/config/)`（`config_loader.gd`）。出厂数值按域拆在 **`Data/config/*.json`（2026-09-20 由单文件 4872 行拆成 16 个域文件，见下）**；玩家在设置面板改的落**用户层**，**绝不回写出厂配置**（res:// 导出后只读，且会与版本管理打架）。「恢复默认」＝删用户层键回落出厂值。
+  - **域文件清单**：`map`(map/map3d/noise/nav)、`player`(player/player3d/camera/camera3d)、`progression`(characters/progression/meta_progression)、`sprites`(sprites/sprites_hd)、`sprites_gunner/archer/lancer/monk`（各兵种 ×4 档配色帧表）、`enemy`(enemy/enemy_traits)、`enemy_types`、`animals`(animals/animal_types)、`combat`、`items`(loot/storage/resources)、`run`(session/survival/extraction/base)、`ambience`(fog/fog3d/weather/fx)、`ui`(menu_bar/inventory_popup/menu/language/audio/display/debug)。`_comment` 说明字段原样随段迁移。
+  - **加载规则**：`config_loader.load_config()` 按**文件名排序**逐个解析、顶层段深合并成一棵树；各域顶层段互不重叠（跨文件重复定义 = 配置事故，`Dev/verify_config_split.gd` 无头跑一遍即可查出）。**加新域 = 往目录丢一个文件**，无需改加载器。一次性迁移校验：拆分结果与原单文件**深度一致**（逐键逐值、类型敏感）后才删除旧文件（git 历史可找回）。
 - **键位存物理键码**（`event.physical_keycode` / `is_physical_key_pressed`）：捕获端与消费端一致，非 QWERTY 布局不错位。
 - **调试既在 config 也有 `--` 参数（并存分工，非二选一）**：`debug.*` 是真实出厂开关（当前 `auto_enter_run=true`、`time_scale=20`、`log_state_transitions=false`）；`--` 参数是额外的「出图/诊断/回归专用只读通道」（`--seed` / `--preview-map` / `--capture2d` / `--soak*` / `--weapon` / `--no-fog` / `--no-macro` / `--menu-*`），动机是「不改 config 避免留脏配置」。优先级：`--seed` 压过 `map.force_seed`；`debug.smoke_test` 在 CLI 处理前判；CLI 接管成功则不进基地。
 - **资源管线**：新增 PNG 后跑 `python tools/godot_import.py`；新增 `class_name` 后跑 `--headless --import`（全局类名缓存不重扫不认，否则 `load()` 静默返回 null）。回归用 `tools/run_godot_headless.py` / `run_regression.py`。
@@ -55,7 +57,7 @@
 
 ### 1.2 玩家与单位的真实贴图集（config 驱动）
 - 玩家可选出击 **4 名**角色（config `characters.list`）：**枪手**=长枪（`spear` → `sprites_lancer` 8 向枪兵）、**弓兵**=弓（`bow` → `sprites_archer` 弓兵）、**剑士**=剑（`sword` → `sprites_ts` 战士）、**僧侣**=法杖（`staff` → `sprites_monk` 僧侣，2026-09-18 加入）。各武器已锁定自己的贴图集，未指定才回落 `player.sprite_set`。
-  > **强弩（`sniper`）已于 2026-09-17 从出击名单移除**（用户原话：「强弩准备废弃了，风格不统一，太丑了」）—— 它用的是即梦 AI 立绘 `blue_crossbowman/`，与另外三人（Tiny Swords 原生素材）画风割裂。**武器配置块、精灵集、贴图、探针、`fire_hitscan()` 代码全部保留**，`characters.list` 里插回一条即可复活；敌人没有任何一种用这套贴图，故移除不影响敌人。
+  > **强弩（`sniper`）已彻底删除（2026-09-20）**：2026-09-17 先按用户原话「强弩准备废弃了，风格不统一，太丑了」从出击名单移除（即梦 AI 立绘 `blue_crossbowman/` 与另外三人的 Tiny Swords 原生素材画风割裂），三天后确认不复活，于是**武器配置块、精灵集、贴图、`hit_sniper` 特效、曳光、`fire_hitscan()` / `first_wall_point()` / `targets_on_segment()` 整条 hitscan 通路、探针 `probe_sniper`、设置面板选项与翻译条目一并清掉**。想再加「瞬间命中」型武器要重写那条通路，不是插一条配置就行 —— 这是本项目**唯一一条被删掉的攻击类型**，`attack_kind()` 现在只有 `melee` / `ranged` 两种。
   > **僧侣（`monk`）2026-09-18 加入**：Tiny Swords Monk，五档配色齐全（Blue/Purple/Black/Yellow → 玩家档位，Red 已是敌人邪术师）。**官方没画 Attack 帧**（只有 Idle 6 / Run 4 / Heal 11 / Heal_Effect 11），沿用敌人 cultist 的先例 —— **Heal 帧就是攻击动作**（切出 `attack1_*` 与 `heal_*` 同像素两份命名，heal_fx_* 特效层不进动作序列）。本轮边界=「只加外观、能选能打」：新增 `combat.weapons.staff` **复用现成 melee 判定**（一行 combat 代码没改），数值定位=低伤(18)低噪(60，全场最安静)中距(140)近战；治疗机制是后续独立任务。**不在 `roster.starting` 出厂名册里**，走出击面板「补招新兵」获取（补招按钮遍历 characters.list 自动生成）。验收：`Dev/shot_monk_inrun.tscn` 开窗实拍（四人列队 / 四档配色 / Heal 施法当攻击动作），逐帧 `exists()` 断言 120 项全过。
 - **每个角色有 4 套档位配色**（2026-09-17 加等级系统）：同一套 Tiny Swords 骨架、只换颜色，帧数完全一致。放在 `Units/{blue,purple,black,yellow}_{lancer,archer,warrior}/`，由 `tools/slice_{lancer,archer,warrior}.py <Faction>` 生成（`Faction` = `Blue`/`Purple`/`Black`/`Yellow`，对应素材包 `images/Tiny Swords (Free Pack)/Units/<Faction> Units/`）。档位 → 配色的映射在 `progression.tiers` + `progression.sprite_sets`，见 §5.10。**红色永远留给敌人**，玩家档位不许占用红色系。
 - 现存贴图集（`Assets/Art/Sprites/`）：`PlayerTS/warrior_*`（192²，72 帧，历史/备用）、`Player/*`（48²，旧）、`PlayerHD/*`（512²，HD 备用）、`Units/blue_warrior|blue_lancer|blue_archer`（TS 单位）。
@@ -71,7 +73,7 @@
 | 装饰 | `Decor/tree_00..15 / rock_00..03 / stump_00..03 / bush_00..15 / pebble_00..15 / debris_*` | — | 已有 |
 | 矿脉露头 | `Decor/ore_gold_00..05+gold_stone_00..03`(128²) / `ore_iron_00..02` / `ore_oil_00` | 128² | 金矿真；**铁=金矿染灰、油=程序糊紫黑斑（占位）** |
 | 道具图标 | `Items/item_wood/stone/iron/gold/oil/food/arrow/scrap.png` | 64²(gold 128²) | 已有；**item_oil 画风突兀=程序占位** |
-| 投射物 / 武器 | `Projectiles/arrow.png`(64²) | — | 已有；弩已画进 `blue_crossbowman` 角色帧（无独立武器贴图）；近战/弓无独立武器贴图 |
+| 投射物 / 武器 | `Projectiles/arrow.png`(64²) | — | 只有箭有独立贴图；近战与弓的武器都画在角色帧里（`Sprites/Weapons/` 已随强弩删除而清空） |
 | 建筑 | `Buildings/house_large(128×192)/monastery(192×320)/castle(320×256)/archery/barracks/enemy_barracks/house_small/tower/shadow` | — | 已有；基地三建筑借用 TS 原图 |
 | UI | `Assets/Art/UI/` | 仅 `.gitkeep` | **空，无任何 png** |
 
@@ -669,6 +671,7 @@
 - 持久层是 **`Meta.roster`**（写进存档槽的 `roster` 键）：`[{uid, id, name, level, xp}]`；
   `id` 是指向 `characters.list` 兵种原型的外键（决定武器 / 指令集 / 描述），`level`/`xp` 是个人的。
 - 出击面板（`character_select_panel.gd`）列的是**名册里的人**，不是兵种原型；出击信号带 `uid`+`level`，`main._squad_characters()` 把它和原型合并后注入每个玩家实例（`player.roster_uid` / `player.level`）。
+- **预选规则（2026-09-20 用户定 A）**：面板默认**全选名册现有人**。`main._selected_units`（上次出击小队）只在局内作为记忆存在，**回基地 `_enter_base()` 即清空** —— 不清的话上一局小队里的已阵亡 uid 会让面板只勾"幸存者"，勾选数一会 1 个一会 4 个像 bug。面板的 `open(preselected)` 兼容预选入参（空 = 全选），预探/老式调用不受影响。
 - `player.on_death()` 里 `Meta.remove_unit(roster_uid)`；`run_manager._end_run("extracted")` 里 `Meta.grant_xp_to_survivors()`（只发活着的、有名册身份的）。
 - `roster_uid == 0` = **无名册身份**（命令行 / 无头回归 / `auto_enter_run` 直跑 Main.tscn）：不发经验、死亡不除名，行为与加等级之前完全一致。
 

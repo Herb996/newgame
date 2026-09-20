@@ -1,7 +1,7 @@
 extends Node
 ## ============================================================
 ## ExtractionSystem — 撤离点调度（挂在 Main 下）
-## 按局内经过时间执行时间轴（全部读 Data/config.json 的 extraction 节点）：
+## 按局内经过时间执行时间轴（全部读 Data/config/ 的 extraction 节点）：
 ##   spawn_at_minutes（30 分钟）    ：随机开启 count（3）个撤离点，弹出小地图
 ##   close_one_at_minutes（45, 55） ：按"生成时预定"的顺序各关闭 1 个
 ##   最后一个撤离点保持开放至超时（60 分钟 = 死亡，由 RunManager 处理）

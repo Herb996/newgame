@@ -12,7 +12,6 @@ extends State
 ## （actor.attack_param），判定帧往哪走按 actor.attack_kind() 分岔：
 ##   melee   → begin_attack_hit() + 逐帧 resolve_attack_hit()（原行为，一字未改）
 ##   ranged  → fire_projectile() 发射一次，不碰 Hitbox（箭会飞）
-##   hitscan → fire_hitscan() 瞬间结算 + 曳光（强弩：判定与出箭同帧）
 ## 武器没写某一项时 attack_param 会自动回落到 combat.attack，所以不配武器表 = 老行为。
 ## ============================================================
 
@@ -48,7 +47,7 @@ func physics_update(delta: float) -> void:
 	var active: float = actor.attack_param("active_seconds", 0.08)
 	var recovery: float = actor.attack_param("recovery_seconds", 0.2)
 	var kind: String = actor.attack_kind()
-	var hit_once: bool = kind != "melee"    # ranged / hitscan 都只在判定帧开工一次
+	var hit_once: bool = kind != "melee"    # 远程只在判定帧开工一次
 
 	_timer += delta
 	actor.velocity = Vector2.ZERO
@@ -62,16 +61,13 @@ func physics_update(delta: float) -> void:
 				if kind == "ranged":
 					# 拉弓 8 帧的放箭点：进入判定帧的那一瞬发射一次，之后不再发
 					actor.fire_projectile()
-				elif kind == "hitscan":
-					# 瞬狙：判定与出枪同帧，命中数只影响日志/表现
-					actor.fire_hitscan()
 				else:
 					actor.begin_attack_hit()
 					# 出手弧光与判定同帧：挥空也照放（动作和噪音本来就照放），
 					# 砍中目标那一下另有 combat.attack.fx_hit 的星芒。
 					actor.spawn_attack_fx()
 				# 出招发声：惊动附近敌人（DESIGN.md 第二部分 噪音机制）
-				# 取武器自己的噪音值 —— 弓比剑安静、强弩震天响，潜行时的可利用差异
+				# 取武器自己的噪音值 —— 弓比剑安静，潜行时的可利用差异
 				# from_player=true：这是小队自己弄出的动静，计入菜单栏的噪音读数
 				NoiseSystem.emit(actor.global_position, actor.attack_noise(), true, actor)
 		Phase.ACTIVE:

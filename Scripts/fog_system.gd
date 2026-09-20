@@ -2,7 +2,7 @@ extends Node
 ## ============================================================
 ## FogSystem — 2D 战争迷雾（软边羽化）+ 实体显隐（挂在 Main 下）
 ##
-## 规则（Data/config.json）：
+## 规则（Data/config/）：
 ##   player.vision_radius_cells：视野半径（格）
 ##   fog.feather_cells：揭示圈羽化半径（格，0=硬边）
 ##   - 未探索区域：黑色遮罩（覆盖全图，z_index=5）

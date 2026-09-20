@@ -12,11 +12,10 @@ extends Node
 ## 存在、并且条带播到中段（第 0 帧往往还没张开）才截。所以图里没有 = 真没有，
 ## 而不是截早了。
 ##
-## 拍五把武器 + 三个敌人兵种：
-##   sword/spear/staff → 各自的出手弧光 + 砍中目标的星芒（spark_hit）
-##   bow               → 箭命中瞬间的 spark_arrow
-##   sniper            → 瞬狙命中点的 spark_hit（与曳光同帧）
-##   ep_spear_goblin / ep_hex_shaman / ep_bear → 兵种专属出手特效
+## 拍四把武器 + 十八个敌人兵种（第二批后每个兵种都有专属特效）：
+##   sword/spear/staff → 各自的出手弧光 + 各自的命中星芒（fx_hit）
+##   bow               → 弹道命中点（projectile.fx_impact）
+##   ENEMY_SHOTS       → 兵种专属出手特效
 ##
 ## 用法（**必须开窗**，无头是 dummy 驱动、viewport 贴图恒空）：
 ##   python tools/run_probe.py _shot_fx.log Dev/shot_fx.tscn --window
@@ -26,11 +25,15 @@ extends Node
 
 const OUT_DIR := "C:/Users/Administrator/WorkBuddy/2026-09-15-23-06-42"
 const SAVE_PATH := "user://save.json"
-const WEAPONS := ["sword", "spear", "staff", "bow", "sniper"]
-## 我方近战要拍到「弧光 + 命中星芒」两张；远程只拍到命中那一下
-const HIT_SPARK := "spark_hit"
-## 敌人只挑写了专属特效的兵种（其余兵种回落到通用 slash_claw，拍一张代表即可）
-const ENEMY_SHOTS := ["ep_spear_goblin", "ep_hex_shaman", "ep_bear"]
+const WEAPONS := ["sword", "spear", "staff", "bow"]
+## 要拍的兵种出手。第二批之后 21 个兵种全都有专属 id，这里列 18 条不同的形状
+## （牛头人/巨魔故意共用熊的爪痕，是同一张条带，不必再拍一遍）
+const ENEMY_SHOTS := [
+	"ep_spear_goblin", "ep_hex_shaman", "ep_bear",
+	"ep_snake", "ep_spider", "ep_turtle", "ep_pig", "ep_pig_rider",
+	"ep_bomb_fish", "ep_harpoon_shark", "ep_paddle_shark", "ep_gnoll",
+	"ep_gnome", "ep_panda", "ep_skull", "ep_thief", "ep_lizard", "ep_cave",
+]
 
 var _save_backup := ""
 var _save_existed := false
@@ -39,6 +42,8 @@ var _player: Node = null
 ## 裁图中心跟谁：我方那几张跟角色，敌人那几张必须跟**出手的那只**，
 ## 否则图正中被玩家占着，敌人和它的弧光挤在边上看不清。
 var _focus: Node2D = null
+## 非 INF 时把角色钉在这个世界坐标上（敌方阶段用），让镜头稳住不动
+var _pin := Vector2.INF
 var _missed: Array = []
 
 
@@ -126,15 +131,14 @@ func _weapons_phase(pool: Dictionary) -> void:
 				await _shot("fx_%s" % wid, a as Node2D)
 		else:
 			print("[ShotFx]   %s 无出手弧光（远程，命中才出特效）" % wid)
-		# 命中那一记：近战是 spark_hit（resolve_attack_hit 里，探针拍不到的那句），
-		# 弓是弹道命中点的 spark_arrow，强弩是 hitscan 命中点的 spark_hit
-		var spark := HIT_SPARK
+		# 命中那一记：三把近战各有自己的 fx_hit（没写才回落到 combat.attack.fx_hit），
+		# 弓是弹道命中点的 projectile.fx_impact
+		var spark := str(Config.get_value("combat.weapons.%s.fx_hit" % wid, ""))
+		if spark == "":
+			spark = str(Config.get_value("combat.attack.fx_hit", ""))
 		if wid == "bow":
 			spark = str(Config.get_value(
 					"combat.weapons.bow.projectile.fx_impact", ""))
-		elif wid == "sniper":
-			spark = str(Config.get_value(
-					"combat.weapons.sniper.hitscan.fx_impact", ""))
 		var h := await _wait_fx(spark, 300, target)
 		if h == null:
 			_missed.append("%s 命中特效 %s" % [wid, spark])
@@ -154,6 +158,7 @@ func _enemies_phase(pool: Dictionary) -> void:
 	# 期间角色一直往西溜，镜头插值跟在后面，敌人出手那一下早就在画面外了。
 	_player.call("stop_moving")
 	_player.call("clear_move_target")
+	_pin = (_player as Node2D).global_position
 	for tid in ENEMY_SHOTS:
 		var got: Node = null
 		var fx_id := ""
@@ -177,8 +182,11 @@ func _enemies_phase(pool: Dictionary) -> void:
 						float(e.call("attack_range_px"))])
 			# near 传**玩家**不是那只敌人：镜头跟着玩家，特效离玩家一远就根本不在
 			# 画面上（ep_bear 那张投影到 x=-393，裁出来只能是一片草地）。兵种进
-			# 射程才出手，所以"离玩家 140px 内"本身就是"它砍的这一下"。
-			got = await _wait_fx(fx_id, 420, _player as Node2D)
+			# 射程才出手，所以"离玩家一臂之内"本身就是"它砍的这一下"。
+			# 半径按该兵种自己的射程算：第一批全是 52px 的近战，写死 140 够用；
+			# 射程远的兵种出手点落在 射程×0.7 + 射程×0.6 处，140 会把正主筛掉。
+			var rng := float(e.call("attack_range_px"))
+			got = await _wait_fx(fx_id, 420, _player as Node2D, maxf(140.0, rng * 1.6))
 			if got != null:
 				break
 		if got == null:
@@ -241,9 +249,17 @@ func _stand_in_front(t: Node2D, frac: float) -> void:
 
 
 ## 拍摄期间角色必须死不了：一屏特效要等上千帧，被打死一次整组图就断在半路。
+## 顺带把位置钉住：只在 _enemies_phase 开头 stop_moving 一次是不够的 —— 整段里
+## 角色一直在往西溜，镜头插值落后，裁图中心从 x=509 一路漂到 x=-77（后一半直接出框）。
+## 钉在 _pin 上，镜头就稳了；_pin 为 INF 表示不钉（我方阶段要追着靶子打，不能钉）。
 func _keep_alive() -> void:
-	if is_instance_valid(_player):
-		_player.set("hp", int(_player.get("max_hp")))
+	if not is_instance_valid(_player):
+		return
+	_player.set("hp", int(_player.get("max_hp")))
+	if _pin != Vector2.INF:
+		_player.call("stop_moving")
+		_player.call("clear_move_target")
+		(_player as Node2D).global_position = _pin
 
 
 ## 池子里那只代表可能已经死了/被回收 —— 现场从 enemies 组里另找一只同兵种的
@@ -331,20 +347,40 @@ func _shot(tag: String, anchor: Node2D = null) -> void:
 	var a: Node2D = anchor
 	if a == null and _focus != null and is_instance_valid(_focus):
 		a = _focus
+	## 先把锚点的世界坐标**抄成数**，之后一律用这个数，不再碰节点。
+	## 第二批的条带只有 7~12 帧（0.3 秒不到），等镜头那十几帧里它早就 queue_free
+	## 完了。上一版在 await 之后还写 `a is CanvasItem` —— 对已释放实例求值是脚本
+	## 错误，整个 _shot 静默中断，18 张里丢了 14 张，而日志上只看得到"出手"那一行。
+	var at := Vector2.ZERO
+	var has_at := false
+	if a != null and is_instance_valid(a):
+		at = (a as Node2D).global_position
+		has_at = true
 	# 先等镜头把锚点送到画面里再截：整组图要跑上千帧，角色这期间一直在往西走，
 	# 镜头是插值跟的，截早了锚点投影还在画面外（ep_bear 那张 x=-186 就是这么来的）。
+	# 只要求"在屏幕上"（40px 边距），不要求"离边 300px"：720 高的视口里后者只剩
+	# 120px 的可用横带，于是常把 12 次重试全烧光 —— 0.2 秒过去，第二批那些 7~14 帧
+	# 的短条带早播完了，交出来一张收尾残影（fx_sword_hit 那张就是这么废的）。
+	# 锚点偏一点不要紧：下面的裁图框自己会夹到画面内。
+	# 先判后等：上一版每轮开头无条件 await，于是最省也要多烧 1~4 帧。第二批的条带
+	# 只有 9 帧 / 0.21 秒（hit_sword），等完再看画面早已是收尾残影——日志写着抓到
+	# 第 4 帧，实际截到的是第 8 帧。常态（锚点本来就在屏内）必须当帧就截。
 	var settled := false
-	for _s in range(12):
-		await RenderingServer.frame_post_draw
+	var c := Vector2.ZERO
+	for _s in range(4):
 		var vp := get_viewport()
-		if a == null or not is_instance_valid(a) or vp == null:
+		if vp == null:
+			break
+		if not has_at:
 			settled = true
 			break
-		var p: Vector2 = (a as CanvasItem).get_global_transform_with_canvas().get_origin()
-		if p.x > 300.0 and p.x < vp.get_visible_rect().size.x - 300.0 \
-				and p.y > 300.0 and p.y < vp.get_visible_rect().size.y - 300.0:
+		c = vp.get_canvas_transform() * at
+		var vs := vp.get_visible_rect().size
+		if c.x > 40.0 and c.x < vs.x - 40.0 and c.y > 40.0 and c.y < vs.y - 40.0:
 			settled = true
 			break
+		await RenderingServer.frame_post_draw
+		_keep_alive()
 	if not settled:
 		print("[ShotFx] !! %s 锚点迟迟没进画面，硬截" % tag)
 	var im := get_viewport().get_texture().get_image()
@@ -358,11 +394,8 @@ func _shot(tag: String, anchor: Node2D = null) -> void:
 	var h := src.get_height()
 	# 裁图中心跟**刚等到的那条特效**，不跟角色：敌人那几张里出手的兵种没有叫 Body
 	# 的子节点，跟角色 = 落回画面正中 = 敌人和它的弧光全在框外。
-	var c := Vector2(w * 0.5, h * 0.5)
-	if a is CanvasItem and is_instance_valid(a):
-		# 用 CanvasItem 自己的投影：get_canvas_transform() 不含 viewport stretch，
-		# 窗口尺寸和视口逻辑尺寸不一致时会把点甩出裁图外（ep_bear 那张空在这）。
-		c = (a as CanvasItem).get_global_transform_with_canvas().get_origin()
+	if not has_at:
+		c = Vector2(w * 0.5, h * 0.5)
 	var half := 280
 	var box := Rect2i(int(c.x) - half, int(c.y) - half, half * 2, half * 2)
 	box.position.x = clampi(box.position.x, 0, maxi(w - 8, 0))
@@ -378,8 +411,7 @@ func _shot(tag: String, anchor: Node2D = null) -> void:
 		if is_instance_valid(n):
 			live.append("%s#%d" % [_fx_tag(n), int(n.get("frame"))])
 	print("[ShotFx] %s -> %s err=%d 裁图心=(%.0f,%.0f) 锚点世界=%s 场上特效=%s" % [
-			tag, path, err, c.x, c.y,
-			str((a as Node2D).global_position) if a != null else "-", str(live)])
+			tag, path, err, c.x, c.y, str(at) if has_at else "-", str(live)])
 
 
 func _frames(count: int) -> void:

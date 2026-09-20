@@ -2,13 +2,13 @@ extends CanvasLayer
 ## ============================================================
 ## DebugStatPanel — 局内右侧「数值调试」栏（F9 开关，出厂默认关）
 ##
-## 为什么要有它：调角色数值原本只有两条路 —— 改 Data/config.json 重开一局，
+## 为什么要有它：调角色数值原本只有两条路 —— 改 Data/config/ 重开一局，
 ## 或者去局外「参数配置」面板（那是给**玩家**看的，写 user://settings.json，
 ## 还要点「确认应用」，而且只列了显示/音频/玩法那几项，不含战斗数值）。
 ## 本面板走第三条路：写 Config 的**运行时覆盖层**（只存内存，退出即忘）。
 ##
 ## 覆盖层这一选定了三条理由（不是随手挑的）：
-##   · 不污染 Data/config.json —— 那是版本管理里的出厂值；
+##   · 不污染 Data/config/ —— 那是版本管理里的出厂值；
 ##   · 不污染 user://settings.json —— 那层会**悄悄盖住**出厂值，
 ##     调完忘了还原就会带进回归套件和导出包（本项目踩过一次时序坑）；
 ##   · 与探针/回归天然隔离：那些自己也用 set_override，面板关掉即可。
@@ -159,7 +159,7 @@ func _build() -> void:
 	btn_reset.pressed.connect(_reset_everything)
 	tools.add_child(btn_reset)
 	var btn_print := UiKit.small_button("打印", 62, UiKit.FS_SMALL)
-	btn_print.tooltip_text = "打印改动：把本次改过的项连值一起打到控制台，方便抄回 Data/config.json"
+	btn_print.tooltip_text = "打印改动：把本次改过的项连值一起打到控制台，方便抄回 Data/config/"
 	btn_print.pressed.connect(_print_changes)
 	tools.add_child(btn_print)
 	var btn_types := UiKit.small_button("兵种", 62, UiKit.FS_SMALL)
@@ -411,19 +411,14 @@ func _rows_weapons() -> Array:
 		out.append({"label": "%s 后摇" % wn, "path": "combat.weapons.%s.recovery_seconds" % key,
 			"step": 0.01})
 		out.append({"label": "%s 噪音" % wn, "path": "combat.weapons.%s.noise" % key, "step": 10.0})
-		for sub in ["projectile", "hitscan"]:
-			if not (w.get(sub, null) is Dictionary):
-				continue
-			var sd: Dictionary = w[sub]
+		var sd: Dictionary = w.get("projectile", {})
+		if not sd.is_empty():
 			if sd.has("max_distance_px"):
 				out.append({"label": "%s 弹射程" % wn,
-					"path": "combat.weapons.%s.%s.max_distance_px" % [key, sub], "step": 10.0})
+						"path": "combat.weapons.%s.projectile.max_distance_px" % key, "step": 10.0})
 			if sd.has("speed"):
 				out.append({"label": "%s 弹速" % wn,
-					"path": "combat.weapons.%s.%s.speed" % [key, sub], "step": 10.0})
-			if sd.has("pierce"):
-				out.append({"label": "%s 穿透" % wn,
-					"path": "combat.weapons.%s.%s.pierce" % [key, sub]})
+						"path": "combat.weapons.%s.projectile.speed" % key, "step": 10.0})
 	return out
 
 
@@ -675,7 +670,7 @@ func _print_changes() -> void:
 		var rec: Dictionary = _type_edits[k]
 		print("  %-52s %s （原 %s）" % [k, str((rec["el"] as Dictionary)[rec["k"]]),
 				str(rec["orig"])])
-	print("  —— 覆盖层退出即忘；要留下就照这张表改 Data/config.json")
+	print("  —— 覆盖层退出即忘；要留下就照这张表改 Data/config/")
 	print("====================================")
 
 

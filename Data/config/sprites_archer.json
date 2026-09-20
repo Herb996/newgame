@@ -1,0 +1,474 @@
+{
+  "sprites_archer": {
+    "_comment": "玩家 = Tiny Swords Archer（弓手，Blue 阵营）。**弓是免费包里唯一自带完整动作集又自带独立弹道图的武器**：Idle 6 帧 / Run 4 帧 / Shoot 8 帧（完整拉弓->放箭），另有 Arrow.png 作为独立弹道素材（见 combat.weapons.bow.projectile）。Archer 是**单向**素材（正视视角，弓箭画在右侧），所以 idle/walk/attack 三项都只给 default=原图 + left/down_left/up_left=水平镜像 —— 上下朝向分不出来，这点与 Warrior 同限制，与 Lancer 的 8 向不同。画布 192x192（与 Warrior 同格），三套动作的不透明包围盒下沿实测都是 136，故 sprite_offset_y = -(136 - 96) = -40、sprite_scale = 0.6、sprite_pixel_unit = 10（与枪手 sprites_lancer 对齐，保证小队三个角色体型一致）。hit / dodge / dead 留空：官方无受击/倒地帧，走代码里的程序化抖动/冲刺拉伸/死亡倾倒。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -40.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 10,
+      "attack": 15
+    },
+    "idle": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_00.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_01.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_02.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_03.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_04.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_05.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_05.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_05.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/idle_m_05.png"
+      ]
+    },
+    "walk": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/blue_archer/run_00.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/run_01.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/run_02.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/run_03.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/blue_archer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/run_m_03.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/blue_archer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/run_m_03.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/blue_archer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/run_m_03.png"
+      ]
+    },
+    "attack": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_00.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_01.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_02.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_03.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_04.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_05.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_06.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_07.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_03.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_04.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_05.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_06.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_07.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_03.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_04.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_05.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_06.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_07.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_03.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_04.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_05.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_06.png",
+        "res://Assets/Art/Sprites/Units/blue_archer/shoot_m_07.png"
+      ]
+    },
+    "hit": [],
+    "dodge": [],
+    "dead": []
+  },
+  "sprites_archer_purple": {
+    "_comment": "等级档位配色：purple 档（素材包 Purple Units/Archer）。与 sprites_archer 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -40.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 10,
+      "attack": 15
+    },
+    "idle": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_00.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_01.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_02.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_03.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_04.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_05.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_05.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_05.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/idle_m_05.png"
+      ]
+    },
+    "walk": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/purple_archer/run_00.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/run_01.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/run_02.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/run_03.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/purple_archer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/run_m_03.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/purple_archer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/run_m_03.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/purple_archer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/run_m_03.png"
+      ]
+    },
+    "attack": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_00.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_01.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_02.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_03.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_04.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_05.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_06.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_07.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_03.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_04.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_05.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_06.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_07.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_03.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_04.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_05.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_06.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_07.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_03.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_04.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_05.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_06.png",
+        "res://Assets/Art/Sprites/Units/purple_archer/shoot_m_07.png"
+      ]
+    },
+    "hit": [],
+    "dodge": [],
+    "dead": []
+  },
+  "sprites_archer_black": {
+    "_comment": "等级档位配色：black 档（素材包 Black Units/Archer）。与 sprites_archer 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -40.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 10,
+      "attack": 15
+    },
+    "idle": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/black_archer/idle_00.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_01.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_02.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_03.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_04.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_05.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_05.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_05.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/black_archer/idle_m_05.png"
+      ]
+    },
+    "walk": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/black_archer/run_00.png",
+        "res://Assets/Art/Sprites/Units/black_archer/run_01.png",
+        "res://Assets/Art/Sprites/Units/black_archer/run_02.png",
+        "res://Assets/Art/Sprites/Units/black_archer/run_03.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/black_archer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_archer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_archer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_archer/run_m_03.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/black_archer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_archer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_archer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_archer/run_m_03.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/black_archer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_archer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_archer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_archer/run_m_03.png"
+      ]
+    },
+    "attack": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_00.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_01.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_02.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_03.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_04.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_05.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_06.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_07.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_03.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_04.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_05.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_06.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_07.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_03.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_04.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_05.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_06.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_07.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_03.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_04.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_05.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_06.png",
+        "res://Assets/Art/Sprites/Units/black_archer/shoot_m_07.png"
+      ]
+    },
+    "hit": [],
+    "dodge": [],
+    "dead": []
+  },
+  "sprites_archer_gold": {
+    "_comment": "等级档位配色：gold 档（素材包 Yellow Units/Archer）。与 sprites_archer 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -40.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 10,
+      "attack": 15
+    },
+    "idle": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_05.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_05.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_05.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/idle_m_05.png"
+      ]
+    },
+    "walk": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_03.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_m_03.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_m_03.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/run_m_03.png"
+      ]
+    },
+    "attack": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_05.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_06.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_07.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_05.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_06.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_07.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_05.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_06.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_07.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_05.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_06.png",
+        "res://Assets/Art/Sprites/Units/yellow_archer/shoot_m_07.png"
+      ]
+    },
+    "hit": [],
+    "dodge": [],
+    "dead": []
+  }
+}

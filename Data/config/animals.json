@@ -1,0 +1,63 @@
+{
+  "animals": {
+    "count": 60,
+    "min_distance_from_player_cells": 10,
+    "wander_radius_cells": 10,
+    "flee_radius_cells": 6,
+    "speed": 240.0,
+    "flee_speed_mult": 1.6,
+    "drop": {
+      "chance": 1.0,
+      "res": "food",
+      "amount_min": 1,
+      "amount_max": 3
+    }
+  },
+  "animal_types": {
+    "_comment": "官方包里的羊（吃草/待机/走动三套动画）。做成中立生物：地图上游荡，玩家靠近就跑，被打死掉落食物。",
+    "scale": 1.0,
+    "offset_y": -20.0,
+    "pixel_unit": 4.0,
+    "types": [
+      {
+        "id": "sheep",
+        "name": "野羊",
+        "weight": 1,
+        "hp": 12,
+        "fps": {
+          "idle": 6,
+          "walk": 9,
+          "graze": 5
+        },
+        "idle": [
+          "res://Assets/Art/Sprites/Units/sheep/idle_00.png",
+          "res://Assets/Art/Sprites/Units/sheep/idle_01.png",
+          "res://Assets/Art/Sprites/Units/sheep/idle_02.png",
+          "res://Assets/Art/Sprites/Units/sheep/idle_03.png",
+          "res://Assets/Art/Sprites/Units/sheep/idle_04.png",
+          "res://Assets/Art/Sprites/Units/sheep/idle_05.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/sheep/run_00.png",
+          "res://Assets/Art/Sprites/Units/sheep/run_01.png",
+          "res://Assets/Art/Sprites/Units/sheep/run_02.png",
+          "res://Assets/Art/Sprites/Units/sheep/run_03.png"
+        ],
+        "graze": [
+          "res://Assets/Art/Sprites/Units/sheep/grass_00.png",
+          "res://Assets/Art/Sprites/Units/sheep/grass_01.png",
+          "res://Assets/Art/Sprites/Units/sheep/grass_02.png",
+          "res://Assets/Art/Sprites/Units/sheep/grass_03.png",
+          "res://Assets/Art/Sprites/Units/sheep/grass_04.png",
+          "res://Assets/Art/Sprites/Units/sheep/grass_05.png",
+          "res://Assets/Art/Sprites/Units/sheep/grass_06.png",
+          "res://Assets/Art/Sprites/Units/sheep/grass_07.png",
+          "res://Assets/Art/Sprites/Units/sheep/grass_08.png",
+          "res://Assets/Art/Sprites/Units/sheep/grass_09.png",
+          "res://Assets/Art/Sprites/Units/sheep/grass_10.png",
+          "res://Assets/Art/Sprites/Units/sheep/grass_11.png"
+        ]
+      }
+    ]
+  }
+}

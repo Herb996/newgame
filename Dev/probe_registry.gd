@@ -36,7 +36,7 @@ func _check(ok: bool, msg: String) -> void:
 func _ready() -> void:
 	# 分布断言验的是**出厂**设计意图。设置面板会把 map.biome_weights 拉平（这台机器
 	# 上就是 1.45/1.45/1.45/0.2），继承过来"草地格数最多""草地独占区间>0.4"必挂 ——
-	# 那是玩家的选择，不是地图坏了。逐个键钉回 Data/config.json 自己的值。
+	# 那是玩家的选择，不是地图坏了。逐个键钉回 Data/config/ 自己的值。
 	for i in range(MapGenerator.biome_count()):
 		var key := "map.biome_weights." + str(i)
 		Config.set_override(key, Config.get_base_value(key, 1.0))

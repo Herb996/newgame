@@ -5,7 +5,7 @@ extends Area2D
 ## 秒即撤离成功（调用 RunManager.extract()），离开则进度清零。
 ## 进度弧带脉冲动画（02_SYSTEM_SPEC 手感清单）。
 ## 关闭后：显示暗红叉，不再触发。
-## 数值全部来自 Data/config.json 的 extraction / session 节点。
+## 数值全部来自 Data/config/ 的 extraction / session 节点。
 ## ============================================================
 
 var is_open := false

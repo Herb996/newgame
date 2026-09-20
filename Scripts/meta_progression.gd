@@ -12,7 +12,7 @@ extends Node
 ##   · 直接跑 Main.tscn（命令行/无头回归）：active_slot == 0，
 ##     读写旧的单槽 user://save.json —— 行为与加菜单之前**完全一致**。
 ##
-## 数值全部来自 Data/config.json 的 meta_progression 节点，
+## 数值全部来自 Data/config/ 的 meta_progression 节点，
 ## 升级费用 = 配置 cost × (当前等级 + 1)，越买越贵。
 ## ============================================================
 

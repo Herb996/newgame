@@ -1,7 +1,7 @@
 extends Node
 ## ============================================================
 ## AnimalSystem — 中立生物生成（挂在 Main 下）
-## 规则（Data/config.json 的 animals / animal_types 节点）：
+## 规则（Data/config/ 的 animals / animal_types 节点）：
 ##   animals.count                     一局生成数量
 ##   animals.min_distance_from_player_cells  距玩家出生点下限
 ##   animal_types.types[*].weight      抽样权重

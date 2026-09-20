@@ -1,0 +1,341 @@
+{
+  "map": {
+    "width": 128,
+    "height": 128,
+    "tile_size": 64,
+    "noise_frequency": 0.03,
+    "noise_threshold": 0.25,
+    "biome_noise_frequency": 0.008,
+    "biome_border_frequency": 0.08,
+    "biome_border_jitter": 0.06,
+    "biome_spread": 1.35,
+    "biome_edge_blend": 0.45,
+    "biome_smooth_iterations": 3,
+    "biome_remove_islands": true,
+    "biome_min_region_cells": 40,
+    "biome_blend": {
+      "_comment": "群系边界混合层：把两群系之间那条 1 格阶梯的纯色跳变化开。做法是 CPU 侧对 biome 网格做箱式模糊得到每格各群系占比，取次主导群系的占比 w，量化成 1..7 档覆盖率，再用第二层 TileMapLayer 把「次主导群系的同一块 blob」按 1-bit Bayer 网点盖在主图层上。只影响观感——碰撞、寻路 walls、速度场一律不动。下次生成地图才生效。",
+      "enabled": false,
+      "radius_cells": 1,
+      "dither": 8
+    },
+    "biome_outline": {
+      "_comment": "群系边界描边（纯外观，不动碰撞/寻路/速度场）。官方每张 blob 图里其实有两套 16 块区块，拓扑一一对应、只差描边：col 0-3 是浅薄荷高光包着近黑芯，col 5-8 只留那条黑芯。以前 blob 只看可走性，所以两个都能走的群系之间每格都拿到内部实心块、一条线都没有；enabled 打开后\"邻格同群系\"才算连通，交界处就会自动描出官方那圈海岸线。stroke 选哪套：light=浅描边（出厂在用），dark=黑色描边。下次生成地图才生效。",
+      "enabled": true,
+      "stroke": "dark"
+    },
+    "biome_weights": {
+      "0": 3.4,
+      "1": 1.05,
+      "2": 1.25,
+      "3": 0.95
+    },
+    "biome_min_pct": {
+      "0": 10,
+      "1": 10,
+      "2": 10,
+      "3": 10
+    },
+    "biome_max_pct": {
+      "0": 30,
+      "1": 30,
+      "2": 30,
+      "3": 30
+    },
+    "biomes": [
+      {
+        "id": 0,
+        "name": "草地",
+        "speed": 1.0,
+        "floor": [
+          0.3,
+          0.36,
+          0.18
+        ],
+        "wall": [
+          0.5,
+          0.46,
+          0.34
+        ],
+        "tint": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "tree": 0.015,
+        "rock": 0.006,
+        "debris": 0.012,
+        "tileset": "tilemap_color1.png",
+        "bush": 0.03,
+        "pebble": 0.005
+      },
+      {
+        "id": 1,
+        "name": "荒原",
+        "speed": 1.0,
+        "floor": [
+          0.33,
+          0.27,
+          0.18
+        ],
+        "wall": [
+          0.52,
+          0.37,
+          0.2
+        ],
+        "tint": [
+          1.02,
+          0.98,
+          0.94
+        ],
+        "tree": 0.008,
+        "rock": 0.05,
+        "debris": 0.045,
+        "tileset": "tilemap_color4.png",
+        "bush": 0.008,
+        "pebble": 0.03
+      },
+      {
+        "id": 2,
+        "name": "森林",
+        "speed": 1.0,
+        "floor": [
+          0.2,
+          0.28,
+          0.15
+        ],
+        "wall": [
+          0.42,
+          0.3,
+          0.17
+        ],
+        "tint": [
+          0.94,
+          1.0,
+          0.96
+        ],
+        "tree": 0.08,
+        "rock": 0.006,
+        "debris": 0.028,
+        "tileset": "tilemap_color3.png",
+        "bush": 0.06,
+        "pebble": 0.006
+      },
+      {
+        "id": 3,
+        "name": "沼泽",
+        "speed": 0.62,
+        "floor": [
+          0.82,
+          0.86,
+          0.9
+        ],
+        "wall": [
+          0.72,
+          0.76,
+          0.8
+        ],
+        "tint": [
+          1.35,
+          0.82,
+          0.42
+        ],
+        "tree": 0.025,
+        "rock": 0.012,
+        "debris": 0.012,
+        "tileset": "tilemap_color5.png",
+        "bush": 0.05,
+        "pebble": 0.04
+      }
+    ],
+    "resource_clusters": {
+      "total": 100,
+      "types": {
+        "tree": {
+          "share": 40,
+          "min_size": 6,
+          "max_size": 16,
+          "biome_weight": {
+            "0": 3,
+            "1": 1,
+            "2": 6,
+            "3": 0
+          }
+        },
+        "rock": {
+          "share": 25,
+          "min_size": 3,
+          "max_size": 8,
+          "biome_weight": {
+            "0": 2,
+            "1": 6,
+            "2": 2,
+            "3": 0
+          }
+        },
+        "iron": {
+          "share": 20,
+          "min_size": 3,
+          "max_size": 8,
+          "biome_weight": {
+            "0": 1,
+            "1": 8,
+            "2": 1,
+            "3": 0
+          }
+        },
+        "oil": {
+          "share": 15,
+          "min_size": 2,
+          "max_size": 5,
+          "biome_weight": {
+            "0": 1,
+            "1": 1,
+            "2": 1,
+            "3": 0
+          }
+        }
+      }
+    },
+    "cluster_noise_frequency": 0.05,
+    "cluster_threshold": 0.5,
+    "min_reachable_ratio": 0.3,
+    "max_regen_attempts": 10,
+    "river": {
+      "slow": 0.72
+    },
+    "crack": {
+      "enabled": false,
+      "frequency": 0.028,
+      "width_cells": 0.75,
+      "jitter": 0.006,
+      "min_dist_from_spawn_cells": 3,
+      "orientation": [
+        [
+          0.55,
+          -0.18,
+          0.18,
+          1.0
+        ],
+        [
+          1.0,
+          0.18,
+          -0.18,
+          0.55
+        ]
+      ],
+      "biome_scale": [
+        0.9,
+        1.6,
+        0.55,
+        1.0
+      ]
+    },
+    "force_seed": 20260915,
+    "grade": {
+      "enabled": false,
+      "contrast": 1.12,
+      "brightness": 0.0,
+      "saturation": 0.92
+    },
+    "macro_light": {
+      "enabled": true,
+      "frequency": 0.013,
+      "strength": 0.1
+    },
+    "decor": {
+      "noise_frequency": 0.09,
+      "veg_contrast": 0.85,
+      "density": 1.05,
+      "clear_spawn_radius_cells": 3,
+      "shadow": true
+    },
+    "decor_collision": {
+      "enabled": true
+    }
+  },
+  "map3d": {
+    "model_height": [
+      4.0,
+      1.2,
+      0.55
+    ],
+    "model_footprint": [
+      1.5,
+      1.35,
+      1.6
+    ]
+  },
+  "noise": {
+    "hear_radius_cells": 16,
+    "min_notice": 4,
+    "wall_attenuation": 0.5,
+    "decay_per_second": 10,
+    "max_alertness": 150,
+    "footstep_interval_seconds": 0.4,
+    "thresholds": {
+      "suspicious": 15,
+      "investigate": 30,
+      "combat": 70
+    },
+    "sources": {
+      "_note_hurt": "hurt = **被玩家打中时**该敌人自己涨的警觉度（2026-09-17 新增）。攻击者位置由调用方传进来（近战 = 玩家位置、箭 = 出膛点），敌人据此转「调查」走向攻击者 —— 用户定的规则：「其他怪只在一个固定的范围内移动，受到攻击或者噪音，再移动」。写 0 = 关掉这条反应。",
+      "walk": 22,
+      "dodge": 40,
+      "attack": 120,
+      "shout": 160,
+      "hurt": 100
+    },
+    "ring_duration_seconds": 0.7,
+    "ring_color": "#ffd54f",
+    "ring_alpha": 0.35,
+    "ring_min_intensity": 35,
+    "ring_min_interval_seconds": 0.15,
+    "self": {
+      "_comment": "**角色自身噪音**（菜单右下第 1 行，等级光球读的就是它）。**每个角色一份**，存在 player.self_noise 里；菜单栏显示全队**最大值**（『我此刻有多吵』= 最吵的那个人）。线性衰减（每秒固定掉这么多点），所以小动静（脚步 22）不到 0.3 秒归零、玩家侧最响的一下（剑击 120）也只要 1.3 秒衰减完 —— 「自身噪音降得快」。max 是硬上限，同时也是自身噪音参与 link 换算的分母。",
+      "decay_per_second": 90,
+      "max": 300
+    },
+    "world": {
+      "_comment": "**世界累计噪音**（菜单右下第 2 行，全局一份）。读法：把地图想象成一个紧张度水位 —— 谁在闹都会涨，不闹了才慢慢退。用**比例**衰减（每秒掉自身 ×ratio）而不是固定点数：固定点数会让系统变成『低于阈值就归零、高于就爆表』的开关，比例衰减则天然有稳态、且退场时先是快、尾巴拖得长（时间常数 1/ratio ≈ 17 秒）＝「世界噪音降得慢」。reference 是菜单条形归一参考（一次剑击 120 = 满条的 6%；2000 ≈ 十来次挥击的持续暴露量），max 是硬上限。",
+      "decay_ratio_per_second": 0.06,
+      "max": 4000,
+      "reference": 2000
+    },
+    "link": {
+      "_comment": "两条噪音的**互相喂养**（用户原话：『自身噪音会累加世界噪音，世界噪音增加，也会让自身噪音加的更快』）。self_to_world_per_second = 自身噪音**满格**时每秒往世界噪音里灌的点数（按比例：实际灌入 = 360 × self/self.max）；world_to_self_gain = 世界噪音**达到 reference** 时，新发声额外增长的倍率加成（0 → 无耦合，1.2 → 最吵时同样的动作涨 2.2 倍）。⚠ 这是**正反馈**：两者都有 hard cap（self.max / world.max），所以不会发散，但把 gain 调大会让局面一旦吵起来就再也压不下去（谁 explain 都想走的那种联动），调前先想清楚。",
+      "self_to_world_per_second": 360,
+      "world_to_self_gain": 1.2
+    },
+    "display": {
+      "_comment": "菜单右下的读数接线：第 1 行 = 自身噪音（全队最大值，见 noise.self），第 2 行 = 世界噪音（见 noise.world）。**只统计小队自己发出的声音**（emit 的 from_player）—— 敌人呼喊不计入，否则会被误读成『是我在吵』。levels 决定第 1 行的档位名与配色（从高往低匹配 min）。",
+      "alert_watch_interval_seconds": 0.25,
+      "levels": [
+        {
+          "name": "安静",
+          "min": 0,
+          "color": "#7bc86c"
+        },
+        {
+          "name": "轻响",
+          "min": 45,
+          "color": "#d8c34a"
+        },
+        {
+          "name": "吵闹",
+          "min": 120,
+          "color": "#e08a3c"
+        },
+        {
+          "name": "震耳",
+          "min": 200,
+          "color": "#d8452f"
+        }
+      ]
+    }
+  },
+  "nav": {
+    "snap_radius_cells": 3,
+    "unstick_radius_cells": 4
+  }
+}

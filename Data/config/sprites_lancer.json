@@ -1,0 +1,874 @@
+{
+  "sprites_lancer": {
+    "_comment": "玩家 = Tiny Swords Lancer（枪兵，Blue 阵营）。**免费包里唯一画出多方向的兵种**：Attack / Defence 各有 Down / DownRight / Right / UpRight / Up 五向，左半边由官方右半边水平镜像得到（不是程序化硬翻，是官方设计的一部分）。Idle / Run 官方只有单向（正视视角），所以这两项的 default 给原图、left 系给镜像 —— 若原图其实是侧视，左向行为就自动正确；若原图正面对称，镜像也无副作用。画布 320x320（Warrior 是 192x192，长枪需要更宽的格），故 player.sprite_scale=0.6、player.sprite_offset_y=-38（脚底 y=198，198-160=38）、sprite_pixel_unit=10（程序化位移在局部空间，会被 scale 缩小，所以按 1/0.6 补偿）。dodge / dead 故意留空：官方无倒地帧，走代码里的程序化冲刺拉伸与死亡倾倒效果更好。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -38.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 12,
+      "attack": 12,
+      "dodge": 16,
+      "hit": 12,
+      "dead": 8
+    },
+    "idle": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_05.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_06.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_07.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_08.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_09.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_10.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_11.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_05.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_06.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_07.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_08.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_09.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_10.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_11.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_05.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_06.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_07.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_08.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_09.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_10.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_11.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_05.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_06.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_07.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_08.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_09.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_10.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/idle_m_11.png"
+      ]
+    },
+    "walk": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_05.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_05.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_05.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/run_m_05.png"
+      ]
+    },
+    "attack": {
+      "down": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_02.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_02.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_left_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_left_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_left_02.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_right_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_right_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_right_02.png"
+      ],
+      "down_right": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_right_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_right_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_right_02.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_left_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_left_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_down_left_02.png"
+      ],
+      "up_right": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_right_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_right_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_right_02.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_left_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_left_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/attack_up_left_02.png"
+      ]
+    },
+    "hit": {
+      "down": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_05.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_05.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_left_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_left_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_left_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_left_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_left_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_left_05.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_right_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_right_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_right_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_right_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_right_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_right_05.png"
+      ],
+      "down_right": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_right_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_right_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_right_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_right_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_right_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_right_05.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_left_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_left_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_left_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_left_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_left_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_down_left_05.png"
+      ],
+      "up_right": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_right_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_right_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_right_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_right_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_right_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_right_05.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_left_00.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_left_01.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_left_02.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_left_03.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_left_04.png",
+        "res://Assets/Art/Sprites/Units/blue_lancer/guard_up_left_05.png"
+      ]
+    },
+    "dodge": [],
+    "dead": []
+  },
+  "sprites_lancer_purple": {
+    "_comment": "等级档位配色：purple 档（素材包 Purple Units/Lancer）。与 sprites_lancer 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -38.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 12,
+      "attack": 12,
+      "dodge": 16,
+      "hit": 12,
+      "dead": 8
+    },
+    "idle": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_05.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_06.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_07.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_08.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_09.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_10.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_11.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_05.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_06.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_07.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_08.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_09.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_10.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_11.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_05.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_06.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_07.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_08.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_09.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_10.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_11.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_05.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_06.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_07.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_08.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_09.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_10.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/idle_m_11.png"
+      ]
+    },
+    "walk": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_05.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_05.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_05.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/run_m_05.png"
+      ]
+    },
+    "attack": {
+      "down": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_02.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_02.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_left_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_left_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_left_02.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_right_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_right_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_right_02.png"
+      ],
+      "down_right": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_right_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_right_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_right_02.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_left_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_left_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_down_left_02.png"
+      ],
+      "up_right": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_right_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_right_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_right_02.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_left_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_left_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/attack_up_left_02.png"
+      ]
+    },
+    "hit": {
+      "down": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_05.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_05.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_left_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_left_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_left_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_left_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_left_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_left_05.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_right_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_right_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_right_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_right_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_right_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_right_05.png"
+      ],
+      "down_right": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_right_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_right_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_right_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_right_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_right_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_right_05.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_left_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_left_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_left_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_left_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_left_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_down_left_05.png"
+      ],
+      "up_right": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_right_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_right_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_right_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_right_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_right_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_right_05.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_left_00.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_left_01.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_left_02.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_left_03.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_left_04.png",
+        "res://Assets/Art/Sprites/Units/purple_lancer/guard_up_left_05.png"
+      ]
+    },
+    "dodge": [],
+    "dead": []
+  },
+  "sprites_lancer_black": {
+    "_comment": "等级档位配色：black 档（素材包 Black Units/Lancer）。与 sprites_lancer 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -38.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 12,
+      "attack": 12,
+      "dodge": 16,
+      "hit": 12,
+      "dead": 8
+    },
+    "idle": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_05.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_06.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_07.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_08.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_09.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_10.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_11.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_05.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_06.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_07.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_08.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_09.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_10.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_11.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_05.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_06.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_07.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_08.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_09.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_10.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_11.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_05.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_06.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_07.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_08.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_09.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_10.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/idle_m_11.png"
+      ]
+    },
+    "walk": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/black_lancer/run_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_05.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_05.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_05.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/run_m_05.png"
+      ]
+    },
+    "attack": {
+      "down": [
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_down_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_down_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_down_02.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_up_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_up_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_up_02.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_left_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_left_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_left_02.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_right_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_right_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_right_02.png"
+      ],
+      "down_right": [
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_down_right_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_down_right_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_down_right_02.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_down_left_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_down_left_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_down_left_02.png"
+      ],
+      "up_right": [
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_up_right_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_up_right_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_up_right_02.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_up_left_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_up_left_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/attack_up_left_02.png"
+      ]
+    },
+    "hit": {
+      "down": [
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_05.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_05.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_left_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_left_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_left_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_left_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_left_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_left_05.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_right_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_right_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_right_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_right_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_right_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_right_05.png"
+      ],
+      "down_right": [
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_right_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_right_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_right_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_right_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_right_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_right_05.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_left_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_left_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_left_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_left_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_left_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_down_left_05.png"
+      ],
+      "up_right": [
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_right_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_right_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_right_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_right_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_right_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_right_05.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_left_00.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_left_01.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_left_02.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_left_03.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_left_04.png",
+        "res://Assets/Art/Sprites/Units/black_lancer/guard_up_left_05.png"
+      ]
+    },
+    "dodge": [],
+    "dead": []
+  },
+  "sprites_lancer_gold": {
+    "_comment": "等级档位配色：gold 档（素材包 Yellow Units/Lancer）。与 sprites_lancer 同骨架同帧数、只换颜色，view/fps 完全沿用。",
+    "view": {
+      "sprite_scale": 0.6,
+      "sprite_offset_y": -38.0,
+      "sprite_pixel_unit": 10.0
+    },
+    "fps": {
+      "idle": 8,
+      "walk": 12,
+      "attack": 12,
+      "dodge": 16,
+      "hit": 12,
+      "dead": 8
+    },
+    "idle": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_05.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_06.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_07.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_08.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_09.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_10.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_11.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_05.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_06.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_07.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_08.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_09.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_10.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_11.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_05.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_06.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_07.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_08.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_09.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_10.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_11.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_05.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_06.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_07.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_08.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_09.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_10.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/idle_m_11.png"
+      ]
+    },
+    "walk": {
+      "default": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_05.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_05.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_05.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/run_m_05.png"
+      ]
+    },
+    "attack": {
+      "down": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_02.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_02.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_left_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_left_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_left_02.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_right_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_right_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_right_02.png"
+      ],
+      "down_right": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_right_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_right_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_right_02.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_left_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_left_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_down_left_02.png"
+      ],
+      "up_right": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_right_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_right_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_right_02.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_left_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_left_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/attack_up_left_02.png"
+      ]
+    },
+    "hit": {
+      "down": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_05.png"
+      ],
+      "up": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_05.png"
+      ],
+      "left": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_left_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_left_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_left_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_left_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_left_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_left_05.png"
+      ],
+      "right": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_right_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_right_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_right_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_right_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_right_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_right_05.png"
+      ],
+      "down_right": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_right_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_right_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_right_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_right_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_right_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_right_05.png"
+      ],
+      "down_left": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_left_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_left_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_left_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_left_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_left_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_down_left_05.png"
+      ],
+      "up_right": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_right_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_right_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_right_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_right_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_right_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_right_05.png"
+      ],
+      "up_left": [
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_left_00.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_left_01.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_left_02.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_left_03.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_left_04.png",
+        "res://Assets/Art/Sprites/Units/yellow_lancer/guard_up_left_05.png"
+      ]
+    },
+    "dodge": [],
+    "dead": []
+  }
+}

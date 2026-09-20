@@ -2,7 +2,7 @@ extends Node
 ## ============================================================
 ## probe_squad — 复现「基地大门选不同角色 → 进局后各人武器/贴图集正确」
 ##
-## 复现路径：main._on_launch([枪手/弓兵/剑士/强弩])
+## 复现路径：main._on_launch([枪手/弓兵/剑士/僧侣])
 ##   → 检查每个 player 实例的 current_weapon / _sprite_set_for_weapon / 首帧
 ## 结论写 user://_probe_squad.txt，同时打印到 stdout。
 ## ============================================================
@@ -14,7 +14,7 @@ const EXPECT := {
 	"枪手": ["spear", "sprites_lancer"],
 	"弓兵": ["bow", "sprites_archer"],
 	"剑士": ["sword", "sprites_ts"],
-	"强弩": ["sniper", "sprites_crossbowman"],
+	"僧侣": ["staff", "sprites_monk"],
 }
 
 var _lines: Array = []
@@ -31,11 +31,11 @@ func _ready() -> void:
 	for _i in range(30):
 		await get_tree().process_frame
 
-	# 复现大门选角出击：枪手 + 弓兵 + 剑士 + 强弩
+	# 复现大门选角出击：名单里四个人全上
 	main._on_launch([{"id": "spearman", "name": "枪手"},
 			{"id": "archer", "name": "弓兵"},
 			{"id": "swordsman", "name": "剑士"},
-			{"id": "sniper", "name": "强弩"}])
+			{"id": "monk", "name": "僧侣"}])
 
 	for _i in range(40):
 		await get_tree().process_frame

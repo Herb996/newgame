@@ -62,8 +62,8 @@ func _section_a() -> void:
 	for k in table.keys():
 		if not str(k).begins_with("_"):
 			ids.append(str(k))
-	_check(ids == ["sword", "spear", "staff", "bow", "sniper"],
-			"武器 id = [sword, spear, staff, bow, sniper]（staff 2026-09-18 随僧侣加入，实得 %s）" % str(ids))
+	_check(ids == ["sword", "spear", "staff", "bow"],
+			"武器 id = [sword, spear, staff, bow]（staff 2026-09-18 随僧侣加入；sniper 2026-09-20 整体删除，实得 %s）" % str(ids))
 	_check(str(Config.get_value("player.weapon", "")) == "sword",
 			"player.weapon 默认 = sword（实得 %s）" % str(Config.get_value("player.weapon", "")))
 
@@ -245,8 +245,8 @@ func _section_e() -> void:
 			% str(_player.current_weapon))
 	_player.switch_weapon(&"sword")
 	var ids: Array = _player.weapon_ids()
-	_check(ids == ["sword", "spear", "staff", "bow", "sniper"],
-			"weapon_ids() 跳过 _comment（staff 2026-09-18 随僧侣加入，实得 %s）" % str(ids))
+	_check(ids == ["sword", "spear", "staff", "bow"],
+			"weapon_ids() 跳过 _comment（实得 %s）" % str(ids))
 	_check(_player.attack_kind() == "melee", "开局 attack_kind = melee")
 	_check(is_equal_approx(_player.attack_param("windup_seconds", -1.0), 0.12),
 			"剑的前摇 = 0.12（取自武器表，与全局同值）")

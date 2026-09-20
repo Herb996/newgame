@@ -1,0 +1,107 @@
+{
+  "enemy": {
+    "count": 100,
+    "min_distance_from_player_cells": 20,
+    "max_hp": 40,
+    "contact_damage": 10,
+    "attack": {
+      "_comment": "敌人近战出手（2026-09-19 用户定：「敌人应该要有攻击距离这个属性，进入攻击距离就开始攻击」）。中心距 ≤ range_px 就出手：立刻播攻击动作 + 进 cooldown，windup_seconds 前摇走完后才结算伤害；这段时间内玩家跑出射程 = 挥空，但动作和冷却**不回收**（出手就有代价）。兵种可在 enemy_types.types[*].attack_range_px 单独覆盖射程。",
+      "_note_geometry": "range_px 必须 **大于** 分离层把敌人顶住的那圈间距 = combat.separation.radius_px.enemies + .player（默认 22+20=42px）。事故记录：再早的近战判定靠 Area2D body_entered，触发半径只有敌人 14 + 玩家 16 = 30px < 42，于是全图敌人一刀都打不出来。这条不等式由 Dev/probe_enemy_attack.gd 按 config 实算把住 —— 改大分离半径却不同步射程，探针会立刻红。",
+      "range_px": 52.0,
+      "cooldown_seconds": 1.0,
+      "windup_seconds": 0.18,
+      "min_duration_seconds": 0.3,
+      "_note_variance": "variance = 每刀伤害的随机浮动幅度（0.1 = ±10%），出厂 0 ⇒ 每刀一个准数。刻意做成**全局档**、不像 range_px 那样能按兵种覆盖：250 只怪各调一个浮动区间，只会让「这只打得疼」变成读不出原因的噪声。玩家的防御不在这里扣（谁防守谁知道，见 Scripts/combat/damage_pipeline.gd 的头注释），所以这一刀被完全挡下时敌人照样进冷却、照样播动作。",
+      "variance": 0.0,
+      "fx_attack": "slash_claw"
+    },
+    "knockback_px": 32.0,
+    "speed": 360.0,
+    "chase_speed_multiplier": 1.35,
+    "hit_flash_seconds": 0.22,
+    "hit_knockback_px": 14.0,
+    "hit_squash_amount": 0.18,
+    "hit_stun_seconds": 0.0,
+    "death_fade_seconds": 0.45,
+    "death_fps": 8.0,
+    "vision_cells": 10,
+    "vision_blocked_by_walls": true,
+    "los_step_cells": 0.35,
+    "lose_sight_seconds": 3.0,
+    "ai_active_radius_cells": 32,
+    "patrol_radius_cells": 6,
+    "patrol_idle_seconds": 1.5,
+    "repath_interval_seconds": 0.4,
+    "ai": {
+      "_comment": "敌人 AI 的**全局默认值**，兵种可在 enemy_types.types[*].ai 里按键覆盖（劫掠者就覆盖了全部三项，见 §5.5）。没写 ai 段的兵种 = 完全按这里走。",
+      "_note_roam": "roam.mode 决定「去哪游荡」：home_radius（默认）= 只在出生点周围 patrol_radius_cells 格的方形范围里随机选点 —— 这就是用户说的『其他怪只在一个固定的范围内移动』；whole_map = 在整张地图上随机挑一个可达点走过去（劫掠者『满地图随机游走』）。两种模式都只在**没有噪音、没挨打**时生效：一旦听到动静或被攻击，立刻转调查/追击去追声源（见 noise.sources.hurt）。",
+      "_note_pack": "pack = 同兵种结伙：两只同类靠近到 join_radius_px 内，后来者加入先到者的群，之后**跟着群主一起移动**（群主铺目标，成员跟队形）。max_members 是**每群上限**（用户 2026-09-17 定：『上限先做到 5 个』），装满了就不再收人；群主死亡时由同群下一个活着的成员自动接任。",
+      "_note_sens": "noise_sensitivity = 这个兵种的**耳朵倍率**：>1 听得更远也更清（等效听力半径 ×倍率、同样距离听到的强度也更高）。劫掠者『对声音更敏感』就是它。",
+      "roam": {
+        "mode": "home_radius",
+        "patrol_radius_cells": 6.0,
+        "min_target_distance_px": 320.0,
+        "max_target_distance_px": 0.0,
+        "sample_attempts": 24
+      },
+      "noise_sensitivity": 1.0,
+      "pack": {
+        "enabled": false,
+        "max_members": 5,
+        "join_radius_px": 160.0,
+        "follow_distance_px": 48.0,
+        "scan_interval_seconds": 1.0,
+        "repath_interval_seconds": 0.4
+      }
+    },
+    "hp_bar": {
+      "_comment": "敌人头顶血条（2026-09-17 新增）。项目此前没有敌人血条（血量只出现在 HUD 文字与菜单栏的目标信息里），是为了弓手「幻影分身」的「本体和分身血条同步」需求补的通用件（Scripts/enemy_hp_bar.gd），所有敌人都共用。显示规则：满血且没挨过打 → 不画（零绘制开销）；挨一次伤害 → 显示 show_seconds 秒后自动隐去。",
+      "_note_sync": "本体与分身的血条**颜色/尺寸/位置完全一致**是刻意的 —— 幻影分身靠「看不出哪个是真身」迷惑玩家，谁都不许按 is_phantom 换色。",
+      "enabled": true,
+      "width_px": 28.0,
+      "height_px": 4.0,
+      "offset_y": -68.0,
+      "show_seconds": 3.0,
+      "bg_color": "#0000008c",
+      "color": "#e04a3c",
+      "low_color": "#ffd54f"
+    },
+    "drop": {
+      "chance": 1.0,
+      "amount_min": 2,
+      "amount_max": 6,
+      "weights": {
+        "wood": 3,
+        "stone": 3,
+        "iron": 2,
+        "food": 3,
+        "gold": 1,
+        "oil": 1
+      }
+    },
+    "flip_h_with_facing": true
+  },
+  "enemy_traits": {
+    "_comment": "敌人特性的全局规则。特性本身配在 enemy_types.types[*].traits[] 里，这里只管**跨实例/跨特性共用的调节**。",
+    "phantom": {
+      "_comment": "幻影分身（弓手 phantom_double）的全局调节。enabled=false → 分到该特性的弓手不再召唤分身（本体照常行动、照常挨打），调试/平衡用。单只本体的分身上限配在特性里（max_phantoms_per_owner=8）；max_live_phantoms 是**全场的硬兜底**（0 = 不限），2026-09-17 从 40 下调到 16 —— 100 只敌里十几只弓手、每只最多 8 具，理论上一局能到 100 具以上，这个兜底才是真正决定「同屏能看到几具幻影」的那个数，嫌多/嫌少先调它。",
+      "enabled": true,
+      "max_live_phantoms": 16,
+      "max_phantoms_per_owner": 8,
+      "hp_ratio_of_owner": 0.2,
+      "resummon_interval_seconds": 5.0
+    },
+    "noise_amplify": {
+      "_comment": "噪音放大的全局封顶（特性 burst_drum「爆裂鼓手」用，见 enemy_types.types[cultist].traits[0].noise_amplify）。多只邪术师的增幅叠加后统一夹在 max_multiplier 之内；enabled=false 可整体关掉放大（调试/平衡用）。",
+      "enabled": true,
+      "max_multiplier": 3.0
+    },
+    "population_scaling": {
+      "_comment": "数量缩放（用户 2026-09-17 定）：「掠夺者总数量越少，特性初始触发概率越高」，用来防止链条把怪刷爆。参与统计的是**场上所有带特性的活敌人**（掠夺者本体 + 它分裂/再生出来的全部后代）。算法：factor = clamp((base_at - n) / (base_at - full_at), 0, 1)，实际概率 = lerp(chance_base, chance_max, factor)；带特性的敌人 ≤ full_chance_at_or_below 时 factor=1（拿到各自特性的 chance_max 上限），≥ base_chance_at_or_above 时 factor=0（回落到 chance_base）。两边相等时退化成开关（要么上限要么基础）。",
+      "enabled": true,
+      "full_chance_at_or_below": 8,
+      "base_chance_at_or_above": 40,
+      "cache_seconds": 0.25
+    }
+  }
+}

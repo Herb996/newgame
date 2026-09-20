@@ -1,7 +1,7 @@
 extends Node
 ## ============================================================
 ## EnemySystem — 敌人生成（挂在 Main 下）
-## 规则（Data/config.json 的 enemy 节点）：
+## 规则（Data/config/ 的 enemy 节点）：
 ##   count：一局生成数量（100）
 ##   min_distance_from_player_cells：距玩家出生点 ≥ 20 格
 ## 只刷在地板格上，位置不重复（先收集所有合法格再随机抽取）。
@@ -135,7 +135,7 @@ func _type_pool() -> Array:
 
 
 # ------------------------------------------------------------
-# 死亡特性（数值全在 Data/config.json 的 enemy_types.types[*].traits[]，见 enemy.gd）
+# 死亡特性（数值全在 Data/config/ 的 enemy_types.types[*].traits[]，见 enemy.gd）
 #
 # 兵种可以带一个**特性池** traits[]（或旧式单数 trait）：每个实例生成时随机分配其中一个，
 # 一个角色只有一种特性；特性刷出来的孩子继承父的那一个。已知两种：

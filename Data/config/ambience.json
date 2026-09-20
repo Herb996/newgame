@@ -1,0 +1,651 @@
+{
+  "fog": {
+    "feather_cells": 2.0
+  },
+  "fog3d": {
+    "enabled": true,
+    "height": 0.06,
+    "reveal_soft_cells": 2.2,
+    "soft_lo": 0.22,
+    "soft_hi": 0.68,
+    "color": "#040405"
+  },
+  "weather": {
+    "_comment": "局内雨天效果（仅 Mode.RUN，基地无雨）。enabled=false 整套零节点装配，截图二分用。数值全在这里，脚本零硬编码。踩水触发节奏复用 noise.footstep_interval_seconds，不另设键造成两处真相。2026-09-19：水洼/倒影/折射三条通路按用户裁定删除，改为\"雨湿地面层 rain_ground\"；同日再加的湿脚印 footprint 试完即废（用户：太丑），踩水反馈只剩波纹一条通道。",
+    "enabled": true,
+    "viewports": {
+      "_comment": "波纹离屏 SubViewport 的渲染倍率。scale=0.5 即半分辨率（用户已确认）；子视口相机 zoom = 主相机 zoom × scale，保证 SCREEN_UV 与子视口贴图逐点对应，雨湿地面 shader 直接按屏幕 UV 取波纹。",
+      "scale": 0.5
+    },
+    "rain_ground": {
+      "_comment": "雨湿地面层（取代旧\"水洼\"概念，2026-09-19 用户裁定）：**不是第 5 个群系**——项目只有草地/森林/荒原/沼泽四种，这里指被雨打湿的草地/森林地板。下雨时**指定群系的地板整片是湿的**，踩哪都出波纹，不需要先找到一洼水。allowed_biomes=哪些群系会湿（0草地/2森林；荒原1、沼泽3保持干燥）；boundary_blur/boundary_passes=干湿边界的多轮均值模糊半径与轮数（把整格 0/1 揉成多格宽软带，配合 shader 域扭曲才看不出格网）；wet_threshold=逻辑判定用整格布尔的场值阈值（与 shader 掩码同源）；exclude_water_cells=模糊**之后**把不可通行格（本项目铺 water_bg 水面贴图）的场值清零——不剔的话岸上草地的湿值会经模糊渗进水面格，整片湖被压暗又打上冷调水光，看着像浮了一层沫子（用户 2026-09-19 裁定\"水面剔出去\"）。必须切在切 _wet_cells 之前，让视觉场和脚步判定同源，别反过来搞成\"看着干、踩上去出波纹\"。外观有四件事：darkness 压暗、tint_color/tint_amount 偏冷、sheen 细碎反光（静态 fbm，湿面把天光散成一片模糊亮斑）、mottle_* **斑驳水光**（2026-09-19 补，用户：\"地面看不出湿\"）。mottle_amount=0 整层关闭（截图二分用）；mottle_scale=条带噪声频率（每格）；mottle_stretch=[x,y] 各向异性拉伸——x 取低频、y 取高频才拉得出**横向条带**，等方频率只会均匀糊成一块膜；mottle_speed=[x,y] 水光流速（格/秒）**恒为 [0,0]**：明暗与亮斑都必须钉在格子上——非零就是「一层水膜从草地上飘过去」（用户 2026-09-19：水的那个图层会飘），局内会动的只该有踩水波纹；mottle_threshold=亮/暗分界场值；mottle_soft=两侧过渡宽度；mottle_gain=亮斑把草色**换成**天光的混合强度（0..1，不是加白量）；mottle_dark=配对暗斑压暗量；mottle_color=亮斑色（深一档的天蓝，不是近白）。**亮斑与暗斑必须成对**：只加亮斑读成油渍/雪堆，亮旁边紧贴一条暗边才有\"水膜反着天光\"的立体读法；两层都按 cov 门控，干地与湿边拿不到水光。mottle 三个失败模式是截图 A/B 出来的，别退回旧值：① 频率低（0.075～0.34/格，斑幅 3～9 格＝屏上 150～300px）读成**雾团/云影**，要 2.2/格 才碎成\"斑\"；② 亮斑用\"往底色加白\"的写法，在橄榄绿草地上只会得到更亮的橄榄绿＝**苔藓斑**，必须 mix 到冷调天光色（乘本地亮度，树荫下才不自己发光）；③ 亮斑色取近白（#cce6f5）＋gain 拉高（0.5）时，2 倍放大看是一堆**粉笔团/棉絮**——亮斑要的是深一档的蓝（#7fa8cc）配低混合强度（0.35），宁可看不太出也不要糊成白斑。sheen 随之从 0.16 降到 0.05：它和 mottle 是同一件事的两层，都开就糊成一片。alpha=满湿处层不透明度；noise_scale/scroll_cells_per_s=细碎反光频率/流速（流速同样恒为 [0,0]，理由同 mottle_speed）；edge_soft/edge_warp/edge_warp_scale=过渡带宽度/边界揉弯幅度与频率（格）；ripple_wiggle=波纹经过处让反光抖多少；step_wet_radius_cells=脚步\"算不算踩到湿的地方\"的邻域半径（可见湿面是软边轮廓、_wet_cells 是整格布尔，边界错开近一格，0=退回单格硬判定）。",
+      "allowed_biomes": [
+        0,
+        2
+      ],
+      "boundary_blur": 2,
+      "boundary_passes": 3,
+      "wet_threshold": 0.5,
+      "exclude_water_cells": true,
+      "step_wet_radius_cells": 1,
+      "darkness": 0.3,
+      "tint_color": "#9dc0dc",
+      "tint_amount": 0.3,
+      "sheen": 0.05,
+      "mottle_amount": 1.0,
+      "mottle_scale": 2.2,
+      "mottle_stretch": [
+        0.8,
+        1.4
+      ],
+      "mottle_speed": [
+        0.0,
+        0.0
+      ],
+      "mottle_threshold": 0.74,
+      "mottle_soft": 0.06,
+      "mottle_gain": 0.35,
+      "mottle_dark": 0.12,
+      "mottle_color": "#7fa8cc",
+      "alpha": 0.9,
+      "noise_scale": 0.13,
+      "scroll_cells_per_s": [
+        0.0,
+        0.0
+      ],
+      "edge_soft": 0.45,
+      "edge_warp": 0.9,
+      "edge_warp_scale": 0.16,
+      "ripple_wiggle": 0.003
+    },
+    "ripple": {
+      "_comment": "踩水波纹（只在雨湿地面内合成，干地脚步不出波纹；r=亮度基提亮湿面、g=晃动量驱动反光抖动，旧版色散/倒影通道已随\"水洼\"概念一起删除）。radius_px=主弧展开半径（世界像素；要经半分辨率子视口 + 相机 zoom 两次缩小，太小则屏上不足一像素＝看不见）；duration_s=寿命；color/alpha=弧色与基准透明度；base_channel/disp_channel=写进 r/g 通道的强度；glow=亮度增益；line_width=软带总宽 px；band_layers=[[宽度倍率, 透明度倍率]…] 三层同心描边**由外向内递减**（外缘最亮、往里越来越淡）；反过来排（内圈最强）会读成\"地上一枚瞄准准星\"，正是用户否掉过的观感；inner_ratio/inner_alpha=拖尾内弧半径比/透明度比（角度整体再错开半个槽，两层不能同心）；ellipse_squash=椭圆压扁（贴地透视）。2026-09-19 终版形状：一整圈→**一小撮碎片弧**。每圈掷 fragments 段，各段只占整圈均分槽里的一截：arc_span_deg 基准跨角、arc_span_jitter 跨角起伏（±比例）、arc_radius_jitter 半径起伏（±比例，打散\"共圆\"＝关键，首版就是因为所有碎片同半径同时扩到同一圈而读成白色虚线靶子）、arc_phase_jitter 起播延迟（0..该比例的寿命）、arc_alpha_jitter 各段亮度起伏。槽位均分＋硬上限（单段跨角 ≤ 槽宽 80%）保证永远留缺口、绝不闭合成环。",
+      "pool_size": 16,
+      "radius_px": 66.0,
+      "duration_s": 0.6,
+      "color": "#9fd0e8",
+      "alpha": 0.8,
+      "base_channel": 0.85,
+      "disp_channel": 0.5,
+      "glow": 0.95,
+      "line_width": 5.5,
+      "band_layers": [
+        [
+          1.0,
+          0.42
+        ],
+        [
+          0.7,
+          0.22
+        ],
+        [
+          0.42,
+          0.1
+        ]
+      ],
+      "inner_ratio": 0.5,
+      "inner_alpha": 0.45,
+      "fragments": 4,
+      "arc_span_deg": 44.0,
+      "arc_span_jitter": 0.4,
+      "arc_radius_jitter": 0.14,
+      "arc_phase_jitter": 0.3,
+      "arc_alpha_jitter": 0.35,
+      "ellipse_squash": 0.45
+    },
+    "rain": {
+      "_comment": "三层景深雨（DEV LOG.02）：RainFar/RainMid/RainNear，同屏总滴数=各层 amount 之和（参考区间 400-800）。每层：lifetime_s 与 speed_px 决定单滴寿命与下落速度（远慢近快=视差）；scale=[min,max] 雨丝缩放（近处更粗更长）；alpha 覆盖 streak.color 的透明度；wind_factor 该层吃多少风（远处偏转小）；gust_phase 各层阵风错相，避免整屏同步摆动像一面墙；spread_deg 方向散布；z 为**相对 RainAnchor** 的层级（anchor_z=6 已整体压在雾层 5 之上，三层只需排 0/1/2）。下落方式：initial_velocity 沿 +y、重力只给 X（参考步骤 3 用 gravity.x 做风偏），所以风是**持续加速**而非固定倾角。gust=阵风包络：gravity.x = wind_x_px × wind_factor × (1 + amplitude×sin(2π(t/period_s + phase)))。fade_in_s=进局时雨幕/雨滴淡入（用户要求天气切换用 Tween 过渡）。streak=贴图基准尺寸（每层再乘 scale）。splash=地面飞溅，独立发射器、沿视口下半带持续发射（不用粒子碰撞回调：headless 与性能都更稳）。",
+      "layers": [
+        {
+          "name": "RainFar",
+          "amount": 400,
+          "lifetime_s": 0.95,
+          "speed_px": [
+            760.0,
+            980.0
+          ],
+          "scale": [
+            0.55,
+            0.8
+          ],
+          "alpha": 0.3,
+          "wind_factor": 0.55,
+          "gust_phase": 0.0,
+          "spread_deg": 4.0,
+          "z": 0
+        },
+        {
+          "name": "RainMid",
+          "amount": 260,
+          "lifetime_s": 0.7,
+          "speed_px": [
+            1050.0,
+            1350.0
+          ],
+          "scale": [
+            0.9,
+            1.25
+          ],
+          "alpha": 0.45,
+          "wind_factor": 1.0,
+          "gust_phase": 0.33,
+          "spread_deg": 6.0,
+          "z": 1
+        },
+        {
+          "name": "RainNear",
+          "amount": 140,
+          "lifetime_s": 0.5,
+          "speed_px": [
+            1450.0,
+            1800.0
+          ],
+          "scale": [
+            1.5,
+            2.2
+          ],
+          "alpha": 0.5,
+          "wind_factor": 1.45,
+          "gust_phase": 0.66,
+          "spread_deg": 8.0,
+          "z": 2
+        }
+      ],
+      "blend_add": true,
+      "wind_x_px": -320.0,
+      "gust": {
+        "amplitude": 0.5,
+        "period_s": 7.0
+      },
+      "fade_in_s": 1.2,
+      "splash_amount": 140,
+      "streak": {
+        "width_px": 1,
+        "length_px": 30,
+        "color": "#d5e6f5",
+        "alpha": 0.45
+      },
+      "splash": {
+        "lifetime_s": 0.35,
+        "speed_px": [
+          40.0,
+          110.0
+        ],
+        "gravity_px": 1400.0,
+        "size_px": 4.0,
+        "color": "#cfe6ff",
+        "alpha": 0.7
+      },
+      "overlay": {
+        "enabled": true,
+        "layer": 1,
+        "color": "#8fb0cc",
+        "opacity": 0.15,
+        "darken": 0.9,
+        "vertical_bias": 0.35
+      },
+      "emission_margin_px": 160.0,
+      "anchor_z": 6,
+      "splash_z": 3
+    },
+    "step": {
+      "_comment": "脚步音：players 个 AudioStreamPlayer2D 轮转避免重叠被吞；max_distance 之外不响（世界像素）。volume_db=湿脚步（踩水）音量；dry_volume_db=干地脚步音量。",
+      "max_distance_px": 900.0,
+      "volume_db": -10.0,
+      "players": 3,
+      "dry_volume_db": -14.0
+    },
+    "audio": {
+      "_comment": "程序合成占位音（项目无音频素材）。rain_loop_seconds 越长 gust 起伏越自然；sample_rate 单声道即可；low/high_pass 塑形雨声频谱（去隆隆/去尖啸）；gust_depth=响度起伏深度；drip_count=循环内混入的嘀嗒瞬态个数；step_duration_s=踩水音长度；step_dry_*=干脚步（900Hz 低通噪声脆响）长度与滤波截止。",
+      "rain_loop_seconds": 4.0,
+      "sample_rate": 22050,
+      "rain_volume_db": -16.0,
+      "rain_lowpass_hz": 1400.0,
+      "rain_highpass_hz": 180.0,
+      "gust_depth": 0.35,
+      "drip_count": 6,
+      "step_duration_s": 0.18,
+      "step_dry_duration_s": 0.1,
+      "step_dry_lowpass_hz": 900.0
+    }
+  },
+  "fx": {
+    "_comment": "特效库（Scripts/combat/fx_library.gd）。一条 = 一个特效，谁用谁写 id，加角色不改代码。四个引用点各自独立可缺省（缺省 = 空串 = 不生成，老配置不改也照样跑）：① 我方出手那一刀的弧光 combat.weapons.<武器>.fx_attack；② 我方近战砍中目标身上的星芒 combat.attack.fx_hit（武器写了 fx_hit 听武器的）；③ 我方弹道命中 combat.weapons.<武器>.projectile.fx_impact / .fx_miss（2026-09-20 连强弩一起删掉了瞬狙那一支，命中特效统一走弹道）；④ 敌人出手 enemy_types.types[].fx_attack，空串则回落 enemy.attack.fx_attack 那条默认。素材由 tools/cut_fx.py 从 RPG Effect All Free 总表切出：横条图集（帧从左到右）、格 128px = 源表 64px 格的 2 倍整数放大、每格保留完整正方形不裁包围盒（裁了会抖）。源表结构：行 = 9 种配色（0 橙/1 粉/2 蓝/3 绿/4 棕橙/5 白/6 土黄/7 红/8 紫）、列 = 帧。frames/fps 必须和切脚本打印的一致。scale/offset_px/modulate/z_index 全在这张表里调。",
+    "enabled": true,
+    "max_simultaneous": 48,
+    "effects": {
+      "slash_sword": {
+        "_comment": "剑士出手：RPG 表 P33-1617 第 5 行（白/钢），素面粗厚弯月弧 14 帧。",
+        "texture": "res://Assets/Art/Sprites/FX/slash_sword.png",
+        "frames": 14,
+        "fps": 40.0,
+        "scale": 0.9,
+        "offset_px": [
+          28.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#cfe0ff",
+        "additive": false,
+        "fade_out": 0.08,
+        "z_index": 55
+      },
+      "thrust_spear": {
+        "_comment": "枪手出手：P28-1350 第 5 行，右指长锥带环纹 12 帧（突刺不是横扫）。",
+        "texture": "res://Assets/Art/Sprites/FX/thrust_spear.png",
+        "frames": 12,
+        "fps": 40.0,
+        "scale": 1.5,
+        "offset_px": [
+          70.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.06,
+        "z_index": 55
+      },
+      "cast_staff": {
+        "_comment": "僧侣出手：P32-1575 第 2 行（蓝），同心双环内套旋纹球 14 帧。法杖三段时间合计 0.65s，所以这条刻意放慢（14/26≈0.54s）。",
+        "texture": "res://Assets/Art/Sprites/FX/cast_staff.png",
+        "frames": 14,
+        "fps": 26.0,
+        "scale": 1.15,
+        "offset_px": [
+          26.0,
+          -14.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.12,
+        "z_index": 55
+      },
+      "spark_arrow": {
+        "_comment": "箭矢命中：P33-1637 第 0 行（橙），饱满四芒星带亮心 14 帧。比通用受击星芒小一号 —— 箭是扎进去的，不该炸成火球。",
+        "texture": "res://Assets/Art/Sprites/FX/spark_arrow.png",
+        "frames": 14,
+        "fps": 42.0,
+        "scale": 0.75,
+        "offset_px": [
+          0.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.06,
+        "z_index": 50
+      },
+      "spark_hit": {
+        "_comment": "通用受击星芒：P32-1585 第 5 行（白），粗射线八芒星爆发 14 帧。近战判定帧砍中目标时在目标身上放这一条。",
+        "texture": "res://Assets/Art/Sprites/FX/spark_hit.png",
+        "frames": 14,
+        "fps": 44.0,
+        "scale": 0.85,
+        "offset_px": [
+          0.0,
+          -10.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.06,
+        "z_index": 56
+      },
+      "slash_claw": {
+        "_comment": "敌人近战出手：P33-1616 第 7 行（红），带尖刺毛边的月牙弧 13 帧。毛边比我方那条更糙 —— 一眼分得清是谁在挥。",
+        "texture": "res://Assets/Art/Sprites/FX/slash_claw.png",
+        "frames": 13,
+        "fps": 34.0,
+        "scale": 1.25,
+        "offset_px": [
+          34.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.08,
+        "z_index": 52
+      },
+      "cast_hex": {
+        "_comment": "萨满出手：P29-1425 第 8 行（紫），四扇叶旋成圆形法阵环 13 帧。",
+        "texture": "res://Assets/Art/Sprites/FX/cast_hex.png",
+        "frames": 13,
+        "fps": 22.0,
+        "scale": 1.05,
+        "offset_px": [
+          22.0,
+          -18.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.12,
+        "z_index": 52
+      },
+      "puff_dust": {
+        "_comment": "落空/撞墙的扬尘：P31-1527 第 6 行（土黄），放射点状扩散碎圈 14 帧。箭撞墙或飞满射程时用，给「弹道去哪了」一个交代。非加色：它是尘不是光。",
+        "texture": "res://Assets/Art/Sprites/FX/puff_dust.png",
+        "frames": 14,
+        "fps": 26.0,
+        "scale": 1.1,
+        "offset_px": [
+          0.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#d8c4a0",
+        "additive": false,
+        "fade_out": 0.14,
+        "z_index": 48
+      },
+      "slash_bite": {
+        "_comment": "P27-1349 第 3 行：锯齿边半圆弧带扫成钩 11 帧。蛇的毒牙双钩：弧比通用爪痕更窄更锯齿，绿色一眼是毒。",
+        "texture": "res://Assets/Art/Sprites/FX/slash_bite.png",
+        "frames": 11,
+        "fps": 32.0,
+        "scale": 1.15,
+        "offset_px": [
+          30.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.08,
+        "z_index": 52
+      },
+      "spit_web": {
+        "_comment": "P23-1122 第 5 行：点环收拢成尖刺缠环 8 帧。蜘蛛吐丝缠环。**非加色**：丝是实体不是光，加色在绿地上会糊成一团白。",
+        "texture": "res://Assets/Art/Sprites/FX/spit_web.png",
+        "frames": 8,
+        "fps": 28.0,
+        "scale": 1.2,
+        "offset_px": [
+          26.0,
+          -6.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#e8eef5",
+        "additive": false,
+        "fade_out": 0.1,
+        "z_index": 52
+      },
+      "slam_ring": {
+        "_comment": "P23-1114 第 6 行：粗圆环胀成齿瓣边环 7 帧。巨龟砸地的地面震环。z 比别的低一档：它贴地，不该盖住单位。",
+        "texture": "res://Assets/Art/Sprites/FX/slam_ring.png",
+        "frames": 7,
+        "fps": 22.0,
+        "scale": 1.5,
+        "offset_px": [
+          22.0,
+          10.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#e0cfa8",
+        "additive": false,
+        "fade_out": 0.12,
+        "z_index": 46
+      },
+      "burst_charge": {
+        "_comment": "P20-975 第 4 行：颗粒方块裂成四臂飞散 12 帧。野猪冲撞溅起的四臂土块。非加色：尘不是光。",
+        "texture": "res://Assets/Art/Sprites/FX/burst_charge.png",
+        "frames": 12,
+        "fps": 30.0,
+        "scale": 1.3,
+        "offset_px": [
+          24.0,
+          6.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#e8c890",
+        "additive": false,
+        "fade_out": 0.1,
+        "z_index": 48
+      },
+      "slash_rend": {
+        "_comment": "P19-935 第 4 行：实心月牙炸成放射短条 11 帧。豺狼人的撕扯：月牙落地后炸成放射短条，比通用爪痕多一段撕裂。",
+        "texture": "res://Assets/Art/Sprites/FX/slash_rend.png",
+        "frames": 11,
+        "fps": 32.0,
+        "scale": 1.2,
+        "offset_px": [
+          30.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.08,
+        "z_index": 52
+      },
+      "spike_bone": {
+        "_comment": "P25-1227 第 5 行：六角尖星胀缩外溅点 9 帧。骷髅的骨刺。骨白走非加色 + 微黄 modulate，加色会把它洗成无特征白球。",
+        "texture": "res://Assets/Art/Sprites/FX/spike_bone.png",
+        "frames": 9,
+        "fps": 34.0,
+        "scale": 1.0,
+        "offset_px": [
+          24.0,
+          -8.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#f2f0e6",
+        "additive": false,
+        "fade_out": 0.08,
+        "z_index": 54
+      },
+      "bash_rock": {
+        "_comment": "P23-1121 第 4 行：圆角三角块碎成斜散片 8 帧。洞穴兽砸下的三角石块碎片。刻意不用团状爆点，免得和野猪的溅土撞形。",
+        "texture": "res://Assets/Art/Sprites/FX/bash_rock.png",
+        "frames": 8,
+        "fps": 30.0,
+        "scale": 1.25,
+        "offset_px": [
+          28.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#d8b48a",
+        "additive": false,
+        "fade_out": 0.1,
+        "z_index": 50
+      },
+      "slash_shadow": {
+        "_comment": "P21-1012 第 8 行：尖刃旋转收成细虚弧 12 帧。盗贼的影袭细虚弧。素材本体很细，scale 给到 1.35 才在战况里看得见。",
+        "texture": "res://Assets/Art/Sprites/FX/slash_shadow.png",
+        "frames": 12,
+        "fps": 32.0,
+        "scale": 1.35,
+        "offset_px": [
+          30.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.08,
+        "z_index": 52
+      },
+      "thrust_harpoon": {
+        "_comment": "P25-1224 第 5 行：尖锐斜向菱形刃片 9 帧。鱼叉鲨的斜向钢色菱形刃。非加色：金属反光在绿地上加色会失去边缘。",
+        "texture": "res://Assets/Art/Sprites/FX/thrust_harpoon.png",
+        "frames": 9,
+        "fps": 32.0,
+        "scale": 1.3,
+        "offset_px": [
+          34.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#dfe9f5",
+        "additive": false,
+        "fade_out": 0.08,
+        "z_index": 53
+      },
+      "splash_bomb": {
+        "_comment": "P23-1112 第 2 行：实心圆团胀成多瓣花环 7 帧。炸弹鱼炸开的水花环：只有 7 帧，fps 压到 24 才够时间看清胀开。",
+        "texture": "res://Assets/Art/Sprites/FX/splash_bomb.png",
+        "frames": 7,
+        "fps": 24.0,
+        "scale": 1.45,
+        "offset_px": [
+          20.0,
+          -4.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.1,
+        "z_index": 52
+      },
+      "sweep_fin": {
+        "_comment": "P21-1013 第 2 行：碗形宽月牙边缘散成点 12 帧。桨鲨的宽幅横扫：碗形大月牙，和鱼叉鲨的细斜刃形成一宽一窄的对比。",
+        "texture": "res://Assets/Art/Sprites/FX/sweep_fin.png",
+        "frames": 12,
+        "fps": 30.0,
+        "scale": 1.3,
+        "offset_px": [
+          30.0,
+          4.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.08,
+        "z_index": 52
+      },
+      "slash_sabre": {
+        "_comment": "P26-1271 第 0 行：锯齿弯刀状弧旋点环 10 帧。猪骑兵的马上弯刀：锯齿弧尾带点环，橙色把它和步兵的红爪分开。",
+        "texture": "res://Assets/Art/Sprites/FX/slash_sabre.png",
+        "frames": 10,
+        "fps": 32.0,
+        "scale": 1.25,
+        "offset_px": [
+          30.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.08,
+        "z_index": 52
+      },
+      "shred_bolt": {
+        "_comment": "P16-778 第 1 行：箭簇碎屑横向飞散铺开 8 帧。侏儒的小发明：箭簇碎屑横向铺开，是这批里唯一纯横向飞散的形状。",
+        "texture": "res://Assets/Art/Sprites/FX/shred_bolt.png",
+        "frames": 8,
+        "fps": 30.0,
+        "scale": 1.2,
+        "offset_px": [
+          26.0,
+          -4.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.1,
+        "z_index": 53
+      },
+      "slam_paw": {
+        "_comment": "P21-1020 第 5 行：粗月牙两端卷钩再收窄 12 帧。熊猫的掌风：两端卷钩的粗白月牙。非加色，白素材加色必糊。",
+        "texture": "res://Assets/Art/Sprites/FX/slam_paw.png",
+        "frames": 12,
+        "fps": 30.0,
+        "scale": 1.4,
+        "offset_px": [
+          32.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#f5f5f0",
+        "additive": false,
+        "fade_out": 0.08,
+        "z_index": 52
+      },
+      "slash_tail": {
+        "_comment": "P17-825 第 6 行：梳齿扇形月牙向右渐缩 10 帧。蜥蜴的尾巴抽打：梳齿扇形，收细方向和剑弧相反。",
+        "texture": "res://Assets/Art/Sprites/FX/slash_tail.png",
+        "frames": 10,
+        "fps": 32.0,
+        "scale": 1.2,
+        "offset_px": [
+          28.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.08,
+        "z_index": 52
+      },
+      "hit_sword": {
+        "_comment": "P25-1226 第 7 行：四叶X十字胀开成尖刺 9 帧。剑命中：X 形割口十字，替掉原来所有近战共用的八芒星。",
+        "texture": "res://Assets/Art/Sprites/FX/hit_sword.png",
+        "frames": 9,
+        "fps": 42.0,
+        "scale": 1.0,
+        "offset_px": [
+          0.0,
+          -10.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.06,
+        "z_index": 56
+      },
+      "hit_pierce": {
+        "_comment": "P16-766 第 5 行：放射尖刺星配点状外环 8 帧。枪命中：细密尖刺 + 外圈点环，穿刺感。白色走非加色。",
+        "texture": "res://Assets/Art/Sprites/FX/hit_pierce.png",
+        "frames": 8,
+        "fps": 44.0,
+        "scale": 0.95,
+        "offset_px": [
+          0.0,
+          -10.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#eef2f8",
+        "additive": false,
+        "fade_out": 0.06,
+        "z_index": 56
+      },
+      "hit_holy": {
+        "_comment": "P23-1113 第 2 行：四角菱星胀成十字花框 7 帧。法杖命中：蓝色十字花框，和出手那条同心环法阵同色系，成套。",
+        "texture": "res://Assets/Art/Sprites/FX/hit_holy.png",
+        "frames": 7,
+        "fps": 40.0,
+        "scale": 1.05,
+        "offset_px": [
+          0.0,
+          -10.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.07,
+        "z_index": 56
+      },
+      "hit_arrow": {
+        "_comment": "P32-1583 第 7 行：放射尖刺圆球渐点散 14 帧。弓命中：红色放射刺球。14 帧所以 fps 拉到 48，箭的着弹就该一闪而过。",
+        "texture": "res://Assets/Art/Sprites/FX/hit_arrow.png",
+        "frames": 14,
+        "fps": 48.0,
+        "scale": 0.9,
+        "offset_px": [
+          0.0,
+          -10.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.06,
+        "z_index": 56
+      }
+    }
+  }
+}

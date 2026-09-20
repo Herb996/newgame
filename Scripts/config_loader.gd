@@ -1,25 +1,28 @@
 extends Node
 ## ============================================================
 ## ConfigLoader — 自动加载单例（在脚本里用 `Config` 访问）
-## 职责：启动时读取 Data/config.json，向全游戏提供数值查询。
+## 职责：启动时读取 Data/config/ 下的域文件，向全游戏提供数值查询。
 ##
 ## 铁律（见 DESIGN.md）：
-##   所有数值配置写入 Data/*.json，任何脚本不得硬编码数值。
+##   所有数值配置写入 Data/config/*.json，任何脚本不得硬编码数值。
 ##   其他脚本一律通过 Config.get_value("路径.键") 取值。
 ##
 ## 取值分三层，优先级从高到低：
 ##   1. `_overrides` —— 代码在本次运行里显式改的（只存内存，退出即忘）。
 ##      用途：菜单进游戏时临时压掉 `debug.auto_enter_run` 这类开关。
 ##   2. `_user`      —— 设置菜单里用户改的，落在 `user://settings.json`。
-##   3. `_data`      —— Data/config.json 的出厂值。
+##   3. `_data`      —— Data/config/ 各域文件合并后的出厂值。
 ##
-## 为什么要分「用户层」而不是直接改 config.json：
+## 为什么要分「用户层」而不是直接改出厂配置：
 ##   导出成 pcx/exe 之后 `res://` 是**只读**的，写不进去；
 ##   而且开发期改到 src 里的配置会跟版本管理打架。所以出厂值只读，
 ##   用户改动另存 user://，随时能「恢复默认」。
 ## ============================================================
 
-const CONFIG_PATH := "res://Data/config.json"
+## 出厂配置目录：一个功能域一个 .json 文件，按文件名排序逐个加载、
+## 顶层段深合并成一棵树（各域文件顶层段互不重叠，合并顺序仅作确定性保障）。
+## 加新域 = 往目录里丢一个文件，无需改这里。
+const CONFIG_DIR := "res://Data/config"
 const USER_SETTINGS_PATH := "user://settings.json"
 
 var _data: Dictionary = {}
@@ -33,17 +36,30 @@ func _ready() -> void:
 	load_user_settings()
 
 
-## 读取（或重新读取）出厂配置文件
+## 读取（或重新读取）出厂配置：Data/config/ 下全部域文件
 func load_config() -> bool:
-	if not FileAccess.file_exists(CONFIG_PATH):
-		push_error("[Config] 找不到配置文件：%s" % CONFIG_PATH)
+	var dir := DirAccess.open(CONFIG_DIR)
+	if dir == null:
+		push_error("[Config] 找不到配置目录：%s" % CONFIG_DIR)
 		return false
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(CONFIG_PATH))
-	if not (parsed is Dictionary):
-		push_error("[Config] JSON 解析失败，请检查格式：%s" % CONFIG_PATH)
+	var names: Array = []
+	for n in dir.get_files_at(CONFIG_DIR):
+		if n.ends_with(".json"):
+			names.append(n)
+	if names.is_empty():
+		push_error("[Config] 配置目录为空：%s" % CONFIG_DIR)
 		return false
-	_data = parsed
-	print("[Config] 配置已加载：地图 %sx%s | 撤离点 %s 个 | 局内 %s 秒" % [
+	names.sort()
+	_data = {}
+	for n in names:
+		var path: String = CONFIG_DIR + "/" + str(n)
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if not (parsed is Dictionary):
+			push_error("[Config] JSON 解析失败，请检查格式：%s" % path)
+			return false
+		_deep_merge(_data, parsed)
+	print("[Config] 配置已加载（%d 个域文件）：地图 %sx%s | 撤离点 %s 个 | 局内 %s 秒" % [
+		names.size(),
 		get_value("map.width"), get_value("map.height"),
 		get_value("extraction.count"), get_value("session.time_limit_seconds"),
 	])
@@ -60,7 +76,7 @@ func load_config() -> bool:
 ##   - 取值路径落到**字典**：三层做**深合并**（高层覆盖低层同名键，低层补齐缺失键）。
 ##     这是 2026-09-17 修的一个严重 bug 的根因 —— 之前某个高层只要“有这条路径”就整棵
 ##     返回，于是 settings.json 里部分覆盖的 combat.weapons{sword/bow 只写了 damage}
-##     会把出厂值里 bow 的 sprite_set/kind/projectile 乃至整个 sniper 武器全部顶掉，
+##     会把出厂值里 bow 的 sprite_set/kind/projectile 全部顶掉，
 ##     导致“选弓手进图却是枪兵近战”。深合并后用户只调自己改的值，其余沿用出厂值。
 func get_value(path: String, default = null):
 	var ov := _probe(_overrides, path)
@@ -160,7 +176,7 @@ func user_settings() -> Dictionary:
 # ------------------------------------------------------------
 
 ## 例：从开始菜单进游戏时 `Config.set_override("debug.auto_enter_run", false)`，
-## 这样不会顺手改掉 config.json，也不影响命令行回归（它们走另一条路径）。
+## 这样不会顺手改掉出厂配置，也不影响命令行回归（它们走另一条路径）。
 func set_override(path: String, value) -> void:
 	_set_path(_overrides, path, value)
 
@@ -182,7 +198,7 @@ func has_override(path: String) -> bool:
 
 ## 覆盖层里的全部叶子路径（"player.speed" 这种点路径）。
 ## 面板顶部的「全部还原」与「打印本次覆盖项」都读它 —— 覆盖层只存内存，
-## 想留下哪个值只能自己抄进 Data/config.json，所以先把名单打出来。
+## 想留下哪个值只能自己抄进 Data/config/，所以先把名单打出来。
 func override_paths() -> Array:
 	var out: Array = []
 	_collect_leaf_paths(_overrides, "", out)

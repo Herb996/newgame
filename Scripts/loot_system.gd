@@ -1,7 +1,7 @@
 extends Node
 ## ============================================================
 ## LootSystem — 资源点生成（挂在 Main 下）
-## 规则（Data/config.json 的 loot 节点）：
+## 规则（Data/config/ 的 loot 节点）：
 ##   density：资源点占可达地板格的比例（0.05 ≈ 128 图约 300+ 个）
 ##   amount_per_node：每个点拾取获得的单位数（10）
 ## 每个点随机绑定一种资源（resources 节点定义的全部种类，

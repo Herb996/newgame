@@ -145,12 +145,12 @@ func _c_sprite_map() -> void:
 			var got := Meta.unit_sprite_set(w, lv)
 			var want: String = _expected[w][i]
 			_check(got == want, "%s @ Lv%d → %s（实得 %s）" % [w, lv, want, got])
-	# 档位表里没配的武器（强弩已移出名单，但武器/贴图全留着）必须回落到武器自带贴图集，
-	# 不能让「没配档位」变成「没贴图」。
-	_check(Meta.unit_sprite_set("sniper", 9) == "",
-			"未配档位的武器返回空串（sniper @ Lv9），由 player 回落武器自带贴图集")
-	_check(str(Config.get_value("combat.weapons.sniper.sprite_set", "")) == "sprites_crossbowman",
-			"强弩的武器自带贴图集仍在（sprites_crossbowman）")
+	# 档位表里没配的武器 id 必须返回空串，由 player 往下回落（武器自带贴图集 →
+	# player.sprite_set），不能让「没配档位」变成「没贴图」。
+	_check(Meta.unit_sprite_set("not_a_weapon", 9) == "",
+			"档位表里没有的武器 id 返回空串（@ Lv9），交由 player 逐级回落")
+	_check(str(Config.get_value("combat.weapons.bow.sprite_set", "")) == "sprites_archer",
+			"回落的第二级确实在（弓自带 sprites_archer）")
 
 
 # ------------------------------------------------------------

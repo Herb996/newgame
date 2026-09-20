@@ -6,7 +6,7 @@ extends Node
 ##   类型 / 位置 / 产量 / 状态，供采集系统、小地图、HUD 查询与扣减。
 ## 它只管数据，不管渲染与交互（LootNode 等是表现/拾取层，采集时回调本表）。
 ##
-## 资源类型（res_id）与《They Are Billions》一致，沿用 config.json 的
+## 资源类型（res_id）与《They Are Billions》一致，沿用 items.json 的
 ## resources 段：wood(木头) / stone(石头) / iron(铁) / gold(金) /
 ## oil(油) / food(食物)。这套 id 同时被 enemy.drop / meta_progression 复用。
 ##

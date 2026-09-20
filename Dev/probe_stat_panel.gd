@@ -647,7 +647,7 @@ func _s8_restore() -> void:
 		_check(_snap_ok(ANIMAL_TABLE, aidx, ["hp"]), "生物兵种表回到出厂值")
 	if _p != null:
 		# 还原只回退**覆盖层**：本机用户设置（settings.json）里的值本来就该赢，
-		# 面板不许越过它 —— 期望值因此是"生效值"而不是 Data/config.json 的出厂值。
+		# 面板不许越过它 —— 期望值因此是"生效值"而不是 Data/config/ 的出厂值。
 		_check(_near(float(_p.get("speed")), float(Config.get_value("player.speed", 640.0)), 0.5),
 				"角色移速回到本机生效值 %f（出厂 640，用户层可覆盖）" \
 						% float(Config.get_value("player.speed", 640.0)))

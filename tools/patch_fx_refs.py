@@ -46,9 +46,6 @@ def main():
     bow = weapons["bow"]["projectile"]
     bow["fx_impact"] = "spark_arrow"
     bow["fx_miss"] = "puff_dust"
-    if "hitscan" in weapons["sniper"]:
-        hs = weapons["sniper"]["hitscan"]
-        hs["fx_impact"] = "spark_hit"
 
     eattack = data["enemy"]["attack"]
     eattack["fx_attack"] = ENEMY_FX_DEFAULT

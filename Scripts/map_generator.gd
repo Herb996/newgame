@@ -4,7 +4,7 @@ extends RefCounted
 ## MapGenerator — 程序化地图生成
 ##
 ## 三层渲染（2026-09-16 改版，见 docs/DESIGN.md 的「缺失素材清单」章与 tools/build_ts_assets.py）：
-##   1. 地形层 TileMapLayer：生物群系分区（数量由 config.json 的 map.biomes 决定）
+##   1. 地形层 TileMapLayer：生物群系分区（数量由 map.json 的 map.biomes 决定）
 ##      × 每群系 16 个 blob 自动拼接瓦片。**直接用 Tiny Swords 官方 64px 图集原样
 ##      切片**，四邻连通性决定用哪一块，岸线/崖壁由素材自带的描边自然生成。
 ##   2. 装饰层 Node2D：树 / 石头（并入 walls，参与寻路与连通性）、
@@ -25,7 +25,7 @@ extends RefCounted
 ##   biome[y][x]   → 生物群系 id（0..BIOME_COUNT-1），决定用哪张官方地形图集与装饰配方
 ##   三者不同：树所在格渲染成地板，但通行上是障碍。
 ##
-## 数值全部来自 Data/config.json 的 map / map.decor 节点。
+## 数值全部来自 Data/config/ 的 map / map.decor 节点。
 ##
 ## 用法：var result = MapGenerator.generate()
 ##   result.node    → Node2D（含 TileMapLayer + 装饰层），加入场景树即显示
@@ -82,7 +82,7 @@ const SRC_OUTLINE_COL_DARK := 5
 const BLD_LEVELS := 7           # 覆盖率档位：1/8 … 7/8（0=不盖，8 永不使用）
 const BLD_DEFAULT_DITHER := 8   # 默认 Bayer 矩阵边长（像素），必须整除 tile_size
 
-# 生物群系数量与图集列布局：不再写死常量，改为运行时从 config.json 的
+# 生物群系数量与图集列布局：不再写死常量，改为运行时从 map.json 的
 # map.biomes 读取（biome_count()），因此【加一种地形只改配置、GDScript 零改码】：
 # 在 config 里加一项（含 tileset 字段指向某张 Tilemap_colorN.png）即可。
 # 图集列数学仍按 biome_count() 推导，所以自动跟着变。
@@ -179,7 +179,7 @@ const TERRAIN_DIR := "res://Assets/Art/Tiles/TS/"
 const DEFAULT_TERRAIN := "tilemap_color1.png"
 const WATER_SRC := "water_bg.png"
 
-# ---------- 生物群系定义（数据驱动，唯一真相源 = Data/config.json 的 map.biomes）----------
+# ---------- 生物群系定义（数据驱动，唯一真相源 = Data/config/ 的 map.biomes）----------
 # 每项：{id, name, floor:[r,g,b], wall:[r,g,b], tint:[r,g,b], tree, rock, debris,
 #        floor_src?（AI 无缝地面纹理文件名，缺省则程序化生成）}
 # 历史默认值（config 缺失时回落，确保工程随时可跑）：
@@ -396,6 +396,11 @@ const DECOR_RENDER_ORDER := [DECOR_WATER, DECOR_CRACK, DECOR_DEBRIS, DECOR_BUSH,
 		DECOR_TREE, DECOR_ROCK]
 # 立体物件里"本身平摊在地上"的类别：不需要落地投影
 const DECOR_NO_SHADOW := [DECOR_DEBRIS, DECOR_BUSH]
+
+# 落地投影参数（运行时 _decor_shadow_texture 与预览 _blend_shadow 共用，改这里一处即全局生效）
+const SHADOW_W_RATIO := 0.60   # 影宽 = 物件宽 × 此比例
+const SHADOW_H_RATIO := 0.28   # 影高 = 影宽 × 此比例（越扁越贴地）
+const SHADOW_ALPHA := 0.22     # 影中心最大不透明度
 
 # ---------- 矿脉（地图资源节点，非装饰、不阻挡通行）----------
 const VEIN_IRON := 0
@@ -943,8 +948,8 @@ static func build_preview(result: Dictionary, cells: int) -> Image:
 			var flat: bool = DECOR_FLAT.has(k)
 			# 落地投影：与运行时同序（先影后本体）；裂缝/河水/碎石/灌木贴地，不投影
 			if shadow_on and not flat and not DECOR_NO_SHADOW.has(k):
-				var sw: float = maxf(6.0, src.get_width() * 0.80)
-				var shh: float = maxf(3.0, sw * 0.34)
+				var sw: float = maxf(6.0, src.get_width() * SHADOW_W_RATIO)
+				var shh: float = maxf(3.0, sw * SHADOW_H_RATIO)
 				_blend_shadow(out, int(x * ts + ts * 0.5),
 						int(y * ts + ts * 0.5 + shh * 0.5), sw * 0.5, shh * 0.5)
 			# 与游戏中 Sprite2D 的对齐方式一致：立体物件脚底落在格心下方 2px，
@@ -1012,7 +1017,7 @@ static func _blend_shadow(out: Image, cx: int, cy: int, rx: float, ry: float) ->
 			var dd := dx * dx + dy * dy
 			if dd > 1.0:
 				continue
-			var a: float = (1.0 - dd) * 0.42
+			var a: float = (1.0 - dd) * SHADOW_ALPHA
 			if a <= 0.02:
 				continue
 			var d := out.get_pixel(x, y)
@@ -1932,8 +1937,8 @@ static func _shallow_water(src: Image) -> Image:
 static func _decor_shadow_texture(kind: int, base_width: float) -> Texture2D:
 	if _decor_shadow_tex.has(kind):
 		return _decor_shadow_tex[kind]
-	var w: int = maxi(6, int(base_width * 0.80))
-	var h: int = maxi(3, int(float(w) * 0.34))
+	var w: int = maxi(6, int(base_width * SHADOW_W_RATIO))
+	var h: int = maxi(3, int(float(w) * SHADOW_H_RATIO))
 	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
 	var cx := float(w - 1) * 0.5
@@ -1947,7 +1952,7 @@ static func _decor_shadow_texture(kind: int, base_width: float) -> Texture2D:
 			var d := dx * dx + dy * dy
 			if d > 1.0:
 				continue
-			img.set_pixel(x, y, Color(0.0, 0.0, 0.0, (1.0 - d) * 0.42))
+			img.set_pixel(x, y, Color(0.0, 0.0, 0.0, (1.0 - d) * SHADOW_ALPHA))
 	var tex := ImageTexture.create_from_image(img)
 	_decor_shadow_tex[kind] = tex
 	return tex

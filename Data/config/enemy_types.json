@@ -1,0 +1,936 @@
+{
+  "enemy_types": {
+    "_comment": "Tiny Swords 免费包没有「怪物」，但有 5 个阵营 × 4 个兵种的完整单位。这里挑 4 个敌方阵营单位当敌人：强度递进，贴图/动画各不相同。官方包**没有受击/死亡动画**，受击靠染色、死亡靠淡出（见 enemy.gd）。",
+    "scale": 1.0,
+    "offset_y": -40.0,
+    "pixel_unit": 6.0,
+    "types": [
+      {
+        "id": "ep_bear",
+        "name": "熊",
+        "weight": 1,
+        "hp": 80,
+        "damage": 14,
+        "speed_mult": 0.9,
+        "scale": 0.75,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_bear/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/idle_07.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_bear/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/run_04.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_bear/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/attack_06.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/attack_07.png",
+          "res://Assets/Art/Sprites/Units/ep_bear/attack_08.png"
+        ],
+        "traits": [
+          {
+            "_comment": "邪术师的**特性池**：目前只有这一个，所以每只邪术师都是「爆裂鼓手」（必定分到）。写成池（而不是单数 trait）是为了将来加第二个特性时能按 weight 随机分配，代码一行都不用改。",
+            "_note": "爆裂鼓手（用户 2026-09-17 定）：① 放大玩家造成的噪音（见 noise_amplify，光环）；② 血量越低，受到的伤害越少（见 damage_reduction）。实现分别在 Scripts/noise_system.gd（发声时放大）与 Scripts/enemy.gd（受击时减伤）。",
+            "id": "burst_drum",
+            "name": "爆裂鼓手",
+            "weight": 1,
+            "noise_amplify": {
+              "_note": "以**发声点**为中心、radius_px 为半径：半径内每个存活邪术师按距离线性加权贡献 per_enemy 的增幅（贴着 = 全量，到半径边缘 = 0），多个叠加。总倍率 = clamp(1 + Σ增幅, 1, enemy_traits.noise_amplify.max_multiplier)。只放大 from_player=true 的发声（小队自己弄出的动静）——敌人自己的呼喊不放大，否则会互相引爆。radius_px ≤ 0 = 关闭放大；想全图生效就把半径设得比地图大。",
+              "radius_px": 480.0,
+              "per_enemy": 0.5
+            },
+            "damage_reduction": {
+              "_note": "血量越低受到的伤害越少：减伤比例 = max_reduction × (1 − hp/max_hp)^exponent。满血不减伤，残血最多减 max_reduction。实际伤害有 min_damage 点保底 —— 残血也会被打死，不会变成无敌。",
+              "max_reduction": 0.6,
+              "exponent": 1.0,
+              "min_damage": 1
+            }
+          }
+        ],
+        "fx_attack": "slash_claw"
+      },
+      {
+        "id": "ep_cave",
+        "name": "洞穴兽",
+        "weight": 1,
+        "hp": 30,
+        "damage": 8,
+        "speed_mult": 0.7,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_cave/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_cave/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_cave/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_cave/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_cave/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_cave/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_cave/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_cave/idle_07.png"
+        ],
+        "fx_attack": "bash_rock"
+      },
+      {
+        "id": "ep_lizard",
+        "name": "蜥蜴",
+        "weight": 1,
+        "hp": 35,
+        "damage": 10,
+        "speed_mult": 1.1,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_lizard/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/idle_06.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_lizard/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/run_05.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_lizard/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/attack_06.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/attack_07.png",
+          "res://Assets/Art/Sprites/Units/ep_lizard/attack_08.png"
+        ],
+        "fx_attack": "slash_tail"
+      },
+      {
+        "id": "ep_snake",
+        "name": "蛇",
+        "weight": 1,
+        "hp": 30,
+        "damage": 9,
+        "speed_mult": 1.2,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_snake/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/idle_07.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_snake/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/run_05.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/run_06.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/run_07.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_snake/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_snake/attack_05.png"
+        ],
+        "fx_attack": "slash_bite"
+      },
+      {
+        "id": "ep_spider",
+        "name": "蜘蛛",
+        "weight": 1,
+        "hp": 32,
+        "damage": 10,
+        "speed_mult": 1.15,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_spider/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/idle_07.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_spider/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/run_04.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_spider/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/attack_06.png",
+          "res://Assets/Art/Sprites/Units/ep_spider/attack_07.png"
+        ],
+        "fx_attack": "spit_web"
+      },
+      {
+        "id": "ep_turtle",
+        "name": "巨龟",
+        "weight": 1,
+        "hp": 120,
+        "damage": 12,
+        "speed_mult": 0.6,
+        "scale": 0.6,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_turtle/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/idle_07.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/idle_08.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/idle_09.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_turtle/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/run_05.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/run_06.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_turtle/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/attack_06.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/attack_07.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/attack_08.png",
+          "res://Assets/Art/Sprites/Units/ep_turtle/attack_09.png"
+        ],
+        "fx_attack": "slam_ring"
+      },
+      {
+        "id": "ep_hex_shaman",
+        "name": "萨满",
+        "weight": 2,
+        "hp": 55,
+        "damage": 10,
+        "speed_mult": 0.95,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/idle_07.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/run_03.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/attack_06.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/attack_07.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/attack_08.png",
+          "res://Assets/Art/Sprites/Units/ep_hex_shaman/attack_09.png"
+        ],
+        "fx_attack": "cast_hex"
+      },
+      {
+        "id": "ep_pig",
+        "name": "野猪",
+        "weight": 1,
+        "hp": 40,
+        "damage": 10,
+        "speed_mult": 1.1,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_pig/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_pig/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_pig/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_pig/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_pig/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_pig/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_pig/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_pig/idle_07.png",
+          "res://Assets/Art/Sprites/Units/ep_pig/idle_08.png",
+          "res://Assets/Art/Sprites/Units/ep_pig/idle_09.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_pig/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_pig/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_pig/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_pig/run_03.png"
+        ],
+        "fx_attack": "burst_charge"
+      },
+      {
+        "id": "ep_pig_rider",
+        "name": "猪骑兵",
+        "weight": 1,
+        "hp": 70,
+        "damage": 14,
+        "speed_mult": 1.0,
+        "scale": 0.75,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/idle_07.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/run_03.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_pig_rider/attack_06.png"
+        ],
+        "fx_attack": "slash_sabre"
+      },
+      {
+        "id": "ep_spear_goblin",
+        "name": "长矛哥布林",
+        "weight": 2,
+        "hp": 38,
+        "damage": 11,
+        "speed_mult": 1.1,
+        "scale": 0.75,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/idle_07.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/run_05.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_06.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_07.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_08.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_09.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_10.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_11.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_12.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_13.png",
+          "res://Assets/Art/Sprites/Units/ep_spear_goblin/attack_14.png"
+        ],
+        "ai": {
+          "_comment": "劫掠者（用户 2026-09-17 定）：「他的机制就是满地图随机游走，并且遇到同类会一起移动，上限先做到 5 个吧……劫掠者对声音更敏感」。三项都覆盖了全局默认值（enemy.ai），详解见 docs/DESIGN.md §5.5。",
+          "_note_roam": "whole_map = 满地图随机游走：每次选新目标都在**整张地图**上随机挑一个可走格（至少离当前位置 min_target_distance_px 远，避免原地小抖动），走过去、停一下、再挑下一个。active_radius_cells 是给它的休眠保护放宽（全局 32 格 = 512px 会把它圈在玩家附近；放到 48 格它才走得出去）。",
+          "_note_pack": "成群：两只劫掠者靠近到 join_radius_px 内就结伙（后来者加入先到者的群），之后成员**跟着群主一起移动**；max_members = 5 是硬上限（用户定的），装满的群不再收人。群主负责选目标，成员只跟队形（follow_distance_px 之外才启程）。群主死了自动由同群下一个活着的成员接任。",
+          "_note_sens": "noise_sensitivity 1.8 = 耳朵比普通敌人灵 1.8 倍（等效听力半径与同距离听到的强度都按这个倍率算，见 noise_system.gd::emit）。",
+          "roam": {
+            "mode": "whole_map",
+            "active_radius_cells": 48.0,
+            "min_target_distance_px": 400.0,
+            "max_target_distance_px": 0.0,
+            "sample_attempts": 24
+          },
+          "noise_sensitivity": 1.8,
+          "pack": {
+            "enabled": true,
+            "max_members": 5,
+            "join_radius_px": 176.0,
+            "follow_distance_px": 48.0,
+            "scan_interval_seconds": 1.0,
+            "repath_interval_seconds": 0.4
+          }
+        },
+        "fx_attack": "thrust_spear"
+      },
+      {
+        "id": "ep_torch_goblin",
+        "name": "火把哥布林",
+        "weight": 1,
+        "hp": 36,
+        "damage": 12,
+        "speed_mult": 1.1,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/idle_07.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/run_05.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/attack_06.png",
+          "res://Assets/Art/Sprites/Units/ep_torch_goblin/attack_07.png"
+        ],
+        "traits": [
+          {
+            "_comment": "弓手的**特性池**：目前只有这一个，所以每只弓手都是「幻影分身」（必定分到）。写成池（而不是单数 trait）是为了将来加第二个特性时能按 weight 随机分配，代码一行都不用改。",
+            "_note": "幻影分身（用户 2026-09-17 定，同日改规格）：「每个只随机召唤一到两个，召唤的分身只有本体20%的血量，分身不会再召唤分身，本体每隔5秒会再随机召唤1到2个，最多8个分身，分身越多，自身受到伤害越少」＋「这批角色（本体加召唤）按最低血条展示，不管攻击哪个，显示血条最低的，迷惑玩家」。实现：enemy.gd（_setup_phantom / display_hp_ratio / refresh_group_hp_bar / _check_phantom_swap / 本体按 resummon_interval_seconds 补召）+ enemy_system.gd::notify_phantom_summon（名额与上限把关）+ 血条 Scripts/enemy_hp_bar.gd。",
+            "_note_blood": "分身有**自己的一份血**（= 本体 max_hp × hp_ratio_of_owner，默认 20%），出生满血、挨打扣自己的、打光就自己消失，**不**把伤害转嫁给本体（2026-09-17 从早先的「共享血池」改成独立血）。分身不会再召唤（否则指数繁殖）。",
+            "_note_bar": "血条：本体 + 它的全部分身算**一组**，统一显示「组内最低血量 ÷ 本体 max_hp」—— 谁掉血都让整组一起变成那个最低值。分身天生只有本体 20% 的血 ⇒ 只要场上有分身，整组血条就一直是『残血』的样子，打哪个都是同一条、都像快死了（这就是迷惑玩家的核心）。见 enemy.gd::display_hp_ratio / refresh_group_hp_bar。**别按 is_phantom 给分身换血条颜色/尺寸**，会一秒破功。",
+            "_note_swarm": "分身越多，本体越难打（用户原话「分身越多，自身受到伤害越少」）：damage_reduction.per_phantom × 场上活分身数，封顶 max_reduction，另有 1 点保底伤害（不会变成无敌）。想少挨减伤就先清分身。",
+            "_note_swap": "本体每跨过一个 swap_hp_step_ratio(20%) 的血量台阶，就随机挑一具活分身**交换坐标**（双方的巡逻中心 _home 跟着挪，免得本体一步走回老窝露馅）。满血→80%/60%/40%/20% 各触发一次，最多 4 次。没分身可换时台阶被吞掉，不会攒着等分身出生后连闪。",
+            "id": "phantom_double",
+            "name": "幻影分身",
+            "weight": 1,
+            "count_min": 1,
+            "count_max": 2,
+            "max_phantoms_per_owner": 8,
+            "hp_ratio_of_owner": 0.2,
+            "resummon_interval_seconds": 5.0,
+            "spawn_radius_px": 96.0,
+            "spawn_interval_seconds": 0.15,
+            "drop_from_splits": false,
+            "swap_hp_step_ratio": 0.2,
+            "damage_reduction": {
+              "per_phantom": 0.075,
+              "max_reduction": 0.6,
+              "min_damage": 1
+            }
+          }
+        ],
+        "fx_attack": "spark_arrow"
+      },
+      {
+        "id": "ep_bomb_fish",
+        "name": "炸弹鱼",
+        "weight": 1,
+        "hp": 34,
+        "damage": 12,
+        "speed_mult": 1.05,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/idle_07.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/run_05.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_bomb_fish/attack_06.png"
+        ],
+        "fx_attack": "splash_bomb"
+      },
+      {
+        "id": "ep_harpoon_shark",
+        "name": "鱼叉鲨",
+        "weight": 1,
+        "hp": 50,
+        "damage": 13,
+        "speed_mult": 1.0,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/idle_07.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/run_05.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/attack_06.png",
+          "res://Assets/Art/Sprites/Units/ep_harpoon_shark/attack_07.png"
+        ],
+        "fx_attack": "thrust_harpoon"
+      },
+      {
+        "id": "ep_paddle_shark",
+        "name": "桨鲨",
+        "weight": 1,
+        "hp": 55,
+        "damage": 14,
+        "speed_mult": 1.05,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/idle_07.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/run_05.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_paddle_shark/attack_05.png"
+        ],
+        "fx_attack": "sweep_fin"
+      },
+      {
+        "id": "ep_gnoll",
+        "name": "豺狼人",
+        "weight": 1,
+        "hp": 45,
+        "damage": 12,
+        "speed_mult": 1.0,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_gnoll/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/idle_05.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_gnoll/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/run_05.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/run_06.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/run_07.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_gnoll/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/attack_06.png",
+          "res://Assets/Art/Sprites/Units/ep_gnoll/attack_07.png"
+        ],
+        "fx_attack": "slash_rend"
+      },
+      {
+        "id": "ep_gnome",
+        "name": "侏儒",
+        "weight": 1,
+        "hp": 28,
+        "damage": 8,
+        "speed_mult": 1.05,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_gnome/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/idle_07.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_gnome/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/run_05.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_gnome/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_gnome/attack_06.png"
+        ],
+        "fx_attack": "shred_bolt"
+      },
+      {
+        "id": "ep_minotaur",
+        "name": "牛头人",
+        "weight": 1,
+        "hp": 140,
+        "damage": 18,
+        "speed_mult": 0.8,
+        "scale": 0.6,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_07.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_08.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_09.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_10.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_11.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_12.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_13.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_14.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/idle_15.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_minotaur/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/run_05.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/run_06.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/run_07.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_minotaur/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/attack_06.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/attack_07.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/attack_08.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/attack_09.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/attack_10.png",
+          "res://Assets/Art/Sprites/Units/ep_minotaur/attack_11.png"
+        ],
+        "fx_attack": "slash_claw"
+      },
+      {
+        "id": "ep_panda",
+        "name": "熊猫",
+        "weight": 1,
+        "hp": 110,
+        "damage": 16,
+        "speed_mult": 0.85,
+        "scale": 0.75,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_panda/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/idle_07.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/idle_08.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/idle_09.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_panda/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/run_05.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_panda/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/attack_06.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/attack_07.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/attack_08.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/attack_09.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/attack_10.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/attack_11.png",
+          "res://Assets/Art/Sprites/Units/ep_panda/attack_12.png"
+        ],
+        "fx_attack": "slam_paw"
+      },
+      {
+        "id": "ep_skull",
+        "name": "骷髅",
+        "weight": 1,
+        "hp": 42,
+        "damage": 12,
+        "speed_mult": 1.0,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_skull/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/idle_07.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_skull/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/run_05.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_skull/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/attack_05.png",
+          "res://Assets/Art/Sprites/Units/ep_skull/attack_06.png"
+        ],
+        "traits": [
+          {
+            "_comment": "掠夺者的**特性池**：每个实例在生成时按 weight 随机分配其中一个，一个角色只有一种特性（用户 2026-09-17 定）；特性刷出来的孩子**继承父的特性**，所以分裂链一直裂、再生链一直再生。分配在 enemy.gd::pick_feature()，判定在 enemy_system.gd。",
+            "_note": "死亡分裂：原始体死亡 → stages[0]；这一批的**最后一个**死亡时才轮到 stages[1]，以此类推，stages 用完就停。个体在死亡原地**一个一个**出来（spawn_interval_seconds = 相邻两个的间隔，不是一次性冒出来）。",
+            "id": "death_split",
+            "weight": 1,
+            "stages": [
+              {
+                "_note": "原始死亡 → 出 2。**初始概率**随场上掠夺者总数缩放（人少拉高、人多压低，见 enemy_traits.population_scaling）：chance_base = 场上很多时的概率，chance_max = 场上很少时的上限（用户给的「最高 100」）。想连后面几代一起压，给 stage[1..3] 也加上这两个键即可（只写 chance 就是固定概率）。",
+                "count": 2,
+                "chance_base": 0.45,
+                "chance_max": 1.0
+              },
+              {
+                "_note": "那 2 个的最后一个死 → 90% 出 4",
+                "count": 4,
+                "chance": 0.9
+              },
+              {
+                "_note": "那 4 个的最后一个死 → 80% 出 8",
+                "count": 8,
+                "chance": 0.8
+              },
+              {
+                "_note": "那 8 个的最后一个死 → 70% 出 64（你没给这一代的概率，按 100/90/80 的递减规律填的，改这个数即可）",
+                "count": 64,
+                "chance": 0.7
+              }
+            ],
+            "spawn_interval_seconds": 0.1,
+            "scatter_px": 0.0,
+            "drop_from_splits": true,
+            "max_live_split_enemies": 0
+          },
+          {
+            "_note": "死亡再生：与死亡分裂不同，**每一次死亡都独立判定**（不看「最后一个」、不逐代递进）——每个再生体死亡都按概率再刷 count 个，孩子继承本特性，所以会一直链下去，直到运气用完或撞上 max_live_split_enemies。逻辑在 enemy_system.gd::notify_death_regen()。",
+            "id": "death_regen",
+            "weight": 1,
+            "count": 2,
+            "_note_chance": "概率同样随场上掠夺者总数缩放：chance_base = 场上很多时，chance_max = 场上很少时的上限（用户给的「最高 50」）。它没有代次概念，所以每一次死亡判定都按这个概率。",
+            "chance_base": 0.15,
+            "chance_max": 0.5,
+            "spawn_interval_seconds": 0.1,
+            "scatter_px": 0.0,
+            "drop_from_splits": true,
+            "max_live_split_enemies": 0
+          }
+        ],
+        "fx_attack": "spike_bone"
+      },
+      {
+        "id": "ep_thief",
+        "name": "盗贼",
+        "weight": 1,
+        "hp": 40,
+        "damage": 11,
+        "speed_mult": 1.2,
+        "scale": 1.0,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_thief/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/idle_05.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_thief/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/run_05.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_thief/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_thief/attack_05.png"
+        ],
+        "fx_attack": "slash_shadow"
+      },
+      {
+        "id": "ep_troll",
+        "name": "巨魔",
+        "weight": 1,
+        "hp": 150,
+        "damage": 20,
+        "speed_mult": 0.7,
+        "scale": 0.5,
+        "idle": [
+          "res://Assets/Art/Sprites/Units/ep_troll/idle_00.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/idle_01.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/idle_02.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/idle_03.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/idle_04.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/idle_05.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/idle_06.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/idle_07.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/idle_08.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/idle_09.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/idle_10.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/idle_11.png"
+        ],
+        "walk": [
+          "res://Assets/Art/Sprites/Units/ep_troll/run_00.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/run_01.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/run_02.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/run_03.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/run_04.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/run_05.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/run_06.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/run_07.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/run_08.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/run_09.png"
+        ],
+        "attack": [
+          "res://Assets/Art/Sprites/Units/ep_troll/attack_00.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/attack_01.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/attack_02.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/attack_03.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/attack_04.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/attack_05.png"
+        ],
+        "dead": [
+          "res://Assets/Art/Sprites/Units/ep_troll/dead_00.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/dead_01.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/dead_02.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/dead_03.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/dead_04.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/dead_05.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/dead_06.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/dead_07.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/dead_08.png",
+          "res://Assets/Art/Sprites/Units/ep_troll/dead_09.png"
+        ],
+        "fx_attack": "slash_claw"
+      }
+    ],
+    "_fx_comment": "types[].fx_attack = 该兵种出手时的特效 id（fx.fx 库里的一条，见顶层 fx._comment）。写空串 = 用 enemy.attack.fx_attack 那条默认。这轮按用户「敌人也做，挑几个兵种」只给 6 个兵种配了专属形状，其余全走默认的红色毛边月牙。"
+  }
+}

@@ -17,7 +17,7 @@ extends Control
 ## 全屏 Control + mouse_filter=IGNORE：不吃 GUI 点击（面板/小地图/按钮各自 STOP
 ## 消费，事件根本不进 _unhandled_input），只在没人消费的左键上做文章。
 ## 挂在 HUD(CanvasLayer) 下，坐标系即视口屏幕坐标；世界↔屏幕用相机画布变换换算，
-## 于是缩放/平移都自动跟手。数值来自 Data/config.json 的 player.*。
+## 于是缩放/平移都自动跟手。数值来自 Data/config/ 的 player.*。
 ## ============================================================
 
 const GROUP := &"selection"

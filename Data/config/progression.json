@@ -1,0 +1,322 @@
+{
+  "characters": {
+    "_comment": "出发大门的选人表（鼠标点大门弹面板，**可多选**组成小队，点「出击」才进局）。weapon 指向 combat.weapons 的 id —— 贴图集跟着武器走（spear → sprites_lancer 8 向枪兵；sword → sprites_ts 战士；bow → 锁 sprites_archer 弓兵），所以角色 = 选武器/打法。default 是无人选择路径（命令行/无头回归/auto_enter_run）的兜底单人；选择名单只存会话内存不落盘。进图后 RTS 点选指挥：点角色选中，左键点地移动、空格闪避，**攻击全自动**（敌人进入『观察视野 ∩ 攻击距离』即自动起手，够不着不追），未选中的成员同样自动战斗；全员站入撤离圈才可撤离，全队倒下才算失败。新增角色往 list 里加即可，面板自动多一行。**强弩（sniper）已于 2026-09-20 整体删除**（2026-09-17 先摘名单，理由是 AI 立绘与另外三人画风割裂；后来确认不复活，于是武器表 / blue_crossbowman 贴图 / 曳光 / fire_hitscan 通路 / 探针一并清掉）—— 想再加「瞬间命中」型武器得重写那条通路，不是插一条配置就行。command_set = 局内菜单栏里这个单位的指令集 id（见顶层 menu_bar.command_sets）—— 换单位就换整套指令面板。",
+    "default": "spearman",
+    "list": [
+      {
+        "id": "spearman",
+        "name": "枪手",
+        "desc": "近战 · 长枪突刺 射程 180px · 伤害 26 · 噪音中",
+        "weapon": "spear",
+        "command_set": "combat"
+      },
+      {
+        "id": "archer",
+        "name": "弓兵",
+        "desc": "远程 · 弓箭弹道 射程 640px · 伤害 20 · 噪音小",
+        "weapon": "bow",
+        "command_set": "combat"
+      },
+      {
+        "id": "swordsman",
+        "name": "剑士",
+        "desc": "近战 · 扇形 200° 最多 3 目标 · 伤害 25 · 噪音大",
+        "weapon": "sword",
+        "command_set": "combat"
+      },
+      {
+        "id": "monk",
+        "name": "僧侣",
+        "desc": "近战 · 法杖横扫 射程 140px · 伤害 18 · 噪音最小",
+        "weapon": "staff",
+        "command_set": "combat"
+      }
+    ]
+  },
+  "progression": {
+    "_comment": "角色等级（2026-09-17 用户定）：最多 9 级、初始 0 级、升级难（要开多局才满）、**死亡永久** —— 单位阵亡即从名册移除，等级与经验一并消失（复活功能以后再加）。视觉 = 方案三：**配色分档**（一眼看档次）+ **头顶数字**（精确等级）。体色一旦承载等级，选中框/小地图点/面板底色必须恒定为阵营蓝当锚。",
+    "max_level": 9,
+    "xp": {
+      "_comment": "升级难度：升到下一级所需经验 = round(base * growth^当前等级)。per_extraction = 撤离成功时每个存活单位拿到的经验；per_kill = 每个击杀的经验（0 = 关掉）。现数值（base 100 × growth 1.3）的升级线约 100/130/169/220/286/371/483/627/816，累计约 3200 —— 单局撤离拿 100，即**约 32 局**满级；刻意做成要多局、但有尽头。待调。",
+      "curve": {
+        "base": 100.0,
+        "growth": 1.3
+      },
+      "per_extraction": 100.0,
+      "per_kill": 0.0
+    },
+    "tiers": [
+      {
+        "max_level": 2,
+        "id": "blue",
+        "name": "新兵"
+      },
+      {
+        "max_level": 5,
+        "id": "purple",
+        "name": "老兵"
+      },
+      {
+        "max_level": 8,
+        "id": "black",
+        "name": "精锐"
+      },
+      {
+        "max_level": 9,
+        "id": "gold",
+        "name": "传奇"
+      }
+    ],
+    "sprite_sets": {
+      "_comment": "档位配色 → 精灵集（按武器查）。gold 档用素材包的 Yellow（金甲）。**红色永远留给敌人**，玩家档位不许占用红色系。新增武器时必须**四档都补一行** —— 漏一档会让该档位的角色查不到映射、回落到 default 外观（表现为「升到某个等级换了个兵种」）。staff（僧侣）2026-09-18 加入。",
+      "blue": {
+        "spear": "sprites_lancer",
+        "bow": "sprites_archer",
+        "sword": "sprites_ts",
+        "staff": "sprites_monk"
+      },
+      "purple": {
+        "spear": "sprites_lancer_purple",
+        "bow": "sprites_archer_purple",
+        "sword": "sprites_ts_purple",
+        "staff": "sprites_monk_purple"
+      },
+      "black": {
+        "spear": "sprites_lancer_black",
+        "bow": "sprites_archer_black",
+        "sword": "sprites_ts_black",
+        "staff": "sprites_monk_black"
+      },
+      "gold": {
+        "spear": "sprites_lancer_gold",
+        "bow": "sprites_archer_gold",
+        "sword": "sprites_ts_gold",
+        "staff": "sprites_monk_gold"
+      }
+    },
+    "badge": {
+      "_comment": "等级显示 = 一个绕角色漂移的小光球（2026-09-18 取代旧的「圈 + 数字」—— 黑底白字压在像素小人头上像工牌，用户评价太违和）。平时只有球（颜色随档位），每隔几秒闪一次；闪的那 1 秒球胀大、球心亮出卡通数字。UI 层 _draw 自绘，不烘进贴图（9 级 x 3 角色 = 27 套帧）。",
+      "enabled": true,
+      "orb": {
+        "_comment": "缕绕角色飞的**淡光**（2026-09-18 三次改版）。前两版都被判丑，根因同一个：把它**画成了实体**——先是「暗色棋子」，后是「卡通糖果球」（细描边定形 + 球冠亮面 + 底部薄影），越画得完整越像一颗真球挂在人身上。光不该有边界。现在删掉一切轮廓，只留几层同心柔光从内到外化开（`glow.layers`），颜色朝白推淡，整体压在半透明。四条行为（用户原话：时隐时现 / 时快时慢 / 颜色尽量淡 / 在角色四周飞）分别在 pulse / speed_sway / glow / center_offset_y+orbit_y_scale 四组参数里。radius_px 是**屏幕像素**（screen_fixed 按 1/zoom 换算）→ 拉远拉近一样大一样清楚。",
+        "center_offset_y": -34.0,
+        "radius_px": 11.0,
+        "screen_fixed": true,
+        "orbit_radius_px": [
+          24.0,
+          36.0
+        ],
+        "orbit_y_scale": 0.85,
+        "spin_speed": 1.2,
+        "speed_sway": 0.5,
+        "speed_sway_hz": 0.13,
+        "speed_sway2": 0.2,
+        "speed_sway_hz2": 0.31,
+        "wobble_px": 3.0,
+        "_speed_comment": "「时快时慢」：ω(t) = spin_speed + speed_sway·2π·speed_sway_hz·cos(2π·hz·t) + speed_sway2·2π·speed_sway_hz2·cos(2π·hz2·t)。⚠ **两条 sway 项之和必须 < spin_speed**，否则 ω 会变负——光点原地掉头，看着像 bug 不像飘。当前 0.41 + 0.39 = 0.80 < 1.20 ✓（ω ∈ [0.40, 2.00]，快慢差 5 倍）。两条频率取不整除（0.13 / 0.31）→ 快慢节奏本身也不规律。",
+        "glow": {
+          "_comment": "淡光的画法。layers = 「从外到内」的同心光斑层，每层 [半径比例, 不透明度比例]：外层大而极淡（当光晕）、内层小而亮（当光核），**没有任何描边**。不变量：ratio 递减、alpha 递增（探针守这条，写反了会变成一圈实心靶子）。ratio 允许 > 1（光晕比光核大）。内层颜色自动朝白推 (1-ratio)×core_whiten → 光核偏白、光晕偏档位色。⚠ 每层是**软边光斑**（运行时生成的径向渐变贴图，见 Scripts/unit_level_badge.gd 的 `_ensure_glow_tex`），不是实心圆 —— 实心圆叠起来能数出一圈圈同心环，放大看就是个靶子（首版实拍验证后改掉的）。falloff 是这张贴图的三次方级以下的衰减指数：越大 → 中心越集中、边缘散得越快（1.5 左右最像光，>4 会缩成一粒硬点）。pulse_seconds = 「时隐时现」的两条周期（两周期不整除 → 明暗节奏不规律，不是呼吸灯）；clamp 后两端都有平台，即**真的会完全隐没、也真的会完全显现**。pulse_power > 1 → 暗的时间更长、亮的时刻更短促。max_alpha 是整体不透明度天花板（<1 才有「虚」的质感）。min_scale = 最暗时缩到多小（亮时饱满、暗时收缩，像凑近又退远）。",
+          "tint_white": 0.55,
+          "max_alpha": 0.9,
+          "core_whiten": 0.5,
+          "falloff": 1.7,
+          "layers": [
+            [
+              1.3,
+              0.14
+            ],
+            [
+              0.95,
+              0.24
+            ],
+            [
+              0.62,
+              0.44
+            ],
+            [
+              0.34,
+              1.0
+            ]
+          ],
+          "pulse_seconds": [
+            3.4,
+            2.1
+          ],
+          "pulse_power": 1.15,
+          "min_scale": 0.72
+        }
+      },
+      "flash": {
+        "_comment": "「闪一下报等级」的节奏：间隔 interval 秒随机闪一次（first_delay = 进场后第一次，别让玩家等太久才明白这光点干嘛的）。rise 胀大 / hold 保持 / fade 淡出。闪的时候**可见度被强制拉满**（orb.glow 的时隐时现会被顶掉）—— 否则光点正好处在「隐」的时刻，闪了也白闪。on_select = 点选该角色立刻闪一次（想知道就能知道）—— 这是「不常驻数字」的补偿手段。scale 比球时代大（2.0）：底球半径小了，不多胀一点数字搁不下。",
+        "interval": [
+          5.0,
+          9.0
+        ],
+        "first_delay": 1.5,
+        "scale": 2.0,
+        "rise": 0.15,
+        "hold": 0.7,
+        "fade": 0.35,
+        "text_size": 14,
+        "text_outline_color": "#2B2A3A",
+        "on_select": true,
+        "on_level_up": true
+      },
+      "far_fade": {
+        "_comment": "视野拉远（zoom 变小）时淡出，避免看全图时一堆光球糊成一片。start_zoom 开始淡、end_zoom 完全隐藏。",
+        "start_zoom": 0.95,
+        "end_zoom": 0.7
+      },
+      "noise_link": {
+        "_comment": "光球跟着**角色自身噪音**（noise.self —— 菜单右下第 1 行，**不是**世界噪音）变快：越吵 = 绕得越快、明灭越急、报等级的闪也越频繁（2026-09-18 用户定）。做法是给整条时间轴乘一个倍数（`_t += delta × speed`），而不是分别去改每条曲线各自的频率 —— 后者会让摆动相位 / 明灭相位 / 抖动各走各的，加速那一瞬光点会「抖一下」；乘同一个 `_t` 则所有东西同步加速且**相位连续**，看不出是被调快了，只会觉得它更躁动。reference = 自身噪音到多少算 100%（按这个取值：脚步 22 → 一档都不到，剑击 120 → 约 1.7 倍，敌人惊呼 160 → 约 2.1 倍。顶格值 240 是当年按强弩一发定的，2026-09-20 那把武器删了但没重调 ⇒ 现在玩家侧最吵的一下只到 1.7 倍，光球不会自己顶满）。curve > 1 → 安静时几乎不变、吵起来才明显提速（否则光点会被呼吸般的脚步声带着一跳一跳）。boost_flash = 自动闪烁的倒计时也乘同一倍数。⚠ `speed_sway` 那条「两条 sway 之和 < spin_speed」的约束是按 1 倍速写的，但整体等比放大不会让 ω 越过零点，所以加速后依然不会掉头 —— 探针 K 段在 3 倍速下也验了一遍。",
+        "enabled": true,
+        "reference": 240.0,
+        "max_speed_multiplier": 3.0,
+        "curve": 1.4,
+        "boost_flash": true
+      },
+      "colors": {
+        "_comment": "档位球色（2026-09-18 整体提亮）。旧值 blue #378ADD / purple #7F77DD / black #5F5E5A / gold #EF9F27 明度都偏低，压到 18px 屏幕上显脏；精锐档那颗 #5F5E5A 更是「太深」的最大来源。精锐改**银灰** —— 与 6–8 级角色的 Black 阵营甲同属黑白灰一族（银就是黑甲的提亮版），档位语义不丢。出击面板色块读的是同一份配置，会一起变。",
+        "blue": "#4FA8F0",
+        "purple": "#A98CFF",
+        "black": "#C9D2E0",
+        "gold": "#FFC53D"
+      }
+    },
+    "roster": {
+      "_comment": "名册：跨局持久的**单位实例**（死亡永久，所以等级挂在具体的人身上，而不是兵种上）。starting = 首次游玩白送的 0 级新兵；recruit_free = 名册空了是否免费补招（不给时就只能等复活功能）。",
+      "starting": [
+        "spearman",
+        "archer",
+        "swordsman",
+        "monk"
+      ],
+      "recruit_free": true,
+      "max_size": 8
+    },
+    "traits": {
+      "_comment": "升级特性（2026-09-18 用户定）：每次升级**随机获得一个特性 +1 层**，收益按层累计（id 即属性键，层数 × per_stack）。等级越高攒的层越多 = 收益越大。**per_stack 一律是整数「单位」**（速度 +5、攻击 +7、攻击距离 +4 这种），不写小数。unit=flat 是把 per_stack 当点数直接相加（移速 px/s、气血点、视野/攻击距离/弹速 px）；unit=pct 用在攻击频率上，per_stack = 每层加的**整数百分点**（5 = 每层 +5%），前摇/判定/后摇 除以 (1 + 层数×5/100)，层越多打得越快。defense 是**入伤减免的点数**（take_damage 里先扣再算，扣到 0 就不掉血）。8 条一视同仁被抽中（均匀随机、无权重）。",
+      "list": [
+        {
+          "id": "attack",
+          "name": "攻击",
+          "unit": "flat",
+          "per_stack": 7
+        },
+        {
+          "id": "defense",
+          "name": "防御",
+          "unit": "flat",
+          "per_stack": 5
+        },
+        {
+          "id": "hp",
+          "name": "气血",
+          "unit": "flat",
+          "per_stack": 5
+        },
+        {
+          "id": "move_speed",
+          "name": "移速",
+          "unit": "flat",
+          "per_stack": 5
+        },
+        {
+          "id": "vision",
+          "name": "视野距离",
+          "unit": "flat",
+          "per_stack": 5
+        },
+        {
+          "id": "attack_range",
+          "name": "攻击距离",
+          "unit": "flat",
+          "per_stack": 4
+        },
+        {
+          "id": "attack_speed",
+          "name": "攻击频率",
+          "unit": "pct",
+          "per_stack": 5
+        },
+        {
+          "id": "projectile_speed",
+          "name": "投射体速度",
+          "unit": "flat",
+          "per_stack": 5
+        }
+      ]
+    }
+  },
+  "meta_progression": {
+    "survival": {
+      "max_hp": {
+        "name": "生命上限",
+        "format": "int",
+        "base": 100,
+        "per_level": 10,
+        "max_level": 5,
+        "cost": {
+          "iron": 30
+        }
+      },
+      "backpack_capacity": {
+        "name": "背包容量",
+        "format": "int",
+        "base": 10,
+        "per_level": 2,
+        "max_level": 5,
+        "cost": {
+          "wood": 25,
+          "gold": 1
+        }
+      },
+      "extraction_speed": {
+        "name": "撤离速度",
+        "format": "percent",
+        "base": 1.0,
+        "per_level": 0.05,
+        "max_level": 5,
+        "cost": {
+          "wood": 20,
+          "gold": 1
+        }
+      },
+      "warehouse_capacity": {
+        "name": "仓库容量",
+        "format": "int",
+        "base": 20,
+        "per_level": 5,
+        "max_level": 5,
+        "cost": {
+          "stone": 40,
+          "gold": 2
+        }
+      }
+    },
+    "acquisition": {
+      "resource_find_chance": {
+        "name": "资源发现率",
+        "format": "percent",
+        "base": 0.5,
+        "per_level": 0.03,
+        "max_level": 5,
+        "cost": {
+          "stone": 25,
+          "gold": 1
+        }
+      },
+      "rare_resource_chance": {
+        "name": "稀有资源率",
+        "format": "percent",
+        "base": 0.05,
+        "per_level": 0.01,
+        "max_level": 5,
+        "cost": {
+          "oil": 30,
+          "gold": 2
+        }
+      }
+    }
+  }
+}

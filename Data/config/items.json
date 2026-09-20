@@ -1,0 +1,71 @@
+{
+  "loot": {
+    "density": 0.05,
+    "amount_per_node": 10,
+    "pickup_radius_px": 80.0,
+    "pickup_retry_seconds": 0.5,
+    "icon_px": 44,
+    "ring_radius_px": 26,
+    "drop_spread_px": 22.0
+  },
+  "storage": {
+    "max_slots": 20,
+    "stack_limit": 1000
+  },
+  "resources": {
+    "wood": {
+      "name": "木头",
+      "rarity": "common",
+      "value": 1,
+      "color": "#8a6a3f",
+      "per_node": 20,
+      "harvest_time_seconds": 2.5,
+      "sprite": "res://Assets/Art/Sprites/Items/item_wood.png"
+    },
+    "stone": {
+      "name": "石头",
+      "rarity": "common",
+      "value": 1,
+      "color": "#9a9aa0",
+      "per_node": 20,
+      "harvest_time_seconds": 2.5,
+      "sprite": "res://Assets/Art/Sprites/Items/item_stone.png"
+    },
+    "iron": {
+      "name": "铁",
+      "rarity": "common",
+      "value": 2,
+      "color": "#bfc8d4",
+      "per_node": 30,
+      "harvest_time_seconds": 4.0,
+      "sprite": "res://Assets/Art/Sprites/Items/item_iron.png"
+    },
+    "gold": {
+      "name": "金币",
+      "rarity": "rare",
+      "value": 10,
+      "color": "#d9b13b",
+      "per_node": 15,
+      "harvest_time_seconds": 5.0,
+      "sprite": "res://Assets/Art/Sprites/Items/item_gold.png"
+    },
+    "oil": {
+      "name": "石油",
+      "rarity": "rare",
+      "value": 8,
+      "color": "#2a2a30",
+      "per_node": 40,
+      "harvest_time_seconds": 6.0,
+      "sprite": "res://Assets/Art/Sprites/Items/item_oil.png"
+    },
+    "food": {
+      "name": "食物",
+      "rarity": "common",
+      "value": 1,
+      "color": "#5da04e",
+      "per_node": 10,
+      "harvest_time_seconds": 3.0,
+      "sprite": "res://Assets/Art/Sprites/Items/item_food.png"
+    }
+  }
+}

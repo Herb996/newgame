@@ -16,7 +16,6 @@ extends CharacterBody2D
 ## 性能：只在「换目标 / 跨格 / 卡住」时重算路径，其余帧沿缓存路径走。
 ## ============================================================
 
-const FX_RING := preload("res://Scripts/combat/fx_ring.gd")
 const PROJECTILE := preload("res://Scripts/combat/projectile.gd")
 
 ## 玩家能打到的目标分组：敌人 + 中立生物（羊，打死掉食物）。
@@ -162,10 +161,6 @@ var _patrol_line: Line2D   # 巡逻路线（闭环折线，仅选中时可见）
 # 表现层动画状态机（4 向精灵方向切换 + 程序化动画），详见 player_animator.gd
 var _animator: PlayerAnimator
 
-# 枪械挂点贴图（武器表 rifle 段有配置才存在；无枪武器自动回收）
-var _rifle: Sprite2D = null
-
-
 
 ## FSM 当前状态名 → 动画状态（供 PlayerAnimator 使用）
 func _current_anim() -> int:
@@ -229,38 +224,8 @@ func _ready() -> void:
 	_patrol_line.visible = false
 	add_child(_patrol_line)
 	_init_combat()
-	_setup_rifle()
 	_setup_level_badge()
 	_init_state_machine()
-
-
-## 枪械挂点：武器表 rifle 段（texture/offset_px/scale）。
-## 为什么用挂点而不是换精灵集：免费包没有任何「持枪」动作帧，换精灵集无图可换；
-## 挂点跟着 facing 旋转即可，角色动画（含 Lancer 8 向）原样保留。
-## offset = 抓握点（机匣）锚在 offset_px 指的位置，旋转围绕握把转才自然。
-func _setup_rifle() -> void:
-	var rc = weapon_data().get("rifle", null)
-	if not (rc is Dictionary) or (rc as Dictionary).is_empty():
-		if _rifle != null and is_instance_valid(_rifle):
-			_rifle.queue_free()
-		_rifle = null
-		return
-	var cfg: Dictionary = rc
-	var tex_path := str(cfg.get("texture", ""))
-	if tex_path == "" or not ResourceLoader.exists(tex_path):
-		push_warning("[Weapon] 枪械贴图缺失：%s（贴图文件要先跑 godot_import.py）" % tex_path)
-		return
-	if _rifle == null:
-		_rifle = Sprite2D.new()
-		_rifle.name = "Rifle"
-		_rifle.centered = false
-		add_child(_rifle)
-	_rifle.texture = load(tex_path)
-	var off: Array = cfg.get("offset_px", [8.0, -20.0])
-	_rifle.position = Vector2(float(off[0]), float(off[1]))
-	_rifle.offset = Vector2(-22, -15)   # 抓握点 = 机匣中心（画布 72x24）
-	_rifle.scale = Vector2.ONE * float(cfg.get("scale", 1.0))
-	_rifle.z_index = 2                  # 画在角色身体之上
 
 
 ## 头顶等级徽章：节点在 Scenes/Player.tscn 里（LevelBadge），这里只把当前等级灌进去。
@@ -310,12 +275,6 @@ func add_self_noise(amount: float) -> void:
 ## 开局清零（NoiseSystem.reset 会遍历 player 组调它）
 func clear_self_noise() -> void:
 	self_noise = 0.0
-
-
-func _process(_delta: float) -> void:
-	if _rifle != null and is_instance_valid(_rifle):
-		_rifle.rotation = facing.angle()
-		_rifle.flip_v = facing.x < 0.0   # 朝左持枪不倒持
 
 
 ## 画布参数（缩放 / 脚底偏移 / 程序化位移单位）是**按画布尺寸算出来的**，
@@ -689,16 +648,16 @@ func _trait_cadence_scale() -> float:
 	return 1.0 + (trait_flat("attack_speed") - supply_penalty("attack_speed")) / 100.0
 
 
-## 攻击伤害叠加特性与物资扣减后的最终基础伤害（近战/弹道/瞬狙三条路径共用）
+## 攻击伤害叠加特性与物资扣减后的最终基础伤害（近战/弹道两条路径共用）
 func trait_damage(base: float) -> float:
 	return base + trait_flat("attack") - supply_penalty("attack")
 
 
-## 一次命中的完整结算（近战 / 弹道 / 瞬狙三条路径共用同一个抽法）。
+## 一次命中的完整结算（近战 / 弹道两条路径共用同一个抽法）。
 ## 返回 {damage:int, crit:bool}。
 ##
 ## 三个参数全部走 `attack_param()` 的「武器表 → combat.attack」回落链，所以
-## 「只给强弩加暴击」这件事是纯配置活（`combat.weapons.sniper.crit_chance`），
+## 「只给弓加暴击」这件事是纯配置活（`combat.weapons.bow.crit_chance`），
 ## 不用碰这段代码 —— 与 damage/range_px/arc_degrees 完全同一套规矩。
 ##
 ## 出厂 crit_chance=0、variance=0 ⇒ 恒等于 `int(trait_damage(base))`，
@@ -766,7 +725,7 @@ func take_item(res_id: String, amount: int) -> int:
 ##   只有视野内的目标才会被自动索敌选中；视野外的敌人不参与任何攻击判定，
 ##   所以"看不见的敌人"永远不会被自动攻击打到。
 ## 攻击距离 attack_range_px：**武器打得到多远**——近战取 range_px，
-##   远程取弹道射程 projectile.max_distance_px，瞬狙取射线射程 hitscan.max_distance_px。
+##   远程取弹道射程 projectile.max_distance_px。
 ## 有效攻击距离 = min(攻击距离, 观察视野)：
 ##   设计上观察视野预期大于攻击距离（先发现、再等它进入射程才开打），
 ##   但不管数值怎么配，实际射程一律被观察视野截断 —— 杜绝"打到看不见的目标"。
@@ -778,7 +737,7 @@ func vision_px() -> float:
 			+ trait_flat("vision") - supply_penalty("vision")
 
 
-## 攻击距离的净修正 = 特性加成 - 物资短缺扣减（三种武器路径共用一份）
+## 攻击距离的净修正 = 特性加成 - 物资短缺扣减（两种武器路径共用一份）
 func _range_bonus() -> float:
 	return trait_flat("attack_range") - supply_penalty("attack_range")
 
@@ -786,17 +745,11 @@ func _range_bonus() -> float:
 ## 武器自身的攻击距离（像素）；含攻击距离特性加成与物资短缺扣减
 func attack_range_px() -> float:
 	var w := weapon_data()
-	match attack_kind():
-		"ranged":
-			var pc = w.get("projectile", null)
-			if pc is Dictionary:
-				return float((pc as Dictionary).get("max_distance_px",
-						attack_param("range_px", 120.0))) + _range_bonus()
-		"hitscan":
-			var hc = w.get("hitscan", null)
-			if hc is Dictionary:
-				return float((hc as Dictionary).get("max_distance_px",
-						attack_param("range_px", 120.0))) + _range_bonus()
+	if attack_kind() == "ranged":
+		var pc = w.get("projectile", null)
+		if pc is Dictionary:
+			return float((pc as Dictionary).get("max_distance_px",
+					attack_param("range_px", 120.0))) + _range_bonus()
 	return attack_param("range_px", 120.0) + _range_bonus()
 
 
@@ -921,7 +874,7 @@ func aim_at_auto_target() -> void:
 
 ## 该武器该用哪套贴图集。优先级（2026-09-17 加等级后）：
 ##   1. 等级档位配色 —— progression.sprite_sets.<档位>.<武器>（同一个人升级就换配色）
-##   2. 武器自带的 sprite_set —— 档位表没配到这把武器时用（如已移出名单的强弩）
+##   2. 武器自带的 sprite_set —— 档位表没配到这把武器时用（如弓锁定 sprites_archer）
 ##   3. config player.sprite_set —— 武器没指定贴图集时的全局回落
 ## 为什么不直接把档位写进武器表：档位是**等级**的函数、武器是**兵种**的函数，
 ## 两者正交；写进武器表就得为每把武器复制 4 份、加一档要改所有武器。
@@ -960,7 +913,6 @@ func switch_weapon(id: StringName) -> bool:
 	current_weapon = id
 	_reload_animator()
 	_apply_hitbox_radius()
-	_setup_rifle()
 	print("[Weapon] 切换武器 -> %s（%s）贴图集=%s"
 			% [str(weapon_data().get("name", id)), attack_kind(), _sprite_set_for_weapon()])
 	return true
@@ -991,8 +943,8 @@ func _apply_hitbox_radius() -> void:
 	var shape := hitbox.get_node("CollisionShape2D").shape as CircleShape2D
 	if shape == null:
 		return
-	# 远程/瞬狙仍然给 0：它们的判定在弹道或射线上，玩家身上不该挂判定框。
-	# （不能直接用 effective_attack_range_px()，那会把弓/强弩的射程变成一个
+	# 远程仍然给 0：判定在弹道上，玩家身上不该挂判定框。
+	# （不能直接用 effective_attack_range_px()，那会把弓的射程变成一个
 	#  巨大却无用的 Area2D，语义错了还可能误伤别处的重叠查询。）
 	if attack_kind() != "melee":
 		shape.radius = 0.0
@@ -1060,16 +1012,6 @@ func has_input(action: StringName) -> bool:
 		if entry["action"] == action:
 			return true
 	return false
-
-
-## 场上所有可受伤目标（敌人 + 中立生物），已滤掉失效实例
-func _damageable_nodes() -> Array:
-	var out: Array = []
-	for g in DAMAGEABLE_GROUPS:
-		for n in get_tree().get_nodes_in_group(g):
-			if is_instance_valid(n):
-				out.append(n)
-	return out
 
 
 func can_dodge() -> bool:
@@ -1186,101 +1128,6 @@ func fire_projectile() -> bool:
 	var hit := roll_hit_damage(attack_param("damage", 20.0))
 	p.setup(cfg, facing, int(hit["damage"]), _walls, _tile_size)
 	return true
-
-
-## 瞬狙（kind = hitscan）：判定帧瞬间沿瞄准线结算，不产生飞行弹道。
-## 返回命中数。链路：
-##   1. 射线 = 枪口 → 枪口 + facing * max_distance_px；
-##   2. first_wall_point 截断到第一个墙点（子弹打不穿墙）；
-##   3. targets_on_segment 按沿线先后取前 pierce 个（穿透）；
-##   4. 每个目标走 roll_hit_damage（与近战/箭同一个入口，各自抽一次暴击）；
-##   5. 表现 = Line2D 曳光（淡出自毁）+ 命中点 fx_ring。
-## 全部判定都是纯数据（无物理查询），无头探针可逐项断言。
-func fire_hitscan() -> int:
-	var hc = weapon_data().get("hitscan", null)
-	if not (hc is Dictionary) or (hc as Dictionary).is_empty():
-		push_warning("[Weapon] %s 是瞬狙武器但没有 hitscan 配置段"
-				% str(weapon_data().get("name", current_weapon)))
-		return 0
-	var cfg: Dictionary = hc
-	var parent := get_parent()
-	if parent == null:
-		return 0
-
-	var from := global_position + facing * float(cfg.get("muzzle_offset_px", 34.0))
-	# 射线长度同样按"有效攻击距离"截断（≤ 观察视野）：
-	# 强弩表上 900px 比 10 格视野（640px）远，实际最远只能打到看得见的地方。
-	var max_dist := minf(float(cfg.get("max_distance_px", 900.0)), effective_attack_range_px())
-	var far := from + facing * max_dist
-	# 墙截断：撞墙的点就是弹道终点（曳光也画到这里，视觉与判定一致）
-	var wall_hit = PROJECTILE.first_wall_point(_walls, _tile_size, from, far)
-	var to: Vector2 = wall_hit if wall_hit != null else far
-
-	var pierce := int(cfg.get("pierce", 1))
-	var radius := float(cfg.get("hit_radius_px", 18.0))
-	var targets := PROJECTILE.targets_on_segment(from, to, radius, _damageable_nodes())
-	if pierce < targets.size():
-		targets = targets.slice(0, pierce)
-
-	for t in targets:
-		# 穿透的每个目标各抽一次（与近战同一口径：一枪两个敌人可以只有一下暴击）
-		var hit := roll_hit_damage(attack_param("damage", 25.0))
-		var dmg := int(hit["damage"])
-		t.take_damage(dmg)
-		# 「受到攻击也要动」：挨了瞬狙的敌人会朝枪口方向来（远处点名不再毫无反应）
-		if t.has_method("alert_from_attacker"):
-			t.call("alert_from_attacker", global_position)
-		# 受击视觉反馈（白闪+挤压+击退）
-		if t.has_method("play_hit_fx"):
-			t.call("play_hit_fx", global_position)
-		print("[Combat] 狙击命中 %s，造成 %d 伤害%s" % [t.name, dmg,
-				"（暴击）" if bool(hit["crit"]) else ""])
-
-	_spawn_tracer(from, to, cfg)
-	if wall_hit != null or not targets.is_empty():
-		var impact: Vector2 = to if (wall_hit != null or targets.is_empty()) \
-				else (targets[-1] as Node2D).global_position
-		_spawn_ring_at(impact, float(cfg.get("impact_radius", 26.0)),
-				Color(str(cfg.get("impact_color", "#ff9a3d"))))
-		EffectLibrary.spawn(str(cfg.get("fx_impact", "")), get_parent(), impact,
-				facing.angle())
-	if not targets.is_empty():
-		HitStop.pulse(get_tree(), "on_deal_damage")
-	return targets.size()
-
-
-## 曳光：Line2D 从枪口到终点，按 tracer_fade_seconds 淡出后自毁。
-## 挂玩家父层（与弹道同容器），寿命短，不随玩家移动。
-func _spawn_tracer(from: Vector2, to: Vector2, cfg: Dictionary) -> void:
-	var parent := get_parent()
-	if parent == null:
-		return
-	var line := Line2D.new()
-	line.name = "SniperTracer"
-	line.width = float(cfg.get("tracer_width", 2.5))
-	line.default_color = Color(str(cfg.get("tracer_color", "#ffd873")))
-	line.z_index = 40
-	line.antialiased = true
-	parent.add_child(line)
-	line.global_position = from
-	line.add_point(Vector2.ZERO)
-	line.add_point(to - from)
-	var fade := maxf(float(cfg.get("tracer_fade_seconds", 0.18)), 0.05)
-	var tw := line.create_tween()
-	tw.tween_property(line, "modulate:a", 0.0, fade)
-	tw.tween_callback(line.queue_free)
-
-
-## 冲击环（复用 fx_ring），但**挂在世界层并定位到任意点**——
-## 冲击波圆环挂在世界上（全局坐标），狙击命中点在远处也要能定位。
-func _spawn_ring_at(pos: Vector2, radius: float, color: Color) -> void:
-	var parent := get_parent()
-	if parent == null:
-		return
-	var ring: Node2D = FX_RING.new()
-	ring.setup(radius, 0.35, color)
-	parent.add_child(ring)
-	ring.global_position = pos
 
 
 ## 是否是可受伤目标（敌人 / 中立生物）

@@ -8,7 +8,7 @@ extends RefCounted
 ##   · 表里一条 = 一个特效，谁用谁写 id，加角色不改代码；
 ##   · 引用点分三层，各自独立可缺省：
 ##       - 我方出手：combat.weapons.<武器>.fx_attack
-##       - 我方命中：combat.weapons.<武器>.projectile.fx_impact / .hitscan.fx_impact
+##       - 我方命中：combat.weapons.<武器>.projectile.fx_impact
 ##       - 敌人出手：enemy_types.types[].fx_attack
 ##     三层都只是"一个字符串"，指向同一张 fx.effects 表 —— 剑士和巨魔用同一条
 ##     slash 弧只是 modulate 换个色，不用复制素材。

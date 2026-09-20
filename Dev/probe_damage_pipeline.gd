@@ -4,7 +4,7 @@ extends Node
 ##
 ## 起因：DamagePipeline.compute() 的签名一直支持 defense / multipliers / variance，
 ## 但全项目只有两个调用点，而且都只传第一个参数 —— 于是"暴击 / 浮动 / 减防"三件事
-## 是纸面上的蓝图。这次把它们接通：三条玩家攻击路径（近战 / 弹道 / 瞬狙）共用
+## 是纸面上的蓝图。这次把它们接通：两条玩家攻击路径（近战 / 弹道）共用
 ## `player.roll_hit_damage()`，敌人出手走 `enemy.roll_attack_damage()`，
 ## 数值全部来自 config（crit_chance / crit_multiplier / variance），出厂值让它们
 ## 一个数都不变。
@@ -13,16 +13,16 @@ extends Node
 ##   A) 纯函数语义：compute 的减防与保底、roll 的抽样与乘算时机、统计分布。
 ##      ⚠ 必须在进 Main 之前跑 —— 局内有刷怪/寻路 jitter 也在抽随机数，
 ##      那时候按固定种子复现不出确定的抽样序列。
-##   B) 零改动：三条路径在当前**生效配置**下的结果与接通前逐位相同（这条最值钱，
+##   B) 零改动：两条路径在当前**生效配置**下的结果与接通前逐位相同（这条最值钱，
 ##      它证明"接线"没有偷偷改平衡）。
-##   C) 暴击接线：crit_chance=1.0 时近战 / 弹道 / 瞬狙三条都真的乘上了倍率。
+##   C) 暴击接线：crit_chance=1.0 时近战 / 弹道两条都真的乘上了倍率。
 ##   D) 回落链：武器表写了 crit_chance 就盖过 combat.attack（与 damage/range_px 同规矩）。
 ##   E) 敌人侧：出厂 variance=0 恒等裸伤；开浮动后落在区间内且真的在变。
 ##   F) 边界：防守侧减免没被搬走 —— 玩家防御仍在 take_damage 里扣，
 ##      敌人结算出的数字与玩家防多少无关（否则就是双重扣防）。
 ##
 ## 【期望值一律现算，不写死】B/C/D 三段比的是"接通前后逐位相同"，而"接通前的值"
-## 取决于**生效配置** = 基础层 Data/config.json + 用户调参层 user://settings.json。
+## 取决于**生效配置** = 基础层 Data/config/ + 用户调参层 user://settings.json。
 ## 在本机上调试面板早就把剑砍成 24、弓射成 16，写死 25/20 会红得莫名其妙。
 ## 所以每处都先 `attack_param("damage")` 取实际基础值，再按公式推出期望，
 ## 并把这些数打进报告里（数值被调过不是 bug，报告要能看出是被调成什么样的）。
@@ -38,7 +38,7 @@ extends Node
 const OUT := "user://_probe_damage_pipeline.txt"
 const WEAPON_SWORD := &"sword"
 const WEAPON_BOW := &"bow"
-const WEAPON_SNIPER := &"sniper"
+const WEAPON_SPEAR := &"spear"
 
 var _lines: Array = []
 var _fails: Array = []
@@ -198,7 +198,7 @@ func _settle() -> void:
 # ------------------------------------------------------------
 func _section_b() -> void:
 	_say("")
-	_say("--- B 段：出厂配置下三条路径数值不变 ---")
+	_say("--- B 段：出厂配置下两条路径数值不变 ---")
 	if _player == null:
 		_say("   [跳过] 没拿到玩家")
 		return
@@ -235,11 +235,11 @@ func _section_b() -> void:
 
 
 # ------------------------------------------------------------
-# C 段：暴击接进三条攻击路径
+# C 段：暴击接进两条攻击路径
 # ------------------------------------------------------------
 func _section_c() -> void:
 	_say("")
-	_say("--- C 段：crit_chance=1 时近战 / 弹道 / 瞬狙三条都吃到 ---")
+	_say("--- C 段：crit_chance=1 时近战 / 弹道两条都吃到 ---")
 	if _player == null:
 		_say("   [跳过] 没拿到玩家")
 		return
@@ -286,21 +286,6 @@ func _section_c() -> void:
 				% [_expected(base_bow, 1.5), base_bow, int(arrow.damage)])
 		arrow.free()
 
-	# ③ 瞬狙：穿透的两只各抽一次（chance=1 ⇒ 都是暴击）
-	_prep(WEAPON_SNIPER)
-	var base_snipe: float = _player.attack_param("damage", -1.0)
-	_player.facing = Vector2.RIGHT
-	var muzzle: Vector2 = _player.global_position + Vector2(34, 0)
-	var s1: FakeTarget = _spawn_target(muzzle + Vector2(80, 0))
-	var s2: FakeTarget = _spawn_target(muzzle + Vector2(140, 2))
-	var hits := int(_player.fire_hitscan())
-	_check(hits == 2, "瞬狙命中 2 只（pierce=2，实得 %d）" % hits)
-	_check(s1.taken.size() == 1 and int(s1.taken[0]) == _expected(base_snipe, 1.5),
-			"瞬狙第一只吃暴击：%.0f×1.5 = %.0f（实得 %s）"
-			% [base_snipe, _expected(base_snipe, 1.5), str(s1.taken)])
-	_check(s2.taken.size() == 1 and int(s2.taken[0]) == _expected(base_snipe, 1.5),
-			"穿透第二只同样 %.0f（实得 %s）" % [_expected(base_snipe, 1.5), str(s2.taken)])
-
 	# 独立性：同一个入口连调 200 次，概率 0.5 时两种结果都得出现
 	Config.set_override("combat.attack.crit_chance", 0.5)
 	_prep(WEAPON_SWORD)
@@ -325,22 +310,22 @@ func _section_d() -> void:
 	if _player == null:
 		_say("   [跳过] 没拿到玩家")
 		return
-	# 全局 100% 暴击，弓自己写 0% → 弓回到裸基础值；强弩没写 → 照吃全局暴击
+	# 全局 100% 暴击，弓自己写 0% → 弓回到裸基础值；枪手没写 → 照吃全局暴击
 	Config.set_override("combat.attack.crit_chance", 1.0)
 	Config.set_override("combat.weapons.bow.crit_chance", 0.0)
 	_prep(WEAPON_BOW)
 	var d_bow: float = _player.attack_param("damage", -1.0)
 	_check(int(_player.roll_hit_damage(d_bow)["damage"]) == _expected(d_bow),
 			"弓写了 crit_chance=0 → 盖过全局 1.0，仍是裸伤 %.0f" % _expected(d_bow))
-	_prep(WEAPON_SNIPER)
-	var d_snipe: float = _player.attack_param("damage", -1.0)
-	_check(int(_player.roll_hit_damage(d_snipe)["damage"]) == _expected(d_snipe, 1.5),
-			"强弩没写 → 吃全局 1.0 暴击：%.0f×1.5 = %.0f" % [d_snipe, _expected(d_snipe, 1.5)])
-	Config.set_override("combat.weapons.sniper.crit_chance", 0.0)
-	_check(int(_player.roll_hit_damage(d_snipe)["damage"]) == _expected(d_snipe),
-			"强弩补写 0 之后回落到裸伤 %.0f（按武器配是纯配置活）" % _expected(d_snipe))
+	_prep(WEAPON_SPEAR)
+	var d_spear: float = _player.attack_param("damage", -1.0)
+	_check(int(_player.roll_hit_damage(d_spear)["damage"]) == _expected(d_spear, 1.5),
+			"枪手没写 → 吃全局 1.0 暴击：%.0f×1.5 = %.0f" % [d_spear, _expected(d_spear, 1.5)])
+	Config.set_override("combat.weapons.spear.crit_chance", 0.0)
+	_check(int(_player.roll_hit_damage(d_spear)["damage"]) == _expected(d_spear),
+			"枪手补写 0 之后回落到裸伤 %.0f（按武器配是纯配置活）" % _expected(d_spear))
 	Config.clear_override("combat.weapons.bow.crit_chance")
-	Config.clear_override("combat.weapons.sniper.crit_chance")
+	Config.clear_override("combat.weapons.spear.crit_chance")
 	# 浮动同样能按武器配
 	Config.set_override("combat.attack.crit_chance", 0.0)
 	Config.set_override("combat.weapons.sword.variance", 0.2)

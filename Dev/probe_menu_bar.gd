@@ -197,7 +197,7 @@ func _ready() -> void:
 
 	_say("--- C2 段：右侧噪音表（控件层面）---")
 	NoiseSystem.reset()
-	NoiseSystem.emit(p.global_position, 240.0, true, p)   # 强弩一发 = 240
+	NoiseSystem.emit(p.global_position, 240.0, true, p)   # 接近 self.max(300) 的一声
 	await _frames(3)
 	_check(menu._cur_bar.value > 200.0, "「自身」条跟着噪音走（条值 %.0f / 满值 %.0f）"
 			% [menu._cur_bar.value, menu._cur_bar.max_value])
@@ -220,10 +220,10 @@ func _ready() -> void:
 			% [want.size(), menu.command_button_ids().size(), str(menu.command_button_ids())])
 	# 换武器 = 换威胁/射程/贴图，指令集不变但单位信息跟着变（这里只验数值随武器走）
 	var rng_before: float = p.attack_range_px()
-	p.switch_weapon(&"sniper")
+	p.switch_weapon(&"bow")
 	await _frames(3)
 	_check(p.attack_range_px() != rng_before,
-			"换单位（武器）后攻击距离跟着变（剑 %.0f → 强弩 %.0f）"
+			"换单位（武器）后攻击距离跟着变（剑 %.0f → 弓 %.0f）"
 			% [rng_before, p.attack_range_px()])
 	p.switch_weapon(&"sword")   # 注意是武器 id，不是角色 id
 	await _frames(3)
@@ -360,8 +360,8 @@ func _ready() -> void:
 	_say("--- G 段：指令面板跟着「当前选中的人」换 ---")
 	main._enter_base()
 	await _frames(5)
-	# 二号位用名单里真的有的角色：强弩 2026-09-17 已从 characters.list 移除，
-	# 拿它组队会被 _squad_characters() 按名单过滤掉（剩 1 人），那不是面板的问题。
+	# 二号位用名单里真的有的角色：不在 characters.list 里的 id 会被
+	# _squad_characters() 按名单过滤掉（剩 1 人），那不是面板的问题。
 	main._on_launch([{"id": "archer", "name": "弓兵"}, {"id": "swordsman", "name": "剑士"}])
 	await _frames(40)
 	var squad := get_tree().get_nodes_in_group("player")

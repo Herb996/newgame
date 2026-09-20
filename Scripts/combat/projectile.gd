@@ -8,7 +8,7 @@ extends Node2D
 ##
 ## 设计上刻意**不新增物理层**：碰撞层/掩码是全局约定，为一个弹道去改容易牵动
 ## 敌人、动物、瓦片三层。这里沿用工程里已有的两套现成做法：
-##   · 打谁  —— 与 `player._damageable_nodes()` 同思路，直接遍历 enemies/animals 组；
+##   · 打谁  —— 直接遍历 enemies/animals 两个组（与 player 的近战判定同一套分组）；
 ##   · 撞墙  —— 与 A* 同思路，直接查 `map` 生成的 `walls` 格子表。
 ## 两者都是纯数据判定，**可在无头环境下逐帧断言**，不依赖物理服务器。
 ##
@@ -191,43 +191,3 @@ static func nearest_target_on_segment(from: Vector2, to: Vector2, radius: float,
 			best_d = d
 			best = n
 	return best
-
-
-## 【瞬狙用】线段上第一个被墙挡住的采样点；没有墙则返回 null。
-## 与 segment_hits_wall 相同的半格采样密度 —— 大步长也不会跳过一整格。
-static func first_wall_point(p_walls: Array, p_tile: int,
-		from: Vector2, to: Vector2):
-	if p_walls.is_empty() or p_tile <= 0:
-		return null
-	var seg := to - from
-	var dist := seg.length()
-	if dist <= 0.0001:
-		return to if is_blocked(p_walls, p_tile, to) else null
-	var n := maxi(1, int(ceil(dist / maxf(float(p_tile) * 0.5, 1.0))))
-	for i in range(1, n + 1):
-		var p := from + seg * (float(i) / float(n))
-		if is_blocked(p_walls, p_tile, p):
-			return p
-	return null
-
-
-## 【瞬狙用】线段半径内的**全部**目标，按「沿射线的先后」排序（先挡枪线的先中）。
-## 与 nearest_target_on_segment 的差别：那个只取最近一个（箭），这个要支持穿透。
-static func targets_on_segment(from: Vector2, to: Vector2, radius: float,
-		nodes: Array) -> Array:
-	var dir := to - from
-	var len2 := maxf(dir.length_squared(), 0.0001)
-	var out: Array = []      # [{node, along}]
-	for n in nodes:
-		if not is_instance_valid(n) or not (n is Node2D):
-			continue
-		var npos: Vector2 = (n as Node2D).global_position
-		var closest := Geometry2D.get_closest_point_to_segment(npos, from, to)
-		if npos.distance_to(closest) > radius:
-			continue
-		out.append({"node": n, "along": (closest - from).dot(dir) / len2})
-	out.sort_custom(func(a, b): return float(a["along"]) < float(b["along"]))
-	var nodes_only: Array = []
-	for e in out:
-		nodes_only.append(e["node"])
-	return nodes_only

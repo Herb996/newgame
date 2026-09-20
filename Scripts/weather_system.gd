@@ -13,7 +13,7 @@ extends Node
 ## 自动销毁；WeatherSystem 本体与它名下的音频播放器持久存活，故 deactivate 里要
 ## 显式 stop 雨声、并把雨湿地面层的 ViewportTexture 参数换回占位图防 stale 采样。
 ##
-## 数值全部来自 Data/config.json 的 weather 节（项目铁律：脚本零硬编码）。
+## 数值全部来自 Data/config/ 的 weather 节（项目铁律：脚本零硬编码）。
 ## 踩水触发节奏复用 noise.footstep_interval_seconds（见 player_move_state.gd）。
 ##
 ## 2026-09-19 按用户裁定整段重做：**取消"水洼"概念**。只要下雨，草地/森林的
