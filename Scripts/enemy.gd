@@ -146,6 +146,7 @@ var _attack_range := 52.0          # 出手距离 px；必须 > 分离层把敌�
 var _attack_cd_seconds := 1.0
 var _attack_windup := 0.18         # 前摇：出手后多久结算伤害
 var _attack_min_dur := 0.3         # 攻击动作保底时长（无攻击帧的兵种也用得上）
+var _attack_variance := 0.0        # 每刀伤害的随机浮动幅度（0.1 = ±10%）；0 = 每刀一个数
 var _attack_hit_at := 0.0          # >0 = 这一刀已出手还在前摇，归零时结算（挥空也要走完）
 var _fx_attack := ""               # 出手特效 id（_apply_type 里算一次：兵种没写就用
                                    # enemy.attack.fx_attack 那条默认；空串 = 不放）
@@ -572,6 +573,9 @@ func _apply_numeric(type_cfg: Dictionary) -> void:
 	_attack_cd_seconds = float(atk.get("cooldown_seconds", 1.0))
 	_attack_windup = float(atk.get("windup_seconds", 0.18))
 	_attack_min_dur = float(atk.get("min_duration_seconds", 0.3))
+	# 伤害浮动同样是全局档（不像 range_px 能按兵种覆盖）：250 只怪各调一个浮动区间
+	# 只会让"这只打得疼"变成读不出原因的噪声。
+	_attack_variance = float(atk.get("variance", 0.0))
 	# 出手特效：兵种写了专属 id 用专属的，写空串（或没写）都回落到 enemy.attack.fx_attack。
 	# 与上面几项一样放在 _body 判空之前：无 Body 的假敌人/探针也要能读到。
 	var type_fx := str(type_cfg.get("fx_attack", ""))
@@ -1708,6 +1712,14 @@ func _start_attack() -> void:
 	_attack_hit_at = _attack_windup
 
 
+## 这一刀落地的伤害。走 DamagePipeline（与玩家三条攻击路径同一条算式），
+## 目前只用到「随机浮动」那一档，`enemy.attack.variance` 出厂 0 ⇒ 与旧写法逐位相同。
+## 刻意不给敌人配暴击：玩家侧没有"敌人暴击"的语义，凭空冒出来的大数字只是噪声。
+## 玩家的防御也**不在这里**扣（谁防守谁知道，见 Scripts/combat/damage_pipeline.gd 头注释）。
+func roll_attack_damage() -> int:
+	return DamagePipeline.compute(float(damage), 0.0, [], _attack_variance)
+
+
 ## 前摇结束：这一刀落地。玩家已经跑出射程就是挥空（动作和冷却照旧不回收）。
 ## 这里刻意**不发噪音**：250 个敌人同时挥砍会把噪音系统刷爆，波及范围毫无意义。
 func _deal_attack_damage() -> void:
@@ -1718,4 +1730,4 @@ func _deal_attack_damage() -> void:
 		return
 	if global_position.distance_to(p.global_position) > _attack_range:
 		return
-	p.take_damage(damage, global_position)
+	p.take_damage(roll_attack_damage(), global_position)

@@ -694,6 +694,24 @@ func trait_damage(base: float) -> float:
 	return base + trait_flat("attack") - supply_penalty("attack")
 
 
+## 一次命中的完整结算（近战 / 弹道 / 瞬狙三条路径共用同一个抽法）。
+## 返回 {damage:int, crit:bool}。
+##
+## 三个参数全部走 `attack_param()` 的「武器表 → combat.attack」回落链，所以
+## 「只给强弩加暴击」这件事是纯配置活（`combat.weapons.sniper.crit_chance`），
+## 不用碰这段代码 —— 与 damage/range_px/arc_degrees 完全同一套规矩。
+##
+## 出厂 crit_chance=0、variance=0 ⇒ 恒等于 `int(trait_damage(base))`，
+## 接这条管线本身不改变任何现有数值。
+## 目标的减免**不在这里算**（玩家防御、敌人血量越低越硬都留在各自 take_damage），
+## 理由见 Scripts/combat/damage_pipeline.gd 的头注释。
+func roll_hit_damage(base: float) -> Dictionary:
+	return DamagePipeline.roll(trait_damage(base), 0.0,
+			attack_param("crit_chance", 0.0),
+			attack_param("crit_multiplier", 1.5),
+			attack_param("variance", 0.0))
+
+
 # ------------------------------------------------------------
 # 背包层：每人一份（拾取归属、生存消耗、弹窗展示都只认这一份）
 # ------------------------------------------------------------
@@ -1101,7 +1119,6 @@ func resolve_attack_hit() -> void:
 	if hitbox == null or attack_kind() != "melee":
 		return
 	var max_targets := int(attack_param("max_targets", 3.0))
-	var base_damage := trait_damage(attack_param("damage", 25.0))
 	var half_arc := deg_to_rad(attack_param("arc_degrees", 200.0)) * 0.5
 	var hits := 0
 	for area in hitbox.get_overlapping_areas():
@@ -1118,7 +1135,9 @@ func resolve_attack_hit() -> void:
 				continue
 		_hit_targets[area] = true
 		hits += 1
-		var dmg := DamagePipeline.compute(base_damage)
+		# 每个目标各抽一次：一剑砍中三个敌人完全可以只有一下冒暴击
+		var hit := roll_hit_damage(attack_param("damage", 25.0))
+		var dmg := int(hit["damage"])
 		area.take_damage(dmg)
 		# 「受到攻击也要动」（用户 2026-09-17）：把攻击者位置告诉它，它自己转调查朝我走来。
 		# 用 has_method 而不是硬调：命中目标可能是动物（另一个脚本），它没有这个方法。
@@ -1131,7 +1150,7 @@ func resolve_attack_hit() -> void:
 		var spark := fx_hit_id()
 		if spark != "":
 			EffectLibrary.spawn(spark, get_parent(), area.global_position)
-		print("[Combat] 命中 %s，造成 %d 伤害" % [area.name, dmg])
+		print("[Combat] 命中 %s，造成 %d 伤害%s" % [area.name, dmg, "（暴击）" if bool(hit["crit"]) else ""])
 	if hits > 0:
 		# 一次挥击只顿一下（不是每中一个目标各顿）：多目标同帧命中在真实时间里仍是同一瞬
 		HitStop.pulse(get_tree(), "on_deal_damage")
@@ -1162,7 +1181,10 @@ func fire_projectile() -> bool:
 	p.name = "Projectile"
 	parent.add_child(p)
 	p.global_position = global_position + facing * float(cfg.get("muzzle_offset_px", 22.0))
-	p.setup(cfg, facing, int(trait_damage(attack_param("damage", 20.0))), _walls, _tile_size)
+	# 出膛那一帧就把这一发结算完（含暴击/浮动各抽一次）：弹道节点只搬运一个算好的整数，
+	# 不在命中帧回头找射手要武器参数 —— 它可能射出视野、射手可能已经换了武器。
+	var hit := roll_hit_damage(attack_param("damage", 20.0))
+	p.setup(cfg, facing, int(hit["damage"]), _walls, _tile_size)
 	return true
 
 
@@ -1171,7 +1193,7 @@ func fire_projectile() -> bool:
 ##   1. 射线 = 枪口 → 枪口 + facing * max_distance_px；
 ##   2. first_wall_point 截断到第一个墙点（子弹打不穿墙）；
 ##   3. targets_on_segment 按沿线先后取前 pierce 个（穿透）；
-##   4. 每个目标走 DamagePipeline（与近战/箭同一条减伤管线）；
+##   4. 每个目标走 roll_hit_damage（与近战/箭同一个入口，各自抽一次暴击）；
 ##   5. 表现 = Line2D 曳光（淡出自毁）+ 命中点 fx_ring。
 ## 全部判定都是纯数据（无物理查询），无头探针可逐项断言。
 func fire_hitscan() -> int:
@@ -1200,9 +1222,10 @@ func fire_hitscan() -> int:
 	if pierce < targets.size():
 		targets = targets.slice(0, pierce)
 
-	var base_damage := trait_damage(attack_param("damage", 25.0))
 	for t in targets:
-		var dmg := DamagePipeline.compute(base_damage)
+		# 穿透的每个目标各抽一次（与近战同一口径：一枪两个敌人可以只有一下暴击）
+		var hit := roll_hit_damage(attack_param("damage", 25.0))
+		var dmg := int(hit["damage"])
 		t.take_damage(dmg)
 		# 「受到攻击也要动」：挨了瞬狙的敌人会朝枪口方向来（远处点名不再毫无反应）
 		if t.has_method("alert_from_attacker"):
@@ -1210,7 +1233,8 @@ func fire_hitscan() -> int:
 		# 受击视觉反馈（白闪+挤压+击退）
 		if t.has_method("play_hit_fx"):
 			t.call("play_hit_fx", global_position)
-		print("[Combat] 狙击命中 %s，造成 %d 伤害" % [t.name, dmg])
+		print("[Combat] 狙击命中 %s，造成 %d 伤害%s" % [t.name, dmg,
+				"（暴击）" if bool(hit["crit"]) else ""])
 
 	_spawn_tracer(from, to, cfg)
 	if wall_hit != null or not targets.is_empty():

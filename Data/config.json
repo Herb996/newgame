@@ -652,6 +652,8 @@
       "cooldown_seconds": 1.0,
       "windup_seconds": 0.18,
       "min_duration_seconds": 0.3,
+      "_note_variance": "variance = 每刀伤害的随机浮动幅度（0.1 = ±10%），出厂 0 ⇒ 每刀一个准数。刻意做成**全局档**、不像 range_px 那样能按兵种覆盖：250 只怪各调一个浮动区间，只会让「这只打得疼」变成读不出原因的噪声。玩家的防御不在这里扣（谁防守谁知道，见 Scripts/combat/damage_pipeline.gd 的头注释），所以这一刀被完全挡下时敌人照样进冷却、照样播动作。",
+      "variance": 0.0,
       "fx_attack": "slash_claw"
     },
     "knockback_px": 32.0,
@@ -938,6 +940,10 @@
       "range_px": 120.0,
       "arc_degrees": 200,
       "max_targets": 3,
+      "_comment_damage": "伤害结算三件套（2026-09-20 接通 DamagePipeline，详见 DESIGN.md §5.8）：crit_chance = 每次**命中**抽中暴击的概率（0.15 = 15%；一剑砍中三个敌人是三次独立抽样，不是起手定一次），crit_multiplier = 抽中时的倍率，variance = 随机浮动幅度（0.1 = ±10%，最后向下取整）。三项都能在武器表里按武器覆盖（combat.weapons.<武器>.crit_chance），没写就回落这里的全局值 —— 与 damage/range_px/arc_degrees 同一套回落链。出厂 crit_chance 与 variance 都是 0 ⇒ 一刀一个准数，与接通之前逐位相同：接这条管线的意义是把旋钮摆出来（配合 F9 调试栏现场试），不是改平衡。",
+      "crit_chance": 0.0,
+      "crit_multiplier": 1.5,
+      "variance": 0.0,
       "fx_hit": "spark_hit",
       "fx_hit_comment": "fx_hit = 我方近战**砍中目标**时在身上放的星芒（武器自己写了 fx_hit 就听武器的）。出手那一刀的弧光是另一件事，写在 combat.weapons.<武器>.fx_attack。"
     },

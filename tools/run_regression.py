@@ -87,6 +87,15 @@ SUITES = [
     # 跟着重算、出厂层与 user://settings.json 一个字节都不许被写脏、
     # clear_override 剪空壳字典（否则「已改 N 项」虚报）。S9 窗口实拍段无头会自己跳过。
     ("Dev/probe_stat_panel.tscn", "_r_statpanel.log", ("[Probe]",)),
+    # 2026-09-20 伤害管线接通（暴击 / 浮动 / 减防不再是纸面蓝图）。守四件事：
+    # ① 出厂 crit_chance=0、variance=0 时三条玩家路径（近战真实 Area2D 重叠 / 弹道出膛
+    #    结算 / 瞬狙穿透）与敌人 roll 逐位等于接通前的值 —— 接线不许偷偷改平衡；
+    # ② crit_chance=1 时三条路径真的各吃到 ×倍率，且一次挥击多个目标各抽一次；
+    # ③ 回落链：武器表写 crit_chance/variance 盖过 combat.attack（按武器配是纯配置活）；
+    # ④ 边界：玩家防御仍在 take_damage 里扣、敌人结算值与玩家防多少和距离无关
+    #    （搬到攻击侧就会出现"要扣血才决定砍不砍"的倒置）。
+    # 期望值一律由**生效配置**现算，所以 user://settings.json 里调过剑/弓伤害也不会假红。
+    ("Dev/probe_damage_pipeline.tscn", "_r_dmgpipe.log", ("[DmgProbe]",)),
 ]
 
 BAD_MARKS = ("SCRIPT ERROR", "Parse Error", "Invalid call", "Invalid access",

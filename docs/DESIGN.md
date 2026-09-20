@@ -261,6 +261,7 @@
 - 设计上**观察视野应大于攻击距离**（先发现、再等目标进入射程）；即便配反了也不会打到视野外——有效射程一律取较小值。
 
 - 通用兜底 `combat.attack`：dmg25 / 120px / 200° / 3 目标 / windup0.12 active0.08 recovery0.2 / `cancel_window 0.08`（武器表缺项回落；武器表空＝退回单武器行为）。
+- 伤害管线三档（2026-09-20 接通，见 §5.8）：`crit_chance 0.0` / `crit_multiplier 1.5` / `variance 0.0`。**出厂值 ⇒ 一条都不改变数值**（不抽暴击、不浮动）；三个键与 damage/range_px 同一套回落规矩，武器表写同名键就盖过全局（`combat.weapons.sniper.crit_chance` ⇒ 只有强弩暴击）。
 - 弓箭矢（`bow.projectile`）：`speed 900`、`max_distance 640`、`hit_radius 16`、`muzzle_offset 22`、texture `arrow.png`。
 - 强弩（`sniper.hitscan`）：`max_distance 900`、`hit_radius 18`、`pierce 2`、`muzzle 34`、`tracer_width 2.5`(#ffd873, fade 0.18)、`impact_radius 26`(#ff9a3d)；角色帧 `blue_crossbowman/`（弩已烘焙进帧，2026-09-17 弃用挂点）。
 - 闪避 `combat.dodge`：`duration 0.22` / `speed×3.0` / 无敌 / `cooldown 0.8`。
@@ -270,7 +271,7 @@
 |---|---|
 | `enemy.count` | 100（距玩家 ≥20 格生成）|
 | `enemy.max_hp` / `contact_damage` | 40 / 10（兵种 `damage` 覆盖）|
-| `enemy.attack` | `range_px 52` / `cooldown_seconds 1.0` / `windup_seconds 0.18` / `min_duration_seconds 0.3`；兵种可用 `attack_range_px` 覆盖射程 |
+| `enemy.attack` | `range_px 52` / `cooldown_seconds 1.0` / `windup_seconds 0.18` / `min_duration_seconds 0.3` / `variance 0.0`（出手伤害浮动 ±%，走同一条 `DamagePipeline`；**刻意是全局键、不分兵种**，兵种要差异化请另加键）；兵种可用 `attack_range_px` 覆盖射程 |
 | `enemy.speed` / `chase_speed_multiplier` | 360 / ×1.35 |
 | `enemy.knockback_px` | 32 |
 | `enemy.vision_cells` / `blocked_by_walls` / `los_step` | 10 / true / 0.35 |
@@ -327,6 +328,7 @@
 - **河流：已彻底删除**。`_place_water` 及全部辅助函数（`_pick_water_start`/`_grow_river`/`_grow_lake`/`_water_ok`/`_enforce_water_sizes`）与 `generate()` 里的调用均已移除，`map.river` 只剩 `slow`（涉水减速系数，供 `speed_mult` 兜底，无水源时不触发）。`DECOR_WATER` 类型与水面渲染仍保留，但已无任何逻辑生成水格 → 地图无水。
 - **裂缝：已删除**（`map.crack.enabled=false`，`generate()` 不再调用裂缝绘制）。
 - 观感：`grade.enabled=false`（对比 1.12/饱和 0.92 待启用）；`macro_light.enabled=true`（freq 0.013 strength 0.1）；`decor.density 1.05`、`clear_spawn 3` 格、`shadow=true`、`decor_collision.enabled=true`；`nav.snap_radius 3 / unstick 4`。
+  - **落地投影**（`decor.shadow`）：给每个立体装饰物（树/石）脚下生成一张椭圆软影，由 `map_generator.gd` 的 `_decor_shadow_texture` 生成，形状/浓淡统一由三个常量 `SHADOW_W_RATIO`（影宽=物件宽×比例）/ `SHADOW_H_RATIO`（影高=影宽×比例）/ `SHADOW_ALPHA`（中心最大不透明度）控制——运行时与预览 `_blend_shadow` 共用同一组，改这一处即全图生效。碎石/灌木（`DECOR_NO_SHADOW`）、裂缝/河水（`DECOR_FLAT`）贴地不投影。当前 `0.60 / 0.28 / 0.22`（原 `0.80/0.34/0.42` 太浓、树影糊成黑斑，2026-09-20 收敛）。
 - **地图资源成簇**（`map.resource_clusters`，替代旧 `map.veins`）：`{ total, types }`——`total` = 全图 4 种加起来的总簇数；每类型 `tree/rock/iron/oil` 含 `share`（占总数比例）、`min_size`/`max_size`（每簇大小随机区间）、`biome_weight{0草/1荒/2林/3沼}`（该类型在各群系的分布比例，0=不出）。`_place_clustered_resources` 先按 `share` 把 `total` 分给各类型、再按 `biome_weight` 分到各群系、每簇大小在 `[min,max]` 随机、凑不够整簇丢弃。树/石写进 `decor`（阻挡）；铁/油追加进 `veins`（可采集）。默认：`total=100`，树 share40 min6 max16 {草3荒1林6}、石 share25 min3 max8 {草2荒6林2}、铁 share20 min3 max8 {草1荒8林1}、油 share15 min2 max5 {草1荒1林1}，沼泽均 0。最小值调大即避免"过小的碎簇/被夹的小簇"。
 - **灌木/碎石**：仍按 `map.decor.density` + 群系 `bush/pebble` 概率逐格点缀撒（不参与上面的成簇比例）。**金币不再作为地图矿脉**（仅可能从 loot 拾取/敌人掉落获得）。
 - **资源**（`resources`）：
@@ -390,7 +392,7 @@
 ## 5. 机制系统
 
 ### 5.1 仇恨 / 敌人 AI 状态机（`enemy.gd` + `combat/states/enemy_*`）
-- **仅 3 态**：`patrol` / `investigate` / `chase`。**无 idle/attack 状态**——「攻击」＝`enemy.gd::_tick_attack()` 每物理帧问一次「圆心距 ≤ `attack.range_px(52)`？」，是则 `_start_attack()`：置 `_attack_timer`（挥击帧时长 = 帧数/帧率，无攻击帧的兵种用 `min_duration_seconds(0.3)` 保底并退化成 WALK）+ 进 `cooldown_seconds(1.0)` + 起 `windup_seconds(0.18)` 前摇，前摇走完才 `_deal_attack_damage()`（此时玩家已跑出射程 = 挥空，但动作与冷却**不回收**）。非 FSM 节点。追击态进了射程会**主动停步**（`EnemyChaseState` 里 `clear_move_target()`），否则边走边挥会让动作下一帧就被 walk 覆盖。
+- **仅 3 态**：`patrol` / `investigate` / `chase`。**无 idle/attack 状态**——「攻击」＝`enemy.gd::_tick_attack()` 每物理帧问一次「圆心距 ≤ `attack.range_px(52)`？」，是则 `_start_attack()`：置 `_attack_timer`（挥击帧时长 = 帧数/帧率，无攻击帧的兵种用 `min_duration_seconds(0.3)` 保底并退化成 WALK）+ 进 `cooldown_seconds(1.0)` + 起 `windup_seconds(0.18)` 前摇，前摇走完才 `_deal_attack_damage()`（此时玩家已跑出射程 = 挥空，但动作与冷却**不回收**）。交出去的那个数来自 `roll_attack_damage()` —— 与玩家三条路径同一条 `DamagePipeline`，只吃 `enemy.attack.variance`（出厂 0 ⇒ 恒等于兵种裸伤）；**玩家防多少与它无关**，固定减免在 `player.take_damage()` 里扣（§5.8 的攻击侧/防守侧切分）。非 FSM 节点。追击态进了射程会**主动停步**（`EnemyChaseState` 里 `clear_move_target()`），否则边走边挥会让动作下一帧就被 walk 覆盖。
 - 转换：`patrol→chase`＝`can_see_player()`；`patrol→investigate`＝`alertness ≥ investigate(30)`；`investigate→chase`＝看见玩家，或 `alertness ≥ combat(70)` 用追击速度「狂暴」；`investigate→patrol`＝`alertness < suspicious(15)` 放弃。⚠ suspicious/combat 不产生独立状态，只作 tint 与速度/放弃下限。config 实际阈值 15/30/70（代码硬编码回退 20/50/100 已被覆盖）。
 - `can_see_player`：距离 `vision_cells(10) × tile(64) ≈ 640px`；墙遮挡沿线段按 `los_step 0.35` 采样墙格；玩家死亡看不见。
 - 跟丢：`chase` 累计看不到 > `lose_sight_seconds(3.0)` → 把最后已知位置当声源，`alertness ≥ 30` 进 investigate 否则回 patrol（不透视实时追）。
@@ -645,11 +647,19 @@
 - 输入：左键 = `command_click(世界坐标)`（待点选时＝点敌/点地，否则＝移动/路由到小地图）；右键**没命中角色**时 = `cancel_commands()`（点在角色身上那一下被背包弹窗先吃掉，§5.11）；ESC = 仅退出待点选模式（**不再吞整局 ESC**；弹窗开着时那一下归弹窗）。
 
 **三种分型的判定**
-- **melee**（`player_attack_state` + `resolve_attack_hit`）：WINDUP→ACTIVE→RECOVERY；ACTIVE 每帧取 Hitbox `get_overlapping_areas()`，`arc 200°`(半角 100° 过滤)、`max_targets 3` 去重、`range 120`=Hitbox 半径；伤害经 `DamagePipeline.compute`（当前无暴击/减伤/浮动≈原值）。
-- **ranged**（`fire_projectile` + `combat/projectile.gd`）：ACTIVE 进入瞬间发一次；命中＝点到本帧飞行线段最近距 ≤ `hit_radius 16`（防穿透与步长无关），撞墙按 ≤ 半格采样，命中优先于撞墙。
-- **hitscan**（`fire_hitscan`，出枪同帧）：射线枪口→+facing×`900`；`first_wall_point` 半格采样截断到首墙；沿线取前 `pierce 2` 个；每个 `DamagePipeline`；Line2D 曳光 + 命中点 fx_ring。
+- **melee**（`player_attack_state` + `resolve_attack_hit`）：WINDUP→ACTIVE→RECOVERY；ACTIVE 每帧取 Hitbox `get_overlapping_areas()`，`arc 200°`(半角 100° 过滤)、`max_targets 3` 去重、`range 120`=Hitbox 半径；**每个目标各调一次** `player.roll_hit_damage()`（见下）。
+- **ranged**（`fire_projectile` + `combat/projectile.gd`）：ACTIVE 进入瞬间发一次；**出膛那一帧就结算完**（含暴击/浮动各抽一次），弹道节点只搬运一个算好的整数，不在命中帧回头找射手要武器参数（它可能射出视野、射手可能已经换了武器）；命中＝点到本帧飞行线段最近距 ≤ `hit_radius 16`（防穿透与步长无关），撞墙按 ≤ 半格采样，命中优先于撞墙。
+- **hitscan**（`fire_hitscan`，出枪同帧）：射线枪口→+facing×`900`；`first_wall_point` 半格采样截断到首墙；沿线取前 `pierce 2` 个；每个目标各走一次 `player.roll_hit_damage()`；Line2D 曳光 + 命中点 fx_ring。
 - `combat.attack` 与 `combat.weapons.*` 回退：先查当前武器字典，缺键回落 `combat.attack`；`kind` 缺省 melee。
 - `input.buffer 0.25`：闪避等输入预输入入队，idle/move 态 consume（攻击已无键位）。
+
+**伤害结算管线（`combat/damage_pipeline.gd`，2026-09-20 真正接通）**
+- 公式：`FinalDmg = floor((Base × Π 修饰器 − Defense) × RandomVariance)`，最低 1 点保底；`Defense ≥ Base` 时返回 **0**（完全挡下不是 1 点）。纯静态函数、不读配置，所以探针能拿固定种子复现抽样序列。
+- 三个入口：`compute()` 通用结算；`roll()` 抽一次暴击并结算，返回 `{damage, crit}`（`crit` 是给表现层的钩子，结算本身用不到）；玩家侧统一走 `player.roll_hit_damage(base)`，它把 `trait_damage()` 的结果当基础值，三个参数全从 `attack_param()` 取 ⇒ **"只给强弩加暴击"是纯配置活**。
+- **必须每次命中各抽一次**（`roll()` 不是"起手时算好的常数"）：一剑砍三个敌人 = 三次抽样，完全可以只有一下冒红字。所以近战与瞬狙都在目标循环**内部**抽，只有弹道是"出膛即定"（那一发已经离开了射手）。
+- 特性与短缺在管线**之前**：`trait_damage(base) = base + trait_flat("attack") − supply_penalty("attack")`，进的是基础值而不是结算后的数。
+- **【边界：只管攻击侧】** 管线里只有攻击方自己知道的那几件事（基础伤害、暴击乘算、随机浮动）。**防守侧的减免留在被守的一方**：玩家固定防御在 `player.take_damage()` 里扣；敌人"血越少越硬"（爆裂鼓手）与"分身越多越硬"在 `enemy.incoming_damage()` 里扣。这条切分不是偷懒而是必须 —— 敌人 `_deal_attack_damage()` 算完伤害就交出去，玩家挡不挡住都得照样进冷却、照样播动作（用户 2026-09-19 定的，§5.1）；把玩家防御搬到攻击方结算，就会出现「要扣血才决定砍不砍」的倒置。`compute()` 仍保留 `defense` 形参，那是给"护甲值攻击方已知"的目标留的入口。
+- 守卫：`Dev/probe_damage_pipeline.tscn` **43 项**（A 纯函数语义与统计分布 / B 生效配置下三条路径逐位不变 / C `crit_chance=1` 时近战·弹道·瞬狙真的各吃到倍率 / D 武器表盖过全局 / E 敌人侧浮动 / F 防守侧解耦）。⚠ 期望值一律由**生效配置**（基础层 + `user://settings.json` 调参层）现算，写死出厂数会让面板调过数值之后的第一次回归假红。
 
 ### 5.10 角色等级 / 名册（`progression` 段，2026-09-17 用户定）
 
