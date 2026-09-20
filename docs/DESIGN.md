@@ -205,7 +205,7 @@
 
 ### 3.4 调试开关（真相：config + `--` 并存，见 §0.3）
 - config `debug.*`（当前出厂）：`auto_enter_run=true`（菜单进游戏时被覆盖为 false）、`time_scale=20.0`、`log_state_transitions=false`、`smoke_test/flow_test=false`、`map_preview=""`(配 `map_preview_cells=128`/`_scale=0.125`)、`main3d_*`（仅 3D 线消费）。`time_scale` / `log_state_transitions` / `auto_enter_run` 亦挂设置面板「调试」页可改。
-- CLI：`--seed`（压 `map.force_seed`）/ `--preview-map` / `--capture2d` / `--dump-atlas` / `--dump-biome` / `--zoom` / `--soak*` / `--weapon bow|sword|sniper` / `--no-fog` / `--no-macro` / `--menu-*`。
+- CLI：`--seed`（压 `map.force_seed`）/ `--preview-map` / `--capture2d` / `--dump-atlas` / `--dump-biome` / `--zoom` / `--soak*` / `--weapon bow|sword` / `--no-fog` / `--no-macro` / `--menu-*`。
 - ⚠ **`debug.smoke_test` / `flow_test` / `map_preview` 会劫持整个进程**：`main3d.gd::_ready` 里这三条各自启动一段自检后 `return`，自检末尾 `get_tree().quit(失败数?1:0)`。⇒ 任何 `load("res://Scenes/Main3D.tscn")` 的探针都会被中途杀掉（自己的汇总永远打不出来，EXIT 反映的是 FlowTest 而不是本探针）。**探针必须自己 `Config.set_override` 钉成 false/""**（已这么做的：`probe_zoom.gd`、`probe_zoom_shot.gd`），别指望 config 里恰好是对的。同一原因反过来也咬人：这几个键留在 `true` 时，玩家正常开局跑的是自检不是游戏。2026-09-19 就撞过一次（`flow_test` 被别的会话留在 true）。
 
 ### 3.5 局内菜单栏（`menu_bar.gd` + `minimap.gd`，仅局内，占屏高 1/5）
@@ -248,24 +248,23 @@
 | 武器 | kind | 伤害 | 射程/范围 | windup/active/recovery | 噪音 |
 |---|---|---|---|---|---|
 | 剑 `sword` | melee | 25 | 120px / 200° / 3 目标 | 0.12 / 0.08 / 0.20 | 120 |
-| 长枪 `spear` | melee | 26 | 180px / 120° / 2 目标 | 0.12 / 0.08 / 0.20 | 110 |
+| 长枪 `spear` | melee | 26 | 180px / 120° / 2 目标 | 0.15 / 0.08 / 0.25 | 110 |
 | 弓 `bow` | ranged | 20 | 弹速 900 / 最大 640px / 1 目标 | 0.30 / 0.06 / 0.18 | 70 |
-| 强弩 `sniper` | hitscan | 90 | 最大 900px / 穿透 2 / 2 目标 | 0.55 / 0.04 / 0.90 | 240 |
+| 法杖 `staff` | melee | 18 | 140px / 140° / 2 目标 | 0.20 / 0.10 / 0.35 | 60 |
 
 **攻击距离 vs 观察视野（两个独立属性，2026-09-17 起）**
 | 武器 | 表上攻击距离 | 观察视野 | **有效攻击距离** = min(两者) |
 |---|---|---|---|
 | 剑 / 长枪 | 120 / 180px | 640px | 120 / 180px（不受限）|
 | 弓 | 640px | 640px | 640px |
-| 强弩 | 900px | 640px | **640px**（射程被视野截断，打不到看不见的地方）|
+| 弓（探针里把 `max_distance` 临时顶到 900） | 900px | 640px | **640px**（射程被视野截断，打不到看不见的地方）|
 
-- 攻击距离按武器分型取：近战 = `range_px`，远程 = `projectile.max_distance_px`，瞬狙 = `hitscan.max_distance_px`（代码 `player.attack_range_px()`）。
+- 攻击距离按武器分型取：近战 = `range_px`，远程 = `projectile.max_distance_px`（代码 `player.attack_range_px()`，2026-09-20 起只剩这两种）。
 - 设计上**观察视野应大于攻击距离**（先发现、再等目标进入射程）；即便配反了也不会打到视野外——有效射程一律取较小值。
 
 - 通用兜底 `combat.attack`：dmg25 / 120px / 200° / 3 目标 / windup0.12 active0.08 recovery0.2 / `cancel_window 0.08`（武器表缺项回落；武器表空＝退回单武器行为）。
-- 伤害管线三档（2026-09-20 接通，见 §5.8）：`crit_chance 0.0` / `crit_multiplier 1.5` / `variance 0.0`。**出厂值 ⇒ 一条都不改变数值**（不抽暴击、不浮动）；三个键与 damage/range_px 同一套回落规矩，武器表写同名键就盖过全局（`combat.weapons.sniper.crit_chance` ⇒ 只有强弩暴击）。
+- 伤害管线三档（2026-09-20 接通，见 §5.8）：`crit_chance 0.0` / `crit_multiplier 1.5` / `variance 0.0`。**出厂值 ⇒ 一条都不改变数值**（不抽暴击、不浮动）；三个键与 damage/range_px 同一套回落规矩，武器表写同名键就盖过全局（`combat.weapons.bow.crit_chance` ⇒ 只有弓暴击）。
 - 弓箭矢（`bow.projectile`）：`speed 900`、`max_distance 640`、`hit_radius 16`、`muzzle_offset 22`、texture `arrow.png`。
-- 强弩（`sniper.hitscan`）：`max_distance 900`、`hit_radius 18`、`pierce 2`、`muzzle 34`、`tracer_width 2.5`(#ffd873, fade 0.18)、`impact_radius 26`(#ff9a3d)；角色帧 `blue_crossbowman/`（弩已烘焙进帧，2026-09-17 弃用挂点）。
 - 闪避 `combat.dodge`：`duration 0.22` / `speed×3.0` / 无敌 / `cooldown 0.8`。
 
 ### 4.3 敌人与中立生物
@@ -312,7 +311,7 @@
 | `max_alertness` | 150 |
 | `footstep_interval_seconds` | 0.4 |
 | `thresholds.suspicious / investigate / combat` | 15 / 30 / 70 |
-| `sources` | walk 22 / dodge 40 / attack 120 / shout 160 / **hurt 100**（挨打时该敌人自己涨的警觉度，2026-09-17 新增，见 §5.1）/ ~~sniper_shot 240（死配置）~~ |
+| `sources` | walk 22 / dodge 40 / attack 120 / shout 160 / **hurt 100**（挨打时该敌人自己涨的警觉度，2026-09-17 新增，见 §5.1） |
 | `ring` | duration 0.7s，color #ffd54f，alpha 0.35，min_intensity 35，min_interval 0.15 |
 | `self.decay_per_second` / `self.max` | 90 / 300 —— **角色自身噪音**（每人一份）：线性快衰减，硬上限 |
 | `world.decay_ratio_per_second` / `reference` / `max` | 0.06 / 2000 / 4000 —— **世界累计噪音**（全局一份）：比例慢衰减（时间常数 ≈17s） |
@@ -387,7 +386,7 @@
 | `minimap.show_resources` | true | 是否把资源点烘焙进小地图底图 |
 | `minimap.resource_colors` | wood/stone/iron/gold/oil/food 各一色 | 资源点配色 |
 
-- 单位与指令集的绑定在 `characters.list[].command_set`（当前 4 名角色全是 `combat`，强弩 2026-09-17 已移出名单）。加新单位类型（工程/采集）＝ config 加指令集 + `_button_defs()` 补按钮，布局代码不动。
+- 单位与指令集的绑定在 `characters.list[].command_set`（当前 4 名角色全是 `combat`）。加新单位类型（工程/采集）＝ config 加指令集 + `_button_defs()` 补按钮，布局代码不动。
 
 ---
 
@@ -400,7 +399,7 @@
 - 跟丢：`chase` 累计看不到 > `lose_sight_seconds(3.0)` → 把最后已知位置当声源，`alertness ≥ 30` 进 investigate 否则回 patrol（不透视实时追）。
 - **休眠**：距玩家 > `ai_active_radius(32)` 格 → `_dormant`，不跑 FSM/动画/tint（但警觉衰减在休眠判定前，远处仍会掉警戒）。该半径可按兵种覆盖（`ai.roam.active_radius_cells`，劫掠者 48）。
 - **「其他怪只在一个固定的范围内移动」（2026-09-17 用户定，逐字落实）**：默认所有敌人 `ai.roam.mode = home_radius` —— `patrol` 只在本兵种 `ai.roam.patrol_radius_cells(6)` 的**方形**范围里选点（斜角最远 = 6×√2 格 ≈ 543px）。只有**听到噪音**或**挨了打**才会离开这一片。劫掠者是唯一例外（`whole_map`，见 §5.5）。
-- **挨打也会动（2026-09-17，所有敌人通用）**：玩家造成伤害后，三个调用点（近战 `player.resolve_attack_hit`、箭 `combat/projectile.gd`、强弩 `player.fire_hitscan`）各补一句 `alert_from_attacker(攻击者位置)` ⇒ 该敌人 `noise_alertness += noise.sources.hurt(100)` 并把攻击者位置记为声源，下一帧就转 `investigate` 朝攻击者走（近战 = 玩家位置、箭 = **出膛点**，用命中点等于让它原地不动）。刻意**不塞进 `take_damage()` 签名**：那会逼探针里所有假敌人跟着改。`noise.sources.hurt = 0` 可整条关掉。
+- **挨打也会动（2026-09-17，所有敌人通用）**：玩家造成伤害后，两个调用点（近战 `player.resolve_attack_hit`、箭 `combat/projectile.gd`）各补一句 `alert_from_attacker(攻击者位置)` ⇒ 该敌人 `noise_alertness += noise.sources.hurt(100)` 并把攻击者位置记为声源，下一帧就转 `investigate` 朝攻击者走（近战 = 玩家位置、箭 = **出膛点**，用命中点等于让它原地不动）。刻意**不塞进 `take_damage()` 签名**：那会逼探针里所有假敌人跟着改。`noise.sources.hurt = 0` 可整条关掉。
 - **成群（`ai.pack`，2026-09-17，目前只有劫掠者开）**：同 `type_id` 的敌人靠近到 `join_radius_px(176)` 内即结伙，全群**共享同一个字典** `{leader, members}`（引用语义）。**群主**按 `roam` 模式选目标；**成员**只跟队形（距群主 > `follow_distance_px(48)` 才启程，每 `repath_interval 0.4s` 重算路径）。每群硬上限 `max_members(5)`；个体只投奔**不小于自己**的群（否则小群互相拆伙、群主每秒换人）；群主死亡 → 同群下一个活着的自动接任（`_promote_pack_leader`，在读取处懒惰修复、不埋钩子）。
 - 追击速度 = `speed(360) × speed_mult(兵种) × chase_mult(1.35)`；最快 raider≈559 < 玩家 640，可风筝。伤害按兵种 `damage`（默认回落 `enemy.contact_damage`），出手节拍按 `enemy.attack.cooldown_seconds(1.0)` —— **只要挥了就进冷却**，打没打中都一样。
 - **水平朝向（2026-09-19 用户定「给左边也加一个方向」，上下明确不做）**：21 个兵种在 `player_animator.parse_spec` 里全是**写法 B**（扁平帧数组 → 8 方向共用同一批帧），素材本身也只画了侧身一个方向，所以「向左」在代码里只有一个合法实现：**`Sprite2D.flip_h` 镜像**（不用负 `scale.x`：`play_hit_fx` / `_fade_out` 要 tween `_body.scale`，动画器每物理帧重写 `_sprite.scale`，只有 `flip_h` 没人碰）。
@@ -413,7 +412,7 @@
 ### 5.2 噪音机制（`noise_system.gd` + `combat/fx_ring.gd`）
 - `emit(pos, intensity)`：① `intensity ≥ ring_min_intensity(35)` 才画环；② 遍历 `enemies` 组，`d > hear_radius(16×tile)` 跳过；③ 距离线性衰减 `att = 1 − d/hear_radius`；④ 隔墙 `att ×= wall_attenuation(0.5)`（独立 LOS 采样）；⑤ `received = intensity × att`，`≥ min_notice(4)` 才 `e.hear_noise()`。
 - `hear_noise`：`noise_alertness += received`（上限 `max_alertness 150`），记声源位驱动 §5.1 FSM。`decay_per_second(10)` 由**每敌人** `_physics_process` 每帧扣。
-- 源触发点：`walk 22`＝`player_move_state`（每 `footstep_interval 0.4` 一次）；`dodge 40`＝`player_dodge_state`；`attack 120`＝近战出招（先取武器 `noise`：剑120/弓70/狙240，无武器回落）；`shout 160`＝**敌人进入 chase 时广播**（惊动附近，非玩家）；`sniper_shot 240`＝**死配置**（狙击走武器 noise 240）。
+- 源触发点：`walk 22`＝`player_move_state`（每 `footstep_interval 0.4` 一次）；`dodge 40`＝`player_dodge_state`；`attack`＝出招（按武器取 `noise`：剑 120 / 长枪 110 / 法杖 60 / 弓 70，缺省回落 120）；`shout 160`＝**敌人进入 chase 时广播**（惊动附近，非玩家）。
 - ring 半径 = `hear_radius × (1 − min_notice/intensity)`，扩散+淡出描边圆。
 - **菜单栏右下那两条噪音（2026-09-18 重做成互相喂养的两路，详见 §5.2.1）**：第 1 行＝**角色自身噪音**（每人一份，显示全队最大值），第 2 行＝**世界累计噪音**（全局一份）。旧的「当前 / 累积」已废弃 —— 累积原来是只增不减的总账，看不出「这一局到底紧张到什么程度」。
 - **爆裂鼓手放大（2026-09-17，邪术师特性 `burst_drum`）**：`emit()` 在 `from_player=true` 分支里、**记读数与派发之前**乘一次倍率 `player_noise_multiplier(source_pos)`，于是**读数、光圈大小、敌人实际听到的强度全是放大后的值**（一条链路，没有第二个真相）。
@@ -444,7 +443,7 @@
 - **⚠ 这是正反馈**：两边都有 hard cap → **结构上不会发散**（探针 F 段每 0.05 秒发一拳连打 30 秒验证：自身停在 295.5、世界停在 4000，无 NaN/Inf）。但把 `link.world_to_self_gain` 调大，会让「吵起来就再也压不下去」—— 这是手感问题，不是崩溃问题，调之前请先跑 F 段。
 - **⚠ 发声必须带 `source_unit`**：`emit(pos, x, true, actor)`。忘了传 actor 的话这一声会掉进「没归属」那份 `_ambient_self`：菜单照样有读数、但每个角色的光球都没反应 —— 运行时看不出来，所以 `probe_noise_link` K 段在源码层守着三个调用点。
 - **等级光球跟着走**（用户原话「光球根据第一个来」）：`unit_level_badge.noise_speed()` 读**自己那个角色**的自身噪音，`_t += delta × speed` —— 给**整条时间轴**乘一个倍数，而不是分别改每条曲线的频率：后者会让摆动 / 明灭 / 抖动各自的相位错位，加速那一下光点会「抖」；乘同一个 `_t` 则相位连续，看不出是被调快了，只会觉得它更躁动。
-  - 用途和实际 feel：`reference 240`（强弩一发即顶格）、`max_speed_multiplier 3.0`、`curve 1.4` ⇒ 脚步 22 只到 1.05 倍（几乎无感，否则会被呼吸般的脚步声拽得一跳一跳）、剑击 120 → 1.76 倍、持续激战 → 3 倍。
+  - 用途和实际 feel：`reference 240`（当年按强弩一发定的，2026-09-20 那把武器已删 ⇒ 玩家侧最响的剑击 120 只到 0.5 档，光球不会自己顶满）、`max_speed_multiplier 3.0`、`curve 1.4` ⇒ 脚步 22 只到 1.05 倍（几乎无感，否则会被呼吸般的脚步声拽得一跳一跳）、剑击 120 → 1.76 倍、持续激战 → 3 倍。
   - **单次闪烁时长不跟着缩**：那 1.2 秒是为了让球心的数字能被读出来，压到 0.4 秒就是「一闪而过」，等于没报。加速只体现在**多久闪一次**（`_next_flash -= delta × speed`）。
   - 3 倍速下 ω 仍恒 > 0（`speed_sway` 之和 < `spin_speed` 这条约束是等比缩放不变的），所以光点不会原地掉头。
 
@@ -467,7 +466,7 @@
 - **全部近战挥砍**（按 `enemy.attack.range_px` 出手，见 §5.1），4 兵种强度递进（§4.3）；无远程、无技能系统（已删）。
 - 受击＝瞬时泛红（`hit_flash 0.18`，tint lerp 红）。
 - 死亡＝先结算（上报特性 → 掉落 → 收血条 → 清幻影），再分两条表现路：**有 `dead` 帧的兵种**（素材包里目前只有 ep_troll，10 帧）按 `enemy.death_fps(8)` 逐帧播倒地动画，播完才淡出；**没有死帧的兵种**直接进淡出 —— tween 并行「透明 + 缩 ×0.7 + 下沉 12px」（`death_fade_seconds 0.45`），读完是"倒下"不是"被抠掉"。淡出期间 `_dying=true`：AI、受伤、出手全停。
-- **平衡缺口（真实）**：玩家远程（弓弹道 640px、狙 hitscan 900px 穿透 2）可风筝；但敌人视野 ≈640px ≈ 弓射程，贴边对射窗口窄。全员近战 ⇒ 远程无威胁。若走全员远程需补**远程敌人 / 掩体 / 弹速压制**。
+- **平衡缺口（真实）**：玩家远程（弓弹道 640px）可风筝
 
 #### 死亡特性（`marauder` 掠夺者专属，2026-09-17 用户定）
 
@@ -630,7 +629,7 @@
 
 **自动战斗（2026-09-17 起，取代手动攻击键）**
 - 两个属性：**观察视野** `player.vision_radius_cells`（格）× `map.tile_size` = `player.vision_px()`；**攻击距离** = `player.attack_range_px()`（按武器分型取）。
-- **有效攻击距离 = min(攻击距离, 观察视野)** —— 强弩表上 900px 超过 10 格视野（640px），实际只打到 640px。
+- **有效攻击距离 = min(攻击距离, 观察视野)** —— 武器表上写的射程再远，也只打到看得见的那一格边界（10 格视野 = 640px）。
 - 索敌：`_update_auto_target()` 每 `combat.auto_attack.scan_interval_seconds=0.15` 扫一次 `enemies` 组，取「视野内 ∩ 有效攻击距离内」最近的敌人；**够不着的不追击、原地不动**（角色不会自己跑过去）。
 - 起手：**只有 idle 状态**在 `auto_target() != null` 时转 `attack`；**move 状态不索敌**（2026-09-19 改，见下）。起手朝向锁定目标（`aim_at_auto_target()`）；打完回到 idle（若还有移动指令则回 move 继续赶路）。连打节奏由武器时长决定，无额外冷却。
 - **玩家的移动指令优先于自动战斗**（2026-09-19，用户报「点十几下之后控制不了」）：以前 `attack/hitstun/dodge/idle` 进状态一律 `stop_moving()`，等于每次起手都把玩家刚点的那一下抹掉；再加上 move 状态自己也会让位给索敌，结果是"点了地 → 半路开打一停 → 指令没了 → 再点也没反应"。现在拆成两条：`stop_moving()` 只在**玩家主动取消 / 死亡**时调用，被打断改用 `halt_in_place()`（只停脚、留指令）；move 状态不再被索敌抢走，要打断得先有新指令。守卫：`Dev/probe_click_move.tscn` **7 项**（A 连点 16 次，逐条判定"未受理 / 原地卡死 / 中途丢指令 / 预算内没走到"；B 陷在实心格里仍要挪得动；C **自动战斗起手不吞指令** —— 进 attack 后移动目标仍在、打完那一刀继续赶往刚才那一点）。
@@ -638,7 +637,7 @@
 - 小队**全员**自动战斗（不只被选中的那个）；只锁 `enemies` 组，中立生物（羊）不会自动开火。
 - 目标死亡 / 被回收 / 跑出有效射程 → 立刻重扫换目标（只判 `is_dead` 会导致"对空气空挥"，已按距离复核）。
 - 开关：`combat.auto_attack.enabled`（设置面板「玩法」页，默认开）。关掉后完全不开火。
-- 近战判定框半径 = 有效攻击距离；远程 / 瞬狙为 0（判定在弹道或射线上，玩家身上不挂框）。
+- 近战判定框半径 = 有效攻击距离；远程为 0（判定在弹道上，玩家身上不挂框）。
 
 **指令层（菜单栏 → 角色，架在自动战斗之上）**
 - 目标选取优先级：**指定目标（仍在有效射程内）→ 按索敌策略挑**；两者都受「观察视野 ∩ 有效攻击距离」约束，够不着的指定目标**自动解除**（`_update_auto_target` 里 `designated_target` 先过 `_within_reach` 复核）。
@@ -648,17 +647,16 @@
 - 巡逻：`_patrol_points` 环形路线，`_patrol_active` 时朝 `_patrol_index` 的下一点走；到点＝移动目标被清空（`has_move_target()` 转 false，由移动状态自己判到达），停 `patrol_wait_seconds 0.6` 再取下一个。`_patrol_index` **下令时就自增**，被打断不会原地重走同一点。路线用 `Line2D` 闭环画世界（仅选中可见），`cancel_commands()` 清点停走。
 - 输入：左键 = `command_click(世界坐标)`（待点选时＝点敌/点地，否则＝移动/路由到小地图）；右键**没命中角色**时 = `cancel_commands()`（点在角色身上那一下被背包弹窗先吃掉，§5.11）；ESC = 仅退出待点选模式（**不再吞整局 ESC**；弹窗开着时那一下归弹窗）。
 
-**三种分型的判定**
+**两种分型的判定**
 - **melee**（`player_attack_state` + `resolve_attack_hit`）：WINDUP→ACTIVE→RECOVERY；ACTIVE 每帧取 Hitbox `get_overlapping_areas()`，`arc 200°`(半角 100° 过滤)、`max_targets 3` 去重、`range 120`=Hitbox 半径；**每个目标各调一次** `player.roll_hit_damage()`（见下）。
 - **ranged**（`fire_projectile` + `combat/projectile.gd`）：ACTIVE 进入瞬间发一次；**出膛那一帧就结算完**（含暴击/浮动各抽一次），弹道节点只搬运一个算好的整数，不在命中帧回头找射手要武器参数（它可能射出视野、射手可能已经换了武器）；命中＝点到本帧飞行线段最近距 ≤ `hit_radius 16`（防穿透与步长无关），撞墙按 ≤ 半格采样，命中优先于撞墙。
-- **hitscan**（`fire_hitscan`，出枪同帧）：射线枪口→+facing×`900`；`first_wall_point` 半格采样截断到首墙；沿线取前 `pierce 2` 个；每个目标各走一次 `player.roll_hit_damage()`；Line2D 曳光 + 命中点 fx_ring。
 - `combat.attack` 与 `combat.weapons.*` 回退：先查当前武器字典，缺键回落 `combat.attack`；`kind` 缺省 melee。
 - `input.buffer 0.25`：闪避等输入预输入入队，idle/move 态 consume（攻击已无键位）。
 
 **伤害结算管线（`combat/damage_pipeline.gd`，2026-09-20 真正接通）**
 - 公式：`FinalDmg = floor((Base × Π 修饰器 − Defense) × RandomVariance)`，最低 1 点保底；`Defense ≥ Base` 时返回 **0**（完全挡下不是 1 点）。纯静态函数、不读配置，所以探针能拿固定种子复现抽样序列。
 - 三个入口：`compute()` 通用结算；`roll()` 抽一次暴击并结算，返回 `{damage, crit}`（`crit` 是给表现层的钩子，结算本身用不到）；玩家侧统一走 `player.roll_hit_damage(base)`，它把 `trait_damage()` 的结果当基础值，三个参数全从 `attack_param()` 取 ⇒ **"只给强弩加暴击"是纯配置活**。
-- **必须每次命中各抽一次**（`roll()` 不是"起手时算好的常数"）：一剑砍三个敌人 = 三次抽样，完全可以只有一下冒红字。所以近战与瞬狙都在目标循环**内部**抽，只有弹道是"出膛即定"（那一发已经离开了射手）。
+- **必须每次命中各抽一次**（`roll()` 不是"起手时算好的常数"）：一剑砍三个敌人 = 三次抽样，完全可以只有一下冒红字。所以近战在目标循环**内部**抽，只有弹道是"出膛即定"（那一发已经离开了射手）。
 - 特性与短缺在管线**之前**：`trait_damage(base) = base + trait_flat("attack") − supply_penalty("attack")`，进的是基础值而不是结算后的数。
 - **【边界：只管攻击侧】** 管线里只有攻击方自己知道的那几件事（基础伤害、暴击乘算、随机浮动）。**防守侧的减免留在被守的一方**：玩家固定防御在 `player.take_damage()` 里扣；敌人"血越少越硬"（爆裂鼓手）与"分身越多越硬"在 `enemy.incoming_damage()` 里扣。这条切分不是偷懒而是必须 —— 敌人 `_deal_attack_damage()` 算完伤害就交出去，玩家挡不挡住都得照样进冷却、照样播动作（用户 2026-09-19 定的，§5.1）；把玩家防御搬到攻击方结算，就会出现「要扣血才决定砍不砍」的倒置。`compute()` 仍保留 `defense` 形参，那是给"护甲值攻击方已知"的目标留的入口。
 - 守卫：`Dev/probe_damage_pipeline.tscn` **43 项**（A 纯函数语义与统计分布 / B 生效配置下三条路径逐位不变 / C `crit_chance=1` 时近战·弹道·瞬狙真的各吃到倍率 / D 武器表盖过全局 / E 敌人侧浮动 / F 防守侧解耦）。⚠ 期望值一律由**生效配置**（基础层 + `user://settings.json` 调参层）现算，写死出厂数会让面板调过数值之后的第一次回归假红。
@@ -756,7 +754,6 @@
 | `meta_progression.rare_resource_chance` | ⚠ 可购买无效果 | 同上，掉落权重走 `enemy.drop.weights`/`animals.drop` |
 | `storage.max_slots` | ⚠ 零消费 | 仓库格数实由 `warehouse_capacity` 决定（§4.8）|
 | `base.interact_radius_cells` | ⚠ 仅 3D 层 | 2D 交互用 Area2D 碰撞矩形 |
-| `noise.sources.sniper_shot` | ⚠ 死配置 | 狙击音走武器 `noise 240` |
 
 ---
 
