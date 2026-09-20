@@ -23,11 +23,18 @@ extends Control
 
 const GROUP := &"inventory_popup"
 
+## 点了右侧「建造」（2026-09-20 用户定：这一轮只要按钮和信号，建筑选项还不接）。
+## 谁将来接建造流程就 connect 它 —— 参数是"给哪个角色开的背包"。
+signal build_requested(unit: Node)
+
 ## 正在看谁的背包；null = 没弹。菜单栏同步读它（有它时优先显示它）。
 var unit: Node = null
 
 var _panel: PanelContainer
+var _root: HBoxContainer     # 左列背包内容 + 右列按钮
 var _box: VBoxContainer
+var _side: VBoxContainer
+var _build_btn: Button
 var _title: Label
 var _sub: Label
 var _rows: VBoxContainer
@@ -39,6 +46,8 @@ var _survival: Node = null
 var _head_offset := 44.0
 var _margin := 8.0
 var _min_width := 210.0
+var _btn_min_width := 64.0
+var _build_enabled := true
 
 
 func _ready() -> void:
@@ -49,6 +58,8 @@ func _ready() -> void:
 	_head_offset = float(Config.get_value("inventory_popup.head_offset_px", 44.0))
 	_margin = float(Config.get_value("inventory_popup.viewport_margin_px", 8.0))
 	_min_width = float(Config.get_value("inventory_popup.min_width_px", 210.0))
+	_btn_min_width = float(Config.get_value("inventory_popup.build_button.min_width_px", 64.0))
+	_build_enabled = bool(Config.get_value("inventory_popup.build_button.enabled", true))
 	_build()
 	visible = false
 
@@ -114,6 +125,11 @@ func _input(event: InputEvent) -> void:
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT and is_open() \
 				and _panel.get_global_rect().has_point(event.position):
+			# 按钮那一下必须放行：_input 跑在 Control 的 GUI 分发**之前**，
+			# 在这里 set_input_as_handled() 等于把「建造」按死——面板里原本没有
+			# 可点控件所以没人发现过。
+			if _side.visible and _build_btn.get_global_rect().has_point(event.position):
+				return
 			get_viewport().set_input_as_handled()   # 面板内部点击不外泄成移动令
 			return
 	if is_open() and event.is_action_pressed("ui_cancel"):
@@ -152,7 +168,11 @@ func _build() -> void:
 	_box = UiKit.vbox(3)
 	# 给个下限宽度：短缺那行开了自动换行，不撑住宽度的话面板会缩成一条竖带
 	_box.custom_minimum_size = Vector2(_min_width, 0)
-	_panel.add_child(_box)
+
+	# 两列：左边背包明细，右边操作按钮（现在只有「建造」）
+	_root = UiKit.hbox(8)
+	_panel.add_child(_root)
+	_root.add_child(_box)
 
 	_title = UiKit.label("", 15, UiKit.COL_AMBER)
 	_box.add_child(_title)
@@ -167,6 +187,22 @@ func _build() -> void:
 	_warn.custom_minimum_size = Vector2(_min_width, 0)
 	_warn.visible = false
 	_box.add_child(_warn)
+
+	_side = UiKit.vbox(4)
+	_root.add_child(_side)
+	_build_btn = UiKit.button("建造", int(_btn_min_width), 13)
+	# 顶对齐：不顶住的话按钮会被 VBox 拉成和背包一样高的一条
+	_build_btn.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_build_btn.pressed.connect(_on_build_pressed)
+	_side.add_child(_build_btn)
+	_side.visible = _build_enabled
+
+
+func _on_build_pressed() -> void:
+	# 只发信号不接玩法（用户定：建筑选项这轮不做）。弹窗已关就不发，
+	# 否则"点建造的那一帧正好 ESC 收了包"会把 null 或已释放的 unit 传出去。
+	if unit != null and is_instance_valid(unit):
+		build_requested.emit(unit)
 
 
 ## 内容指纹：换人 / 格数变了 / 物品种类数量变了 / 短缺状态变了 都要重画

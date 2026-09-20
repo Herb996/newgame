@@ -51,11 +51,22 @@ SUITES = [
     # 同一颗种子开/关两次，terrain/walls/biome/decor 四张网格必须逐格相同，
     # 关掉后树里不许留节点；另查网点覆盖率确实按 lv/8 量化、混合格只长在边界上。
     ("Dev/probe_biome_blend.tscn", "_r_blend.log", ("[BlendProbe]",)),
+    # 2026-09-20 群系边界描边（取代渐变混合层的现役方案）：把 blob 的"同类"判定从
+    # 「邻格可走」收紧成「邻格可走且同群系」，于是群系交界自动描出官方自带的海岸线。
+    # 守卫：关闭时接缝格 100% 拿到无描边内部块 k=5（这条就是当初"看不出区别"的真根因）、
+    # 开启时 100% 变成有边且只加不减、terrain/walls/biome/decor/speed_mult 逐格不动、
+    # stroke=light/dark 只换图集像素不换 blob 下标、非法 stroke 回退并警告。
+    ("Dev/probe_biome_outline.tscn", "_r_outline.log", ("[OutlineProbe]",)),
     # 2026-09-19 敌人朝向：素材是「单侧画 + 8 方向复用同一批帧」，所以「向左」只能靠
     # Sprite2D.flip_h 镜像。守卫三件事：① 玩家枪兵的真 8 方向素材不许被镜像（默认关）；
     # ② 素材本身朝左的两只鲨鱼要反着判（一刀切 dir.x<0 就翻）；③ 受击压扁走
     # animator 的 scale_mul 通道，不再和每物理帧重写 _sprite.scale 的代码抢方向盘。
     ("Dev/probe_enemy_facing.tscn", "_r_facing.log", ("[EnemyFacingProbe]",)),
+    # 2026-09-20 右键背包弹窗右侧的「建造」按钮：只发信号不接玩法。守卫的是一条
+    # 很容易踩的输入顺序坑 —— Node._input 跑在 Control 的 GUI 分发之前，弹窗原先把
+    # 面板内的点击全吞了，那样按钮永远点不着。所以既量位置（在明细列右侧、没被拉高、
+    # 不越出视口），也量放行（点按钮不 set_input_as_handled、点背包照旧吞）。
+    ("Dev/probe_build_button.tscn", "_r_buildbtn.log", ("[BuildButtonProbe]",)),
 ]
 
 BAD_MARKS = ("SCRIPT ERROR", "Parse Error", "Invalid call", "Invalid access",

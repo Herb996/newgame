@@ -19,6 +19,11 @@
       "radius_cells": 1,
       "dither": 8
     },
+    "biome_outline": {
+      "_comment": "群系边界描边（纯外观，不动碰撞/寻路/速度场）。官方每张 blob 图里其实有两套 16 块区块，拓扑一一对应、只差描边：col 0-3 是浅薄荷高光包着近黑芯，col 5-8 只留那条黑芯。以前 blob 只看可走性，所以两个都能走的群系之间每格都拿到内部实心块、一条线都没有；enabled 打开后\"邻格同群系\"才算连通，交界处就会自动描出官方那圈海岸线。stroke 选哪套：light=浅描边（出厂在用），dark=黑色描边。下次生成地图才生效。",
+      "enabled": true,
+      "stroke": "dark"
+    },
     "biome_weights": {
       "0": 3.4,
       "1": 1.05,
@@ -1326,7 +1331,12 @@
     "_comment": "右键角色的头顶背包弹窗（inventory_popup.gd）。纯表现参数，不碰数值。",
     "head_offset_px": 44.0,
     "viewport_margin_px": 8.0,
-    "min_width_px": 210.0
+    "min_width_px": 210.0,
+    "build_button": {
+      "_comment": "右键角色弹出的背包右侧那一列（Scripts/inventory_popup.gd）。enabled=false 整列不建；min_width_px 是按钮的最小宽度。按钮目前只发 build_requested(unit) 信号，建筑选项还没接（2026-09-20 用户定）。",
+      "enabled": true,
+      "min_width_px": 64.0
+    }
   },
   "menu": {
     "_comment": "开始菜单。game_scene = 新建/历史存档后进入的场景，**本项目只做 2D 线**，所以固定指 res://Scenes/Main.tscn（3D 场景不在计划内，保留只为随时 F6 回看）；save_slots = 存档槽位数（user://saves/slot_NN.json）。",

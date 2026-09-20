@@ -60,6 +60,14 @@ const SRC_TILE := 64            # Tiny Swords 官方瓦片边长（重采样前�
 const WALL_VARIANTS := 1        # 水面列数（官方水面只有一张可平铺瓦片）
 const ATLAS_SEED := 20260915    # 回退图集固定种子：外观稳定，不随地图变化
 
+# ---------- 群系边界描边 ----------
+# 官方每张 tilemap_colorN 里有**两套** 16 块 blob 区块，拓扑逐块对应，只差描边：
+#   col 0-3 = 浅薄荷高光包着黑芯（出厂一直在用）
+#   col 5-8 = 只留那条近黑芯 rgb(22,28,46)，没有高光
+# 两套的板色完全相同，所以换描边风格只要挪源表采样列，blob 编码一个字都不用改。
+const SRC_OUTLINE_COL_LIGHT := 0
+const SRC_OUTLINE_COL_DARK := 5
+
 # ---------- 群系边界混合层（2026-09-19）----------
 # 群系之间原本只有一条 1 格阶梯的纯色跳变 —— 边界两侧什么美术都没画。
 # 修法是**纹理抖动混合**：在边界两侧各 radius 格的带内，把"次主导群系"的同一块
@@ -104,9 +112,11 @@ static func atlas_cols() -> int:            # 图集总列数（不再有"墙顶
 	return atlas_wall_start() + WALL_VARIANTS
 
 # ---------- blob autotile 编码（Tiny Swords 官方 4x4 布局）----------
-# 输入：四方向是否与**同类地形**（此处就是可走地面）相连。
+# 输入：四方向是否与**同类地形**相连（可走地面；开描边后还要求同群系）。
 # 输出：blob 在图集中的列偏移（0..15）= row * 4 + col。
-# 规则来自对 Tilemap_colorN.png 逐格边缘不透明度的反推（tools/inspect_ts_tileset.py）。
+# 规则来自对 Tilemap_colorN.png 逐格边缘不透明度的反推（tools/inspect_ts_tileset.py），
+# 并由 tools/analyze_ts_blob.py 逐格像素统计验证过：4x4 区块 16 格与下面两条规则
+# **完全吻合**（右通⟺col∈{0,1}，下通⟺row∈{0,1}）。
 static func blob_row(t_ok: bool, b_ok: bool) -> int:
 	if b_ok:
 		return 1 if t_ok else 0
@@ -121,20 +131,48 @@ static func blob_offset(t_ok: bool, b_ok: bool, l_ok: bool, r_ok: bool) -> int:
 	return blob_row(t_ok, b_ok) * 4 + blob_col(l_ok, r_ok)
 
 
-## 直接对地形网格取某格的 blob 下标（4 邻是否同为可走地形）。
-## 已由 tools/analyze_ts_blob.py 逐格像素统计验证：Tilemap_color1.png 的
-## 4x4 区块 16 格与上面两条规则**完全吻合**（右通⟺col∈{0,1}，下通⟺row∈{0,1}）。
-## 地图外圈一律当作"不可走" → 地图边缘自动生成完整崖壁，不会出现半截贴图。
-static func blob_index(terrain: Array, x: int, y: int) -> int:
+## 直接对地形网格取某格的 blob 下标（4 邻是否同为可走地面）。
+## 传了 biome 且开了 map.biome_outline 时，"同类"额外要求邻格**同群系** ——
+## 群系交界处于是也会描出官方那圈海岸线。不传就是老行为：只看可走性。
+static func blob_index(terrain: Array, x: int, y: int, biome: Array = []) -> int:
 	var h: int = terrain.size()
 	if h == 0:
 		return 0
 	var w: int = (terrain[0] as Array).size()
-	var t_ok: bool = y > 0 and not bool(terrain[y - 1][x])
-	var b_ok: bool = y < h - 1 and not bool(terrain[y + 1][x])
-	var l_ok: bool = x > 0 and not bool(terrain[y][x - 1])
-	var r_ok: bool = x < w - 1 and not bool(terrain[y][x + 1])
+	var by_biome: bool = not biome.is_empty() and outline_enabled()
+	var t_ok: bool = _blob_linked(terrain, biome, w, h, x, y - 1, x, y, by_biome)
+	var b_ok: bool = _blob_linked(terrain, biome, w, h, x, y + 1, x, y, by_biome)
+	var l_ok: bool = _blob_linked(terrain, biome, w, h, x - 1, y, x, y, by_biome)
+	var r_ok: bool = _blob_linked(terrain, biome, w, h, x + 1, y, x, y, by_biome)
 	return blob_offset(t_ok, b_ok, l_ok, r_ok)
+
+## 邻格与本格是否"同类"（决定 blob 的哪一侧要描边）。
+## 越界一律算不连通 → 地图外圈自动描完整崖壁。
+static func _blob_linked(terrain: Array, biome: Array, w: int, h: int,
+		nx: int, ny: int, sx: int, sy: int, by_biome: bool) -> bool:
+	if nx < 0 or ny < 0 or nx >= w or ny >= h:
+		return false
+	if bool(terrain[ny][nx]):
+		return false
+	if by_biome:
+		return int(biome[ny][nx]) == int(biome[sy][sx])
+	return true
+
+## 群系交界要不要描边（纯外观；关掉就退回"只看可走性"的老行为）。
+static func outline_enabled() -> bool:
+	return bool(Config.get_value("map.biome_outline.enabled", false))
+
+## 选哪一套描边区块：从官方源表的第几列开始采。非法值回退浅描边并警告。
+static func outline_src_col0() -> int:
+	var s: String = String(Config.get_value("map.biome_outline.stroke", "light"))
+	match s:
+		"light":
+			return SRC_OUTLINE_COL_LIGHT
+		"dark":
+			return SRC_OUTLINE_COL_DARK
+		_:
+			push_warning("[Map] map.biome_outline.stroke 只认 light/dark，收到 %s → 用 light" % s)
+			return SRC_OUTLINE_COL_LIGHT
 
 # ---------- 外部贴图资源（Tiny Swords 官方 CC0 素材，见 assets/README）----------
 const TERRAIN_DIR := "res://Assets/Art/Tiles/TS/"
@@ -584,7 +622,7 @@ static func generate() -> Dictionary:
 			else:
 				var b: int = biome[y][x]
 				layer.set_cell(Vector2i(x, y), 0,
-						Vector2i(b * BLOB_N + blob_index(terrain, x, y), 0))
+						Vector2i(b * BLOB_N + blob_index(terrain, x, y, biome), 0))
 
 	# ---- 群系边界混合层 ----
 	# 必须在主图层的 blob 定完之后再算：混合层要照抄同一格的 blob 下标，
@@ -868,7 +906,7 @@ static func build_preview(result: Dictionary, cells: int) -> Image:
 				if terrain[gy][gx]:
 					col = atlas_wall_start()
 				else:
-					col = b * BLOB_N + blob_index(terrain, gx, gy)
+					col = b * BLOB_N + blob_index(terrain, gx, gy, biome)
 				out.blit_rect(_atlas_img, Rect2i(col * ts, 0, ts, ts),
 						Vector2i(x * ts, y * ts))
 
@@ -1293,6 +1331,7 @@ static func _build_atlas_image(tile_size: int) -> Image:
 	img.fill(Color(0, 0, 0, 0))
 
 	var ok := true
+	var col0: int = outline_src_col0()
 	for b in range(biome_count()):
 		var sheet := _load_image(TERRAIN_DIR + biome_tileset(b))
 		if sheet == null:
@@ -1306,7 +1345,7 @@ static func _build_atlas_image(tile_size: int) -> Image:
 		# 撞色、玩家分不清哪儿能走；现在靠 tint 把它压成沼泽黄绿就能一眼区分。
 		var tint: Color = _biome_tint(b)
 		for k in range(BLOB_N):
-			var rect := Rect2i((k % 4) * SRC_TILE, (k / 4) * SRC_TILE, SRC_TILE, SRC_TILE)
+			var rect := Rect2i((col0 + k % 4) * SRC_TILE, (k / 4) * SRC_TILE, SRC_TILE, SRC_TILE)
 			if rect.end.x > sheet.get_width() or rect.end.y > sheet.get_height():
 				push_warning("[Map] 地形图集尺寸不足，缺少 blob 区块：%s" % biome_tileset(b))
 				ok = false
@@ -1549,7 +1588,7 @@ static func _build_blend_cells(biome: Array, terrain: Array, width: int, height:
 			var lv: int = clampi(int(w * float(steps) + 0.5), 0, BLD_LEVELS)
 			if lv <= 0:
 				continue
-			cells[Vector2i(x, y)] = {"alt": alt, "k": blob_index(terrain, x, y),
+			cells[Vector2i(x, y)] = {"alt": alt, "k": blob_index(terrain, x, y, biome),
 					"lv": lv, "w": w}
 	return cells
 

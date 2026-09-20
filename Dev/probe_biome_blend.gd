@@ -37,6 +37,10 @@ func _ready() -> void:
 
 	Config.set_override("map.biome_blend.enabled", true)
 	Config.set_override("map.biome_blend.radius_cells", 1)
+	# 下面的网点覆盖率容差（trans*lv/8+8）是按**浅描边块**的 alpha 轮廓标定的：
+	# 官方深描边块（源表 col 5-8）圆角的像素分布不同，边界档会顶偏 1 个像素。
+	# 描边风格本身由 Dev/probe_biome_outline.gd 管，这里只锁住自己的标定前提。
+	Config.set_override("map.biome_outline.stroke", "light")
 	seed(MAP_SEED)
 	var on: Dictionary = MapGenerator.generate()
 	_check_generated(on, true)
