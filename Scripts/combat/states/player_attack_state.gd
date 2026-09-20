@@ -67,6 +67,9 @@ func physics_update(delta: float) -> void:
 					actor.fire_hitscan()
 				else:
 					actor.begin_attack_hit()
+					# 出手弧光与判定同帧：挥空也照放（动作和噪音本来就照放），
+					# 砍中目标那一下另有 combat.attack.fx_hit 的星芒。
+					actor.spawn_attack_fx()
 				# 出招发声：惊动附近敌人（DESIGN.md 第二部分 噪音机制）
 				# 取武器自己的噪音值 —— 弓比剑安静、强弩震天响，潜行时的可利用差异
 				# from_player=true：这是小队自己弄出的动静，计入菜单栏的噪音读数

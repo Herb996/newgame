@@ -40,6 +40,9 @@ var _animator: PlayerAnimator = null
 
 var _walls: Array = []
 var _tile_size: int = 64
+## setup 注入的类型配置（AnimalSystem 抽样池里的那个字典引用）：调试面板改完
+## animal_types 的数值后要按它重算 max_hp，见 refresh_debug_stats。
+var _type_cfg: Dictionary = {}
 
 var _mode: int = Mode.WALK
 var _mode_timer := 0.0
@@ -64,6 +67,7 @@ func _ready() -> void:
 func setup(walls: Array, tile_size: int, type_cfg: Dictionary = {}) -> void:
 	_walls = walls
 	_tile_size = tile_size
+	_type_cfg = type_cfg
 	if not type_cfg.is_empty():
 		type_id = StringName(str(type_cfg.get("id", "sheep")))
 		type_name = str(type_cfg.get("name", type_cfg.get("id", "sheep")))
@@ -72,6 +76,19 @@ func setup(walls: Array, tile_size: int, type_cfg: Dictionary = {}) -> void:
 	_apply_type_frames(type_cfg)
 	_stuck_anchor = global_position
 	_pick_wander_target()
+
+
+## 调试面板改完数值后的原地重算（见 Scripts/debug_stat_panel.gd）。
+## 羊身上缓存的只有 max_hp（速度/逃跑半径/掉落每次现读 config）。
+## 上限变了 → 自动回满，与 player.gd / enemy.gd 同一条用户约定。
+func refresh_debug_stats() -> void:
+	var old_max := max_hp
+	if not _type_cfg.is_empty():
+		max_hp = int(_type_cfg.get("hp", 12))
+	if max_hp != old_max:
+		hp = max_hp
+	else:
+		hp = mini(hp, max_hp)
 
 
 # ------------------------------------------------------------

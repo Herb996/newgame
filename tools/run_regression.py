@@ -19,6 +19,15 @@ import os
 import subprocess
 import sys
 
+# Windows 控制台默认 GBK：探针状态行里只要有一个 ⇒（U+21D2）这类编不出的字符，
+# print() 就抛 UnicodeEncodeError，整轮回归跑到一半就断。改成替换而不是报错，
+# 中文照常显示，个别符号变成问号——总比没有结果强。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(errors="replace")
+    except Exception:
+        pass
+
 GODOT = r"C:/Users/Administrator/Downloads/Godot_v4.7.2-stable_win64_console.exe"
 PROJ = "D:/SteamPunkExtraction"
 OUT = "C:/Users/Administrator/WorkBuddy/2026-09-14-22-35-14"
@@ -67,6 +76,17 @@ SUITES = [
     # 面板内的点击全吞了，那样按钮永远点不着。所以既量位置（在明细列右侧、没被拉高、
     # 不越出视口），也量放行（点按钮不 set_input_as_handled、点背包照旧吞）。
     ("Dev/probe_build_button.tscn", "_r_buildbtn.log", ("[BuildButtonProbe]",)),
+    # 2026-09-20 配置驱动的特效管线（fx.effects 库 + 三个引用点）。守的重点不是"好不好看"
+    # 而是**表与素材必须自洽**：每条 fx.effects 的贴图宽度要 == frames×128，改了帧数没重切
+    # 图，hframes 会把半格当一帧画；再加生成器语义（additive 挂 CanvasItemMaterial 的 ADD、
+    # 播完自毁、fx.max_simultaneous 硬上限、空/未知 id 与总开关关掉一律不生成）和引用回落
+    # （武器 fx_attack → 无；命中回落 combat.attack.fx_hit；兵种专属 → enemy.attack.fx_attack）。
+    ("Dev/probe_fx.tscn", "_r_fx.log", ("[FxProbe]",)),
+    # 2026-09-20 局内数值调试栏（F9）：它直接写 Config 的运行时覆盖层，所以守的是
+    # 「改完必须能原样还回去」—— 覆盖层清空后敌人兵种表逐键回出厂值、在场单位数值
+    # 跟着重算、出厂层与 user://settings.json 一个字节都不许被写脏、
+    # clear_override 剪空壳字典（否则「已改 N 项」虚报）。S9 窗口实拍段无头会自己跳过。
+    ("Dev/probe_stat_panel.tscn", "_r_statpanel.log", ("[Probe]",)),
 ]
 
 BAD_MARKS = ("SCRIPT ERROR", "Parse Error", "Invalid call", "Invalid access",

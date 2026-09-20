@@ -591,6 +591,38 @@ func attack_noise() -> float:
 
 
 ## ------------------------------------------------------------
+## 特效引用（顶层 fx.effects 库 + EffectLibrary，2026-09-20）
+##
+## 刻意只认"一个字符串 id"：加角色/换武器都只动配置，特效本体在库里共享。
+## 三条引用都允许缺省（空串 = 不生成），所以 fx 段整个删掉也等于老行为。
+## ------------------------------------------------------------
+
+## 出手那一刀的弧光（剑=弯月弧 / 枪=长锥 / 法杖=法阵）
+func fx_attack_id() -> String:
+	return str(weapon_data().get("fx_attack", ""))
+
+
+## 砍中目标时的星芒：武器自己写了 fx_hit 听武器的，否则用 combat.attack.fx_hit
+func fx_hit_id() -> String:
+	var wid := str(weapon_data().get("fx_hit", ""))
+	if wid != "":
+		return wid
+	var atk: Dictionary = Config.get_value("combat.attack", {})
+	return str(atk.get("fx_hit", ""))
+
+
+## 放出手弧光。位置取「射程的一半」而不是武器表上的 fx 偏移：
+## 判定框多大、弧光就多大范围里出现，换武器自动跟着射程走。
+func spawn_attack_fx() -> Node2D:
+	var id := fx_attack_id()
+	if id == "":
+		return null
+	return EffectLibrary.spawn(id, get_parent(),
+			global_position + facing * attack_param("range_px", 120.0) * 0.5,
+			facing.angle())
+
+
+## ------------------------------------------------------------
 ## 升级特性加成（config progression.traits；层数 × per_stack）
 ##
 ## traits 由 main.gd 注入（Meta.traits_of），临时角色为空 → 所有加成 0。
@@ -632,6 +664,23 @@ func _compute_speed() -> float:
 ## （见 trait_damage / vision_px / attack_range_px），不需要在这里处理。
 func refresh_supply_stats() -> void:
 	speed = _compute_speed()
+
+
+## 调试面板改完数值后的原地重算（见 Scripts/debug_stat_panel.gd）。
+## 覆盖的是「开局算一次就钉住」的那几个成员：移速、生命上限、近战判定半径。
+## 伤害/视野/射程/时序不用管 —— 它们每次读都现算，配置一改下一击就是新值。
+##
+## 血上限变了 → **自动回满**（用户 2026-09-20 定）：调完数值还要先吃药或重开一局
+## 才看得出效果，调试节奏会被打断；上限没变时只夹住溢出，不白送血。
+func refresh_debug_stats() -> void:
+	speed = _compute_speed()
+	var new_max := compute_max_hp()
+	if new_max != max_hp:
+		max_hp = new_max
+		hp = max_hp
+	else:
+		hp = mini(hp, max_hp)
+	_apply_hitbox_radius()      # 近战判定圆是缓存进 CollisionShape 的
 
 
 ## 攻击频率的时序缩放：累计 +X% → 前摇/判定/后摇除以 (1 + X/100)，越多越快
@@ -933,15 +982,23 @@ func _apply_hitbox_radius() -> void:
 	shape.radius = maxf(effective_attack_range_px(), 0.0)
 
 
-func _init_combat() -> void:
-	max_hp = int(Config.get_value("combat.player.max_hp", 100))
+## 本局生命上限 = 配置基础 → 被局外养成整值顶替 → 再叠气血特性。
+## 【必须走这个函数】调试面板改完 `combat.player.max_hp` 要原地重算（见 refresh_debug_stats）；
+## 式子抄第二遍，下一次改"养成顶替出厂值"的语义时必然漏改一边，出现开局一个上限、
+## 调完数值另一个上限。
+func compute_max_hp() -> int:
+	var v := int(Config.get_value("combat.player.max_hp", 100))
 	# 局外养成进局内：雕像买的"生命上限"直接决定本局 max_hp
 	# （2026-09-14 用户确认，见 04_OPEN_QUESTIONS 已回答第 12 条）
 	var meta_hp := int(Meta.get_stat("survival.max_hp"))
 	if meta_hp > 0:
-		max_hp = meta_hp
+		v = meta_hp
 	# 气血特性：在养成之后再加一层固定值（层数 × per_stack）
-	max_hp += int(trait_flat("hp"))
+	return v + int(trait_flat("hp"))
+
+
+func _init_combat() -> void:
+	max_hp = compute_max_hp()
 	hp = max_hp
 	print("[Combat] 本局生命上限 %d（含局外养成/升级特性）" % max_hp)
 	_run = get_tree().get_first_node_in_group("run_manager")
@@ -1070,6 +1127,10 @@ func resolve_attack_hit() -> void:
 		# 受击视觉反馈（白闪+挤压+击退），方向同 alert_from_attacker
 		if area.has_method("play_hit_fx"):
 			area.call("play_hit_fx", global_position)
+		# 命中星芒：贴在目标身上而不是自己身前 —— 一剑砍三个时三朵星芒才读得出"都中了"
+		var spark := fx_hit_id()
+		if spark != "":
+			EffectLibrary.spawn(spark, get_parent(), area.global_position)
 		print("[Combat] 命中 %s，造成 %d 伤害" % [area.name, dmg])
 	if hits > 0:
 		# 一次挥击只顿一下（不是每中一个目标各顿）：多目标同帧命中在真实时间里仍是同一瞬
@@ -1157,6 +1218,8 @@ func fire_hitscan() -> int:
 				else (targets[-1] as Node2D).global_position
 		_spawn_ring_at(impact, float(cfg.get("impact_radius", 26.0)),
 				Color(str(cfg.get("impact_color", "#ff9a3d"))))
+		EffectLibrary.spawn(str(cfg.get("fx_impact", "")), get_parent(), impact,
+				facing.angle())
 	if not targets.is_empty():
 		HitStop.pulse(get_tree(), "on_deal_damage")
 	return targets.size()

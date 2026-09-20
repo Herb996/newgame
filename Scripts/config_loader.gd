@@ -173,6 +173,35 @@ func clear_overrides() -> void:
 	_overrides = {}
 
 
+## 某路径是否被覆盖层改过（局内调试面板据此标「已改」）。
+## 注意覆盖层是**按路径造中间字典**的（见 _set_path），所以这里走的是"探到这棵子树的
+## 这个位置"，不是"整棵 _overrides 里有没有这个字符串键"。
+func has_override(path: String) -> bool:
+	return _probe(_overrides, path)[0]
+
+
+## 覆盖层里的全部叶子路径（"player.speed" 这种点路径）。
+## 面板顶部的「全部还原」与「打印本次覆盖项」都读它 —— 覆盖层只存内存，
+## 想留下哪个值只能自己抄进 Data/config.json，所以先把名单打出来。
+func override_paths() -> Array:
+	var out: Array = []
+	_collect_leaf_paths(_overrides, "", out)
+	out.sort()
+	return out
+
+
+func _collect_leaf_paths(d: Dictionary, prefix: String, out: Array) -> void:
+	for k in d:
+		var p := ("%s.%s" % [prefix, str(k)]) if prefix != "" else str(k)
+		var v = d[k]
+		if v is Dictionary:
+			# 空子树一概跳过：clear_override 只抹叶子，中间那层 {} 会留在覆盖层里，
+			# 把它当叶子列出来就等于报了一条「改了但值还是出厂那一整棵」的假改动。
+			_collect_leaf_paths(v, p, out)
+		else:
+			out.append(p)
+
+
 # ------------------------------------------------------------
 # 内部：点路径读写
 # ------------------------------------------------------------
@@ -196,7 +225,15 @@ func _deep_merge(into: Dictionary, from: Dictionary) -> void:
 	for k in from:
 		var v = from[k]
 		if v is Dictionary and into.has(k) and (into[k] is Dictionary):
-			_deep_merge(into[k], v)
+			# ⚠ 递归前先把 into[k] 换成副本。`into` 顶层是新建的 merged，但它从低层抄来的
+			# 每个子字典都是 _data / _user 里的**那一个**（字典是引用语义），在它身上写
+			# 就等于改了出厂值 —— clear_override 之后出厂值回不来，「全部还原」与设置面板
+			# 的「恢复默认」都会坏在这一点上（2026-09-20 查调试面板时定位）。
+			# 只复制被覆盖到的那一支，不复制整棵：hot path 上（_weapons() 每次出手都读）
+			# 拷贝成本与被改动的子树大小成正比，而不是与配置大小成正比。
+			var sub: Dictionary = (into[k] as Dictionary).duplicate(true)
+			into[k] = sub
+			_deep_merge(sub, v as Dictionary)
 		else:
 			into[k] = v
 
@@ -215,12 +252,21 @@ func _set_path(root: Dictionary, path: String, value: Variant) -> void:
 func _erase_path(root: Dictionary, path: String) -> void:
 	var parts := path.split(".")
 	var node := root
+	var chain: Array = [root]
 	for i in range(parts.size() - 1):
 		var k := parts[i]
 		if not (node.has(k) and node[k] is Dictionary):
 			return
 		node = node[k]
+		chain.append(node)
 	node.erase(parts[parts.size() - 1])
+	# 反向剪掉被掏空的中间层：不剪的话 clear_override 之后 _overrides 里留一串 {}，
+	# has_override("enemy.attack") 这类祖先查询会误报成"改过"。
+	for i in range(chain.size() - 1, 0, -1):
+		var child: Dictionary = chain[i]
+		if not child.is_empty():
+			return
+		(chain[i - 1] as Dictionary).erase(parts[i - 1])
 
 
 ## JSON 没有 int/float 之分，读回来全是 float。

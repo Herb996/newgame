@@ -651,7 +651,8 @@
       "range_px": 52.0,
       "cooldown_seconds": 1.0,
       "windup_seconds": 0.18,
-      "min_duration_seconds": 0.3
+      "min_duration_seconds": 0.3,
+      "fx_attack": "slash_claw"
     },
     "knockback_px": 32.0,
     "speed": 360.0,
@@ -802,7 +803,8 @@
         "windup_seconds": 0.12,
         "active_seconds": 0.08,
         "recovery_seconds": 0.2,
-        "noise": 120
+        "noise": 120,
+        "fx_attack": "slash_sword"
       },
       "spear": {
         "name": "长枪",
@@ -815,7 +817,8 @@
         "windup_seconds": 0.15,
         "active_seconds": 0.08,
         "recovery_seconds": 0.25,
-        "noise": 110
+        "noise": 110,
+        "fx_attack": "thrust_spear"
       },
       "staff": {
         "_comment": "法杖（2026-09-18 随「僧侣」加入）。**kind 复用现成的 melee**（扇形 Hitbox），一行 combat 代码都不改 —— 这轮的边界就是「只加外观、能选能打」，治疗机制留作后续任务。数值定位刻意做成**低伤低噪的中距近战**：伤害 18（低于剑 25 / 枪 26）、射程 140（夹在剑 120 与枪 180 之间）、扇形 140° 打 2 个，噪音 60 是四把武器里最小的（比弓的 70 还安静）—— 施法声本就不该像刀剑碰撞那么响，也给日后「奶妈不该引怪」留出空间。三段时间（0.2/0.1/0.35 = 0.65s）刻意放慢，去贴 Heal 动画那 11 帧的施法韵律（14fps ≈ 0.79s，动画略长于判定，末帧停留等待 recovery）。",
@@ -829,7 +832,8 @@
         "windup_seconds": 0.2,
         "active_seconds": 0.1,
         "recovery_seconds": 0.35,
-        "noise": 60
+        "noise": 60,
+        "fx_attack": "cast_staff"
       },
       "bow": {
         "name": "弓",
@@ -851,7 +855,9 @@
           "hit_radius_px": 16.0,
           "scale": 1.0,
           "muzzle_offset_px": 22.0,
-          "max_targets": 1
+          "max_targets": 1,
+          "fx_impact": "spark_arrow",
+          "fx_miss": "puff_dust"
         }
       },
       "sniper": {
@@ -876,7 +882,8 @@
           "tracer_color": "#ffd873",
           "tracer_fade_seconds": 0.18,
           "impact_radius": 26.0,
-          "impact_color": "#ff9a3d"
+          "impact_color": "#ff9a3d",
+          "fx_impact": "spark_hit"
         }
       }
     },
@@ -930,7 +937,9 @@
       "damage": 25,
       "range_px": 120.0,
       "arc_degrees": 200,
-      "max_targets": 3
+      "max_targets": 3,
+      "fx_hit": "spark_hit",
+      "fx_hit_comment": "fx_hit = 我方近战**砍中目标**时在身上放的星芒（武器自己写了 fx_hit 就听武器的）。出手那一刀的弧光是另一件事，写在 combat.weapons.<武器>.fx_attack。"
     },
     "dodge": {
       "duration_seconds": 0.22,
@@ -1394,6 +1403,9 @@
     "stretch_aspect": "keep"
   },
   "debug": {
+    "_comment": "stat_panel_* = 局内右侧「数值调试」栏（Scripts/debug_stat_panel.gd）。出厂 enabled=false：调试构建（OS.is_debug_build()）里 F9 随时能开，导出包不创建这个节点。改数值写的是 Config 的**运行时覆盖层**（只存内存，退出即忘），既不碰本文件也不碰 user://settings.json —— 想留下哪个值，点面板顶部「打印改动」照那张表手改这里。stat_panel_key 存**物理键码**（4194340 = F9），与项目里其它改键一致。",
+    "stat_panel_enabled": false,
+    "stat_panel_key": 4194340,
     "walk_seek_wet": false,
     "force_player_hit": false,
     "force_player_hit_offset": [
@@ -3360,7 +3372,8 @@
               "min_damage": 1
             }
           }
-        ]
+        ],
+        "fx_attack": "slash_claw"
       },
       {
         "id": "ep_cave",
@@ -3379,7 +3392,8 @@
           "res://Assets/Art/Sprites/Units/ep_cave/idle_05.png",
           "res://Assets/Art/Sprites/Units/ep_cave/idle_06.png",
           "res://Assets/Art/Sprites/Units/ep_cave/idle_07.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_lizard",
@@ -3416,7 +3430,8 @@
           "res://Assets/Art/Sprites/Units/ep_lizard/attack_06.png",
           "res://Assets/Art/Sprites/Units/ep_lizard/attack_07.png",
           "res://Assets/Art/Sprites/Units/ep_lizard/attack_08.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_snake",
@@ -3453,7 +3468,8 @@
           "res://Assets/Art/Sprites/Units/ep_snake/attack_03.png",
           "res://Assets/Art/Sprites/Units/ep_snake/attack_04.png",
           "res://Assets/Art/Sprites/Units/ep_snake/attack_05.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_spider",
@@ -3489,7 +3505,8 @@
           "res://Assets/Art/Sprites/Units/ep_spider/attack_05.png",
           "res://Assets/Art/Sprites/Units/ep_spider/attack_06.png",
           "res://Assets/Art/Sprites/Units/ep_spider/attack_07.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_turtle",
@@ -3531,7 +3548,8 @@
           "res://Assets/Art/Sprites/Units/ep_turtle/attack_07.png",
           "res://Assets/Art/Sprites/Units/ep_turtle/attack_08.png",
           "res://Assets/Art/Sprites/Units/ep_turtle/attack_09.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_hex_shaman",
@@ -3568,7 +3586,8 @@
           "res://Assets/Art/Sprites/Units/ep_hex_shaman/attack_07.png",
           "res://Assets/Art/Sprites/Units/ep_hex_shaman/attack_08.png",
           "res://Assets/Art/Sprites/Units/ep_hex_shaman/attack_09.png"
-        ]
+        ],
+        "fx_attack": "cast_hex"
       },
       {
         "id": "ep_pig",
@@ -3595,7 +3614,8 @@
           "res://Assets/Art/Sprites/Units/ep_pig/run_01.png",
           "res://Assets/Art/Sprites/Units/ep_pig/run_02.png",
           "res://Assets/Art/Sprites/Units/ep_pig/run_03.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_pig_rider",
@@ -3629,7 +3649,8 @@
           "res://Assets/Art/Sprites/Units/ep_pig_rider/attack_04.png",
           "res://Assets/Art/Sprites/Units/ep_pig_rider/attack_05.png",
           "res://Assets/Art/Sprites/Units/ep_pig_rider/attack_06.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_spear_goblin",
@@ -3695,7 +3716,8 @@
             "scan_interval_seconds": 1.0,
             "repath_interval_seconds": 0.4
           }
-        }
+        },
+        "fx_attack": "thrust_spear"
       },
       {
         "id": "ep_torch_goblin",
@@ -3759,7 +3781,8 @@
               "min_damage": 1
             }
           }
-        ]
+        ],
+        "fx_attack": "spark_arrow"
       },
       {
         "id": "ep_bomb_fish",
@@ -3795,7 +3818,8 @@
           "res://Assets/Art/Sprites/Units/ep_bomb_fish/attack_04.png",
           "res://Assets/Art/Sprites/Units/ep_bomb_fish/attack_05.png",
           "res://Assets/Art/Sprites/Units/ep_bomb_fish/attack_06.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_harpoon_shark",
@@ -3832,7 +3856,8 @@
           "res://Assets/Art/Sprites/Units/ep_harpoon_shark/attack_05.png",
           "res://Assets/Art/Sprites/Units/ep_harpoon_shark/attack_06.png",
           "res://Assets/Art/Sprites/Units/ep_harpoon_shark/attack_07.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_paddle_shark",
@@ -3867,7 +3892,8 @@
           "res://Assets/Art/Sprites/Units/ep_paddle_shark/attack_03.png",
           "res://Assets/Art/Sprites/Units/ep_paddle_shark/attack_04.png",
           "res://Assets/Art/Sprites/Units/ep_paddle_shark/attack_05.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_gnoll",
@@ -3904,7 +3930,8 @@
           "res://Assets/Art/Sprites/Units/ep_gnoll/attack_05.png",
           "res://Assets/Art/Sprites/Units/ep_gnoll/attack_06.png",
           "res://Assets/Art/Sprites/Units/ep_gnoll/attack_07.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_gnome",
@@ -3940,7 +3967,8 @@
           "res://Assets/Art/Sprites/Units/ep_gnome/attack_04.png",
           "res://Assets/Art/Sprites/Units/ep_gnome/attack_05.png",
           "res://Assets/Art/Sprites/Units/ep_gnome/attack_06.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_minotaur",
@@ -3991,7 +4019,8 @@
           "res://Assets/Art/Sprites/Units/ep_minotaur/attack_09.png",
           "res://Assets/Art/Sprites/Units/ep_minotaur/attack_10.png",
           "res://Assets/Art/Sprites/Units/ep_minotaur/attack_11.png"
-        ]
+        ],
+        "fx_attack": "slash_claw"
       },
       {
         "id": "ep_panda",
@@ -4035,7 +4064,8 @@
           "res://Assets/Art/Sprites/Units/ep_panda/attack_10.png",
           "res://Assets/Art/Sprites/Units/ep_panda/attack_11.png",
           "res://Assets/Art/Sprites/Units/ep_panda/attack_12.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_skull",
@@ -4119,7 +4149,8 @@
             "drop_from_splits": true,
             "max_live_split_enemies": 0
           }
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_thief",
@@ -4152,7 +4183,8 @@
           "res://Assets/Art/Sprites/Units/ep_thief/attack_03.png",
           "res://Assets/Art/Sprites/Units/ep_thief/attack_04.png",
           "res://Assets/Art/Sprites/Units/ep_thief/attack_05.png"
-        ]
+        ],
+        "fx_attack": ""
       },
       {
         "id": "ep_troll",
@@ -4207,9 +4239,146 @@
           "res://Assets/Art/Sprites/Units/ep_troll/dead_07.png",
           "res://Assets/Art/Sprites/Units/ep_troll/dead_08.png",
           "res://Assets/Art/Sprites/Units/ep_troll/dead_09.png"
-        ]
+        ],
+        "fx_attack": "slash_claw"
       }
-    ]
+    ],
+    "_fx_comment": "types[].fx_attack = 该兵种出手时的特效 id（fx.fx 库里的一条，见顶层 fx._comment）。写空串 = 用 enemy.attack.fx_attack 那条默认。这轮按用户「敌人也做，挑几个兵种」只给 6 个兵种配了专属形状，其余全走默认的红色毛边月牙。"
+  },
+  "fx": {
+    "_comment": "特效库（Scripts/combat/fx_library.gd）。一条 = 一个特效，谁用谁写 id，加角色不改代码。四个引用点各自独立可缺省（缺省 = 空串 = 不生成，老配置不改也照样跑）：① 我方出手那一刀的弧光 combat.weapons.<武器>.fx_attack；② 我方近战砍中目标身上的星芒 combat.attack.fx_hit（武器写了 fx_hit 听武器的）；③ 我方弹道/瞬狙命中 combat.weapons.<武器>.projectile.fx_impact / .fx_miss 或 .hitscan.fx_impact；④ 敌人出手 enemy_types.types[].fx_attack，空串则回落 enemy.attack.fx_attack 那条默认。素材由 tools/cut_fx.py 从 RPG Effect All Free 总表切出：横条图集（帧从左到右）、格 128px = 源表 64px 格的 2 倍整数放大、每格保留完整正方形不裁包围盒（裁了会抖）。源表结构：行 = 9 种配色（0 橙/1 粉/2 蓝/3 绿/4 棕橙/5 白/6 土黄/7 红/8 紫）、列 = 帧。frames/fps 必须和切脚本打印的一致。scale/offset_px/modulate/z_index 全在这张表里调。",
+    "enabled": true,
+    "max_simultaneous": 48,
+    "effects": {
+      "slash_sword": {
+        "_comment": "剑士出手：RPG 表 P33-1617 第 5 行（白/钢），素面粗厚弯月弧 14 帧。",
+        "texture": "res://Assets/Art/Sprites/FX/slash_sword.png",
+        "frames": 14,
+        "fps": 40.0,
+        "scale": 0.9,
+        "offset_px": [
+          28.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#cfe0ff",
+        "additive": false,
+        "fade_out": 0.08,
+        "z_index": 55
+      },
+      "thrust_spear": {
+        "_comment": "枪手出手：P28-1350 第 5 行，右指长锥带环纹 12 帧（突刺不是横扫）。",
+        "texture": "res://Assets/Art/Sprites/FX/thrust_spear.png",
+        "frames": 12,
+        "fps": 40.0,
+        "scale": 1.5,
+        "offset_px": [
+          70.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.06,
+        "z_index": 55
+      },
+      "cast_staff": {
+        "_comment": "僧侣出手：P32-1575 第 2 行（蓝），同心双环内套旋纹球 14 帧。法杖三段时间合计 0.65s，所以这条刻意放慢（14/26≈0.54s）。",
+        "texture": "res://Assets/Art/Sprites/FX/cast_staff.png",
+        "frames": 14,
+        "fps": 26.0,
+        "scale": 1.15,
+        "offset_px": [
+          26.0,
+          -14.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.12,
+        "z_index": 55
+      },
+      "spark_arrow": {
+        "_comment": "箭矢命中：P33-1637 第 0 行（橙），饱满四芒星带亮心 14 帧。比通用受击星芒小一号 —— 箭是扎进去的，不该炸成火球。",
+        "texture": "res://Assets/Art/Sprites/FX/spark_arrow.png",
+        "frames": 14,
+        "fps": 42.0,
+        "scale": 0.75,
+        "offset_px": [
+          0.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.06,
+        "z_index": 50
+      },
+      "spark_hit": {
+        "_comment": "通用受击星芒：P32-1585 第 5 行（白），粗射线八芒星爆发 14 帧。近战判定帧砍中目标时在目标身上放这一条。",
+        "texture": "res://Assets/Art/Sprites/FX/spark_hit.png",
+        "frames": 14,
+        "fps": 44.0,
+        "scale": 0.85,
+        "offset_px": [
+          0.0,
+          -10.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.06,
+        "z_index": 56
+      },
+      "slash_claw": {
+        "_comment": "敌人近战出手：P33-1616 第 7 行（红），带尖刺毛边的月牙弧 13 帧。毛边比我方那条更糙 —— 一眼分得清是谁在挥。",
+        "texture": "res://Assets/Art/Sprites/FX/slash_claw.png",
+        "frames": 13,
+        "fps": 34.0,
+        "scale": 1.25,
+        "offset_px": [
+          34.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.08,
+        "z_index": 52
+      },
+      "cast_hex": {
+        "_comment": "萨满出手：P29-1425 第 8 行（紫），四扇叶旋成圆形法阵环 13 帧。",
+        "texture": "res://Assets/Art/Sprites/FX/cast_hex.png",
+        "frames": 13,
+        "fps": 22.0,
+        "scale": 1.05,
+        "offset_px": [
+          22.0,
+          -18.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#ffffff",
+        "additive": true,
+        "fade_out": 0.12,
+        "z_index": 52
+      },
+      "puff_dust": {
+        "_comment": "落空/撞墙的扬尘：P31-1527 第 6 行（土黄），放射点状扩散碎圈 14 帧。箭撞墙或飞满射程时用，给「弹道去哪了」一个交代。非加色：它是尘不是光。",
+        "texture": "res://Assets/Art/Sprites/FX/puff_dust.png",
+        "frames": 14,
+        "fps": 26.0,
+        "scale": 1.1,
+        "offset_px": [
+          0.0,
+          0.0
+        ],
+        "rot_degrees": 0.0,
+        "modulate": "#d8c4a0",
+        "additive": false,
+        "fade_out": 0.14,
+        "z_index": 48
+      }
+    }
   },
   "animal_types": {
     "_comment": "官方包里的羊（吃草/待机/走动三套动画）。做成中立生物：地图上游荡，玩家靠近就跑，被打死掉落食物。",

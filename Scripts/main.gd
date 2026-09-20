@@ -16,6 +16,7 @@ const PLACEMENT_SCRIPT := preload("res://Scripts/placement_mode.gd")
 const SOAK_PROBE := preload("res://Scripts/soak_probe.gd")
 const SELECTION_SCRIPT := preload("res://Scripts/selection_controller.gd")
 const SEPARATION_SCRIPT := preload("res://Scripts/combat/unit_separation.gd")
+const STAT_PANEL_SCRIPT := preload("res://Scripts/debug_stat_panel.gd")
 
 enum Mode { BASE, RUN }
 
@@ -74,8 +75,16 @@ var _placing_id := ""
 ## 局内选择/框选/下令的鼠标控制器：每进一局挂到 HUD 下、回基地时销毁。
 var _selection: Control = null
 
+## 局内数值调试右侧栏（F9 开关，见 Scripts/debug_stat_panel.gd）。
+## 只创建一次、跨局常驻：它调的是 Config 覆盖层与在场单位，跟"这一局"没有绑定关系。
+## 导出包（OS.is_debug_build() == false 且没强开开关）→ 保持 null，节点根本不创建。
+var _stat_panel: CanvasLayer = null
+
 
 func _ready() -> void:
+	# 必须在下面几个 `return` 早退出口之前：命令行出图 / smoke_test 那些路径
+	# 也要能按 F9 调数值（探针就跑在这些路径上）。
+	_mount_stat_panel()
 	base_system.building_interacted.connect(_on_building_interacted)
 	base_system.reposition_requested.connect(_on_reposition_requested)
 	character_panel.launch_requested.connect(_on_launch)
@@ -413,6 +422,18 @@ func _overlay_open() -> bool:
 func _clear_game_root() -> void:
 	for c in game_root.get_children():
 		c.queue_free()
+
+
+## 局内数值调试右侧栏（见 Scripts/debug_stat_panel.gd）。两道闸：
+##   · `OS.is_debug_build()` —— 编辑器 / 非发布导出为真，发布包为假 → 这个节点压根不存在；
+##   · `debug.stat_panel_enabled` —— 要在发布包里临时救火时手动开。
+## 建了**不显示**：显隐归面板自己（F9）。这里只决定"本进程有没有这个工具"。
+func _mount_stat_panel() -> void:
+	if not (OS.is_debug_build() or bool(Config.get_value("debug.stat_panel_enabled", false))):
+		return
+	_stat_panel = STAT_PANEL_SCRIPT.new()
+	_stat_panel.name = "DebugStatPanel"
+	add_child(_stat_panel)
 
 
 ## 局内选择控制器只在局内存在：进局重建、回基地销毁。

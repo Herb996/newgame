@@ -175,7 +175,8 @@ func edge_pan_active() -> bool:
 	return true
 
 
-## 沿父链判断某控件是否属于常驻底部菜单栏（CanvasLayer "MenuBar" 在 group "menu_bar"）。
+## 沿父链判断某控件是否属于"常驻 HUD 类"控件（CanvasLayer 上的菜单栏 / 数值调试栏）。
+## 这类栏贴着屏幕边，鼠标停在上面是常态，不该把边缘滚屏整个停掉。
 ## ⚠ `n` 必须显式声明成 **Node**：`var n := c` 会被推断成 Control，
 ## 于是 `n = n.get_parent()`（返回 Node）每帧抛「Trying to assign Node to Control」——
 ## 而且是**运行时**错误，会把 `edge_pan_active()` 的剩余代码整个吞掉
@@ -183,7 +184,7 @@ func edge_pan_active() -> bool:
 func _is_menu_bar_control(c: Control) -> bool:
 	var n: Node = c
 	while n != null:
-		if n.is_in_group("menu_bar"):
+		if n.is_in_group("menu_bar") or n.is_in_group("debug_dock"):
 			return true
 		n = n.get_parent()
 	return false

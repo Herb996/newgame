@@ -147,6 +147,8 @@ var _attack_cd_seconds := 1.0
 var _attack_windup := 0.18         # 前摇：出手后多久结算伤害
 var _attack_min_dur := 0.3         # 攻击动作保底时长（无攻击帧的兵种也用得上）
 var _attack_hit_at := 0.0          # >0 = 这一刀已出手还在前摇，归零时结算（挥空也要走完）
+var _fx_attack := ""               # 出手特效 id（_apply_type 里算一次：兵种没写就用
+                                   # enemy.attack.fx_attack 那条默认；空串 = 不放）
 
 # --- 表现层 ---
 var _body: Sprite2D = null
@@ -551,15 +553,18 @@ func _vanish_phantoms() -> void:
 	members.clear()
 
 
-## 套用兵种：属性 + 帧序列 + 脚底偏移。所有数值都能在 config 的 enemy_types 里调。
-func _apply_type(type_cfg: Dictionary) -> void:
+## 兵种数值段（**不含** hp=max_hp，也不碰贴图）。
+## 拆出来是为了让调试面板改完 `enemy_types.types[*].hp` 这类值后能重算同一套式子 ——
+## 面板里重抄一遍"兵种键 → 回落 enemy.max_hp"的顺序，下次改语义必然漏改一边。
+## 不在这里写 hp = max_hp：重算数值时把全场怪顺手奶满，是玩家看不懂的副作用
+## （出生满血留给 _apply_type）。
+func _apply_numeric(type_cfg: Dictionary) -> void:
 	if not type_cfg.is_empty():
 		type_id = StringName(str(type_cfg.get("id", "")))
 		type_name = str(type_cfg.get("name", type_cfg.get("id", "")))
 		max_hp = int(type_cfg.get("hp", Config.get_value("enemy.max_hp", 40)))
 		damage = int(type_cfg.get("damage", Config.get_value("enemy.contact_damage", 10)))
 		speed_mult = float(type_cfg.get("speed_mult", 1.0))
-	hp = max_hp
 	# 近战出手参数。放在 `if _body == null: return` 之前：没有 Body 的假敌人/无头探针
 	# 照样要有射程与冷却，否则它们永远不打人，探针也就测不出东西。
 	var atk: Dictionary = Config.get_value("enemy.attack", {})
@@ -567,6 +572,16 @@ func _apply_type(type_cfg: Dictionary) -> void:
 	_attack_cd_seconds = float(atk.get("cooldown_seconds", 1.0))
 	_attack_windup = float(atk.get("windup_seconds", 0.18))
 	_attack_min_dur = float(atk.get("min_duration_seconds", 0.3))
+	# 出手特效：兵种写了专属 id 用专属的，写空串（或没写）都回落到 enemy.attack.fx_attack。
+	# 与上面几项一样放在 _body 判空之前：无 Body 的假敌人/探针也要能读到。
+	var type_fx := str(type_cfg.get("fx_attack", ""))
+	_fx_attack = type_fx if type_fx != "" else str(atk.get("fx_attack", ""))
+
+
+## 套用兵种：属性 + 帧序列 + 脚底偏移。所有数值都能在 config 的 enemy_types 里调。
+func _apply_type(type_cfg: Dictionary) -> void:
+	_apply_numeric(type_cfg)
+	hp = max_hp
 	# 镜像模式算在这里而不是下面的 Body 分支里：无 Body 的假敌人/无头探针也要能读到。
 	_flip_mode = resolve_flip_mode(type_cfg)
 
@@ -611,6 +626,20 @@ func _apply_type(type_cfg: Dictionary) -> void:
 					_death_frames.append(tex)
 	_animator = PlayerAnimator.new(_body)
 	_animator.load_from_config(spec, view_cfg, "")   # 空 label = 不打印（100 个会刷屏）
+
+
+## 调试面板改完数值后的原地重算（见 Scripts/debug_stat_panel.gd）。
+## `_ai_cache` 必须一起作废：它是"定稿后不再读 config"的合并缓存（见 ai_cfg 头注释），
+## 不作废的话面板拖 `enemy.ai.*` 的滑块会一动不动，看起来像面板坏了。
+## 血上限变了 → 自动回满（与 player.gd::refresh_debug_stats 同一条用户约定）。
+func refresh_debug_stats() -> void:
+	var old_max := max_hp
+	_apply_numeric(_type_cfg)
+	_ai_cache = {}
+	if max_hp != old_max:
+		hp = max_hp
+	else:
+		hp = mini(hp, max_hp)
 
 
 ## 本兵种的镜像模式：兵种 art_facing 键 → ART_FACING 表 → 默认朝右。
@@ -1668,6 +1697,11 @@ func _start_attack() -> void:
 	var p := _get_player()
 	if p != null:
 		set_facing(p.global_position - global_position)
+	# 出手弧光：与挥砍动作同帧，和"砍没砍到"无关（理由同上面那三件事）。
+	# 250 只敌人同时挥也不会刷爆 —— EffectLibrary 按 fx.max_simultaneous 直接不生成。
+	if _fx_attack != "" and p != null:
+		EffectLibrary.spawn(_fx_attack, get_parent(),
+				global_position + _facing * _attack_range * 0.6, _facing.angle())
 	# 按攻击帧数算挥砍时长（帧数/帧率），让整套挥砍完整播完；无攻击帧的兵种用保底时长。
 	_attack_timer = maxf(_attack_min_dur, _attack_frames / maxf(_attack_fps, 1.0))
 	_attack_cooldown = _attack_cd_seconds

@@ -42,6 +42,10 @@ var origin := Vector2.ZERO
 var _travelled := 0.0
 var _done := false
 var _sprite: Sprite2D = null
+## 弹道结束时的特效 id（命中 = fx_impact，撞墙/飞满射程 = fx_miss）。
+## 空串 = 不放，与"配置里没这两个键"完全等价（EffectLibrary 见空串直接 return）。
+var _fx_impact := ""
+var _fx_miss := ""
 
 
 ## cfg 直接吃 config 的 combat.weapons.<id>.projectile 段
@@ -55,6 +59,8 @@ func setup(cfg: Dictionary, p_dir: Vector2, p_damage: int,
 	speed = float(cfg.get("speed", 900.0))
 	max_distance = float(cfg.get("max_distance_px", 640.0))
 	hit_radius = float(cfg.get("hit_radius_px", 16.0))
+	_fx_impact = str(cfg.get("fx_impact", ""))
+	_fx_miss = str(cfg.get("fx_miss", ""))
 
 	z_index = 30
 	rotation = dir.angle()          # 贴图朝速度方向；Arrow.png 在画布里居中，不用补偿
@@ -99,13 +105,22 @@ func _physics_process(delta: float) -> void:
 			target.call("play_hit_fx", origin)
 		# 命中微冻：本项目弹道只出自玩家武器，所以算"我方打出伤害"那一档
 		HitStop.pulse(get_tree(), "on_deal_damage")
+		_spawn_fx(_fx_impact)
 		_finish()
 		return
 	if blocked:
+		_spawn_fx(_fx_miss)
 		_finish()
 		return
 	if _travelled >= max_distance:
+		_spawn_fx(_fx_miss)
 		_finish()
+
+
+## 弹道收尾时的特效：挂在**自己的父节点**上而不是自己身上 —— 自己这一帧就 queue_free，
+## 挂下面的话特效会跟着一起消失（连一帧都看不见）。
+func _spawn_fx(id: String) -> void:
+	EffectLibrary.spawn(id, get_parent(), global_position, dir.angle())
 
 
 func _targets() -> Array:
