@@ -93,7 +93,7 @@ func _ready() -> void:
 # ------------------------------------------------------------
 func _table() -> void:
 	var effects: Dictionary = Config.get_value("fx.effects", {})
-	_check(effects.size() == 28, "fx.effects 有 28 条（实得 %d）" % effects.size())
+	_check(effects.size() == 27, "fx.effects 有 27 条（实得 %d）" % effects.size())
 	var bad_tex: Array = []
 	var bad_geom: Array = []
 	for id in effects.keys():
@@ -124,7 +124,7 @@ func _table() -> void:
 	# 表里每一条都要**真建得出节点**：第二批 20 条只写了配置，没被任何实拍路径覆盖之前，
 	# "存在且尺寸对" 不等于 "生成器认得它"。逐条 spawn 一次，顺手核对 hframes。
 	var bad_spawn: Array = []
-	# queue_free 是延迟的：循环里这 28 个都还算「在场」，不放宽上限后半截会被
+	# queue_free 是延迟的：循环里这 27 个都还算「在场」，不放宽上限后半截会被
 	# max_simultaneous 直接拒生成，看起来像表坏了。上限本身由 B 段单独守。
 	Config.set_override("fx.max_simultaneous", 64)
 	for id in effects.keys():

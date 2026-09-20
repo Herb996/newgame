@@ -8,7 +8,7 @@
 可视化版本：`C:\Users\Administrator\Downloads\特效\fx_gallery.html` —— 浏览器直接打开，331 格缩略图按类别/用途可筛选、可搜索、点开看原图。
 它由 `python _gallery.py` 从**本文档第三节 + `_inventory.tsv`** 生成（文字明细以本文档为准，图里不重复维护一份）。
 
-**当前状态：已切 28 条进 `Assets/Art/Sprites/FX/`（128px 格 = 源 64px 放大 2 倍），
+**当前状态：已切 27 条进 `Assets/Art/Sprites/FX/`（128px 格 = 源 64px 放大 2 倍；第二批的 `hit_sniper` 已随强弩删除，2026-09-20），
 由 `Data/config.json` 的 `fx.effects` 按 id 引用；换素材/加条目改 `tools/cut_fx.py` + 配置，不改脚本。**
 第一批 8 条是我方出手 + 通用命中；第二批 20 条（2026-09-20）= 15 个兵种专属出手 + 5 把武器专属命中，
 全部走**现成挂点**（`enemy_types.types[].fx_attack` / `combat.weapons.<w>.fx_hit`），一行 `.gd` 都没改。
