@@ -337,7 +337,8 @@ func _enter_run() -> void:
 ## 建筑交互路由（BaseSystem 转发）
 func _on_building_interacted(building_id: String) -> void:
 	match building_id:
-		"gate":
+		"portal":
+			# 与 2D 线同步（2026-09-20）：出击入口从「出发大门」换到「出击传送门」。
 			_enter_run()
 		"warehouse":
 			warehouse_panel.open()
@@ -775,13 +776,13 @@ func _flow_test() -> void:
 	await _settle(3)
 	_check(fails, not statue_panel.visible, "雕像：再按 E 面板关闭")
 
-	# ---------------- 3) 大门 → 进局 ----------------
-	await _try_building("gate")
+	# ---------------- 3) 传送门 → 进局 ----------------
+	await _try_building("portal")
 	await _settle(4)
 	var enemy_n: int = get_tree().get_nodes_in_group("enemies").size()
 	var loot_n: int = get_tree().get_nodes_in_group("loot_nodes").size()
 	var ext_n: int = get_tree().get_nodes_in_group("extraction_points").size()
-	_check(fails, mode == Mode.RUN, "大门：按 E 进入局内（mode == RUN）")
+	_check(fails, mode == Mode.RUN, "传送门：按 E 进入局内（mode == RUN）")
 	_check(fails, _renderer != null, "局内：3D 地形已渲染")
 	_check(fails, not logic_root.visible, "局内：LogicRoot 隐藏（只做逻辑不渲染）")
 	_check(fails, hud.visible, "局内：HUD 显示")

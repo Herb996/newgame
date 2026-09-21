@@ -176,15 +176,17 @@ func _ready() -> void:
 	_finish(0)
 
 
-## 走一遍真实出击流程：点大门 → 面板只勾名册第一人 → 按「出击」。
+## 走一遍真实出击流程：点传送门 → 面板只勾名册第一人 → 按「出击」。
 ## 不直接调 main._on_launch —— 面板 open() 会 get_tree().paused = true、
 ## close() 再放开，这一开一关正属于"用户做过、探针没做"的动作。
+## ⚠ 2026-09-20 出击入口换人：走 "portal"（原 "gate" 已降为纯装饰，点它只
+##   push_warning，面板根本不会弹 → 这里会 _finish(2) 假报环境坏了）。
 func _sortie() -> void:
-	_main.call("_on_building_interacted", "gate")
+	_main.call("_on_building_interacted", "portal")
 	await _frames(3)
 	var panel: Node = _main.get("character_panel")
 	if panel == null or not bool(panel.get("visible")):
-		_say("!! 点大门没弹出选人面板，出击流程走不下去")
+		_say("!! 点传送门没弹出选人面板，出击流程走不下去")
 		_finish(2)
 		return
 	# 只留第一行：全选会一次生成 4 名角色，节点数一多"谁残留"就淹在噪声里

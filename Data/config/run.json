@@ -41,7 +41,8 @@
     }
   },
   "base": {
-    "map_size": 64,
+    "map_size": 80,
+    "layout_version": 2,
     "fit_camera_on_enter": true,
     "building_cells": 4,
     "floor_3d": "wall_plate.png",
@@ -49,19 +50,203 @@
     "wall_height": 1.8,
     "interact_radius_cells": 4.5,
     "player_spawn_cell": [
-      32,
-      32
+      40,
+      38
     ],
+    "terrain": {
+      "_comment": "**基地默认地面已经改成玩家自定义表（base_custom / base.default_layout），这里默认关着。** enabled=true 时才改跑局内那套 MapGenerator 随机铺一版 —— 群系/边界描边/装饰/投影/宏观明暗全白送，但随机的结果是「树穿过房子 + 湖占掉三分之一」，已被否掉，所以它只该作为编辑模式里「随机铺一版」的重掷工具存在。这里每一项都是**进基地时临时压过 map.* 同名键**的覆盖值（generate() 只认 map.* 路径），用完立刻 clear_override，不会污染局内地图。为什么基地要单独一组参数：群系噪声频率与 biome_min_region_cells 是按 128×128 调的，基地只有 64×64=4096 格，照抄会让整片地只剩一个群系、或者把小群系全当成飞地吞掉。decor_density 压低是给建筑留呼吸感。**seed 非 0 时全局固定（回归/摆构图用），0 = 按存档槽号派生种子 → 每个存档一片固定的地、换槽换地形，不需要往存档里加字段。**",
+      "enabled": false,
+      "seed": 0,
+      "biome_noise_frequency": 0.02,
+      "biome_min_region_cells": 24,
+      "decor_density": 0.55,
+      "biome_weights": {
+        "0": 5.0,
+        "1": 1.2,
+        "2": 1.8,
+        "3": 0.7
+      }
+    },
+    "default_layout": {
+      "_comment": "**新存档的基地地面**（老档改过的表优先，不会被这里覆盖；想恢复出厂就删掉存档里的 base_custom 键）。展开成稀疏格子表存进存档槽，见 base_customization.gd。格式：ground=[{biome,rect:[x,y,w,h]}]（0草/1荒原/2森林/3沼泽）、water=[{rect}]、props=[{kind,rect,step}]（kind 1树 2石 3碎石 4裂缝 5河水 6灌木 7铁脉 8金脉 9油脉；step=沿两方向每 N 格放一个，默认 1）。越界的格子自动裁掉，不用自己数出图。**建筑占地里的摆件渲染时一律不画**（base_system._building_cells_set），所以这里可以放心把矩形铺到房子底下。布局思路（80×80，2026-09-21 随扩图重排）：建筑是 5 列 × 4 行（行 y∈{21,33,45,57}，整条塞进 16:9 远景能框住的 y∈[17.5,62.5] 带里，见 base.buildings 的 _comment）。北缘两条林带夹住军事带（箭术场/兵营/大门/瞭望塔/弩车）、西侧再贴一条林带、东南整片荒原配采石场与铁脉（第 3、4 行的东侧槽位正好压在荒原上，采石场/墓园/圆顶残迹都吃这块地）、西南沼泽带一塘死水配油脉（**从 y=58 下移到 63**，否则第 4 行的树屋与龙形祭坛会站在沼泽里）、中央传送门 [38,33] 与出生点 [40,38] 之间留草当广场。",
+      "ground": [
+        {
+          "biome": 2,
+          "rect": [
+            0,
+            3,
+            24,
+            17
+          ]
+        },
+        {
+          "biome": 2,
+          "rect": [
+            56,
+            3,
+            24,
+            15
+          ]
+        },
+        {
+          "biome": 2,
+          "rect": [
+            0,
+            24,
+            9,
+            34
+          ]
+        },
+        {
+          "biome": 1,
+          "rect": [
+            44,
+            44,
+            36,
+            36
+          ]
+        },
+        {
+          "biome": 3,
+          "rect": [
+            0,
+            63,
+            26,
+            17
+          ]
+        }
+      ],
+      "water": [
+        {
+          "rect": [
+            4,
+            64,
+            10,
+            8
+          ]
+        },
+        {
+          "rect": [
+            30,
+            22,
+            6,
+            5
+          ]
+        }
+      ],
+      "props": [
+        {
+          "kind": 1,
+          "rect": [
+            1,
+            4,
+            21,
+            14
+          ],
+          "step": 3
+        },
+        {
+          "kind": 1,
+          "rect": [
+            57,
+            4,
+            21,
+            12
+          ],
+          "step": 3
+        },
+        {
+          "kind": 1,
+          "rect": [
+            1,
+            25,
+            7,
+            31
+          ],
+          "step": 4
+        },
+        {
+          "kind": 6,
+          "rect": [
+            26,
+            18,
+            10,
+            8
+          ],
+          "step": 3
+        },
+        {
+          "kind": 6,
+          "rect": [
+            44,
+            20,
+            12,
+            6
+          ],
+          "step": 2
+        },
+        {
+          "kind": 2,
+          "rect": [
+            46,
+            46,
+            32,
+            32
+          ],
+          "step": 6
+        },
+        {
+          "kind": 3,
+          "rect": [
+            45,
+            45,
+            34,
+            34
+          ],
+          "step": 5
+        },
+        {
+          "kind": 7,
+          "rect": [
+            60,
+            56,
+            18,
+            20
+          ],
+          "step": 5
+        },
+        {
+          "kind": 8,
+          "rect": [
+            2,
+            30,
+            10,
+            14
+          ],
+          "step": 6
+        },
+        {
+          "kind": 9,
+          "rect": [
+            10,
+            66,
+            14,
+            12
+          ],
+          "step": 5
+        }
+      ]
+    },
     "buildings": [
       {
-        "_comment": "基地建筑表（2026-09-18 全量换上 Tiny Swords Blue Buildings 素材，8 栋齐）。**建筑渲染全自动**：Building.gd 按贴图尺寸等比缩放到 4×4 格框（屋顶可向上探出 1.4 倍）、脚底对齐占地底边，贴图缺失时保底一块 id 配色方块不消失。cell = 占地**左上角**格、占 4×4；玩家重摆过的位置存在 Meta.base_layout 优先于这里的 cell（新增 id 不在存档里 → 直接用配置值）。hint 为空 = 纯装饰（点击只 push_warning 不会崩，main 的 match 有 default 分支）。",
+        "_comment": "基地建筑表（2026-09-18 全量换上 Tiny Swords Blue Buildings 素材，现 12 栋；2026-09-21 随基地扩到 80×80 改成 **5 列 × 4 行 = 20 槽**：列 x∈{12,25,38,51,64}、行 y∈{21,33,45,57}，建筑间横向空 9 格、纵向空 8 格（屋顶上探 1.6 格不会压到上一行）。**⚠ 行距为什么是 12 不是 18**：16:9 窗口进基地的远景只框得住 **80×45 格**——camera_controller._refresh_zoom_limits 把 _zoom_lo 夹在「视口宽 ÷ 地图宽」= 0.375（再远就会露出地图外的黑边，所以宁可上下裁），画面纵向因此只有 y∈[17.5,62.5]。四行必须整条塞进这个带里：首行 21（屋顶顶到 19.4）、末行脚底 61。上一版行距 18 把首末行放在 11/65 → **上下各一整行在屏外**，「进基地一眼看全所有建筑」直接落空（main._enter_base 的 frame_world_rect 再怎么框都会被夹回来）。**建筑渲染全自动**：Building.gd 按贴图尺寸等比缩放到 4×4 格框（屋顶可向上探出 1.4 倍）、脚底对齐占地底边，贴图缺失时保底一块 id 配色方块不消失。cell = 占地**左上角**格、占 4×4；玩家重摆过的位置存在 Meta.base_layout 优先于这里的 cell（新增 id 不在存档里 → 直接用配置值；⚠ 这里涨版要同步涨 `base.layout_version`，否则老档会被自己那份旧网格的重摆位置钉住，看不到新构图）。hint 为空 = 纯装饰（点击只 push_warning 不会崩，main 的 match 有 default 分支）。**出击入口是 portal（2026-09-20 从 gate 换过来，gate 降为装饰），见 DESIGN §2.4**。**空槽预留（美术规格与生图 prompt 见 docs/BUILDING_ART_PROMPTS.md，图到位就照 quarry 那条照抄追加）**：[51,33] fountain 喷泉广场（传送门东侧）、[38,45] blacksmith 铁匠铺（传送门正南，装备修理/制作落点）、[64,45] cemetery 墓园（东南荒原侧，接「单位死亡永久」）、[12,57] treehouse 树屋营地（西南林沼）、[25,57] dragon_altar 龙形祭坛、[38,57] statue_pillar 雕像柱、[51,57] ruin_dome 圆顶残迹；[64,57] 留白。",
         "id": "warehouse",
         "name": "仓库",
         "cell": [
-          10,
-          30
+          12,
+          33
         ],
-        "hint": "按 E 查看仓库",
+        "hint": "左键查看仓库",
         "h3d": 2.6,
         "sprite": "res://Assets/Art/Sprites/Buildings/blue_house1.png"
       },
@@ -69,10 +254,10 @@
         "id": "statue",
         "name": "修道院",
         "cell": [
-          38,
-          30
+          25,
+          33
         ],
-        "hint": "按 E 进行升级",
+        "hint": "左键进行升级",
         "h3d": 3.4,
         "sprite": "res://Assets/Art/Sprites/Buildings/blue_monastery.png"
       },
@@ -80,10 +265,10 @@
         "id": "gate",
         "name": "出发大门",
         "cell": [
-          24,
-          30
+          38,
+          21
         ],
-        "hint": "按 E 选择角色出发",
+        "hint": "",
         "h3d": 2.2,
         "sprite": "res://Assets/Art/Sprites/Buildings/blue_castle.png"
       },
@@ -91,8 +276,8 @@
         "id": "archery",
         "name": "箭术场",
         "cell": [
-          38,
-          16
+          12,
+          21
         ],
         "hint": "",
         "h3d": 2.6,
@@ -102,8 +287,8 @@
         "id": "barracks",
         "name": "兵营",
         "cell": [
-          52,
-          16
+          25,
+          21
         ],
         "hint": "",
         "h3d": 2.6,
@@ -113,8 +298,8 @@
         "id": "tower",
         "name": "瞭望塔",
         "cell": [
-          52,
-          30
+          51,
+          21
         ],
         "hint": "",
         "h3d": 3.2,
@@ -124,8 +309,8 @@
         "id": "house2",
         "name": "民居",
         "cell": [
-          10,
-          44
+          64,
+          33
         ],
         "hint": "",
         "h3d": 2.0,
@@ -135,8 +320,8 @@
         "id": "house3",
         "name": "民居",
         "cell": [
-          24,
-          44
+          25,
+          45
         ],
         "hint": "",
         "h3d": 2.0,
@@ -146,8 +331,8 @@
         "id": "farm",
         "name": "谷仓",
         "cell": [
-          10,
-          16
+          12,
+          45
         ],
         "hint": "",
         "h3d": 2.6,
@@ -157,8 +342,8 @@
         "id": "quarry",
         "name": "采石场",
         "cell": [
-          38,
-          44
+          51,
+          45
         ],
         "hint": "",
         "h3d": 2.6,
@@ -166,12 +351,12 @@
       },
       {
         "id": "portal",
-        "name": "传送门",
+        "name": "出击传送门",
         "cell": [
-          24,
-          16
+          38,
+          33
         ],
-        "hint": "",
+        "hint": "左键进入传送门 · 选择出击小队",
         "h3d": 3.4,
         "sprite": "res://Assets/Art/Sprites/Buildings/blue_portal.png"
       },
@@ -179,8 +364,8 @@
         "id": "catapult",
         "name": "弩车",
         "cell": [
-          52,
-          44
+          64,
+          21
         ],
         "hint": "",
         "h3d": 1.6,

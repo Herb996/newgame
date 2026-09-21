@@ -165,8 +165,10 @@ func active_payload() -> Dictionary:
 
 ## Meta.save_game 走这里：把仓库/升级/**名册**写回当前槽，并刷新时间戳。
 ## seeded_ids = 出厂名单里已发过的原型（见 Meta._migrate_starting_units），一起持久化。
+## base_custom = 玩家自定义的基地地面与摆件（见 base_customization.gd），一起持久化。
 func write_active(bank: Dictionary, upgrades: Dictionary, base_layout: Dictionary = {},
-		roster: Array = [], seeded_ids: Array = []) -> bool:
+		roster: Array = [], seeded_ids: Array = [],
+		base_custom: Dictionary = {}, base_layout_version: int = 0) -> bool:
 	if active_slot <= 0:
 		return false
 	var data := read_slot(active_slot)
@@ -180,8 +182,10 @@ func write_active(bank: Dictionary, upgrades: Dictionary, base_layout: Dictionar
 	data["bank"] = bank
 	data["upgrades"] = upgrades
 	data["base_layout"] = base_layout
+	data["base_layout_version"] = base_layout_version
 	data["roster"] = roster
 	data["seeded_ids"] = seeded_ids
+	data["base_custom"] = base_custom
 	data["last_played_unix"] = int(Time.get_unix_time_from_system())
 	return write_slot(active_slot, data)
 

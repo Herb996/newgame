@@ -26,6 +26,12 @@ var bank: Dictionary = {}
 var upgrade_levels: Dictionary = {}
 ## 基地建筑位置（每存档槽独立），形如 {"warehouse": [24, 30], ...}
 var base_layout: Dictionary = {}
+## 玩家自定义的基地地面与摆件（每存档槽独立）。空 = 没改过，画出来就是默认那片草地。
+## 形状见 base_customization.gd 文件头：{"v":1,"size":64,"ground":{"x,y":群系},...}
+var base_custom: Dictionary = {}
+## 本档的建筑位置是按第几版出厂网格摆的（对齐 config `base.layout_version`）。
+## 官方重排网格后老的那份重摆位置已经对不上新构图，读档时按版本丢弃。
+var base_layout_version := 0
 ## 名册：跨局持久的**单位实例**（死亡永久，所以等级挂在具体的人身上而不是兵种上）。
 ## 形如 [{"uid":1, "id":"spearman", "name":"枪手", "level":0, "xp":0.0}]
 ## —— id 指向 characters.list 里的原型（决定武器/指令集），level/xp 是这个人自己的。
@@ -52,6 +58,8 @@ func load_save() -> void:
 	bank = {}
 	upgrade_levels = {}
 	base_layout = {}
+	base_custom = {}
+	base_layout_version = 0
 	roster = []
 	seeded_ids = []
 	if SaveSlots.has_active_slot():
@@ -62,7 +70,8 @@ func load_save() -> void:
 			return
 		bank = slot_data.get("bank", {})
 		upgrade_levels = slot_data.get("upgrades", {})
-		base_layout = slot_data.get("base_layout", {})
+		base_layout = _load_base_layout(slot_data)
+		base_custom = _load_base_custom(slot_data, slot_data.has("base_custom"))
 		roster = _sanitize_roster(slot_data.get("roster", []))
 		seeded_ids = _sanitize_seeded(slot_data.get("seeded_ids", []))
 		_prune_unknown_resources()
@@ -76,13 +85,60 @@ func load_save() -> void:
 	if parsed is Dictionary:
 		bank = parsed.get("bank", {})
 		upgrade_levels = parsed.get("upgrades", {})
-		base_layout = parsed.get("base_layout", {})
+		base_layout = _load_base_layout(parsed)
+		base_custom = _load_base_custom(parsed, parsed.has("base_custom"))
 		roster = _sanitize_roster(parsed.get("roster", []))
 		seeded_ids = _sanitize_seeded(parsed.get("seeded_ids", []))
 	else:
 		push_warning("[Meta] 存档损坏，已重置。")
 	_prune_unknown_resources()
 	ensure_roster()
+
+
+## 没记 size 的老档是在多大的基地上编辑的 —— 那个尺寸以前写死在 config 里没落盘，
+## 只能按历史值认。以后扩图都会带上 size 字段，这个常量就只服务那批老存档。
+const LEGACY_BASE_SIZE := 64
+
+
+## 读基地自定义表。**键缺失**才展开出厂默认布置（新档，或老档第一次拿到这个字段）；
+## 存过但存的是空表（玩家把摆件全擦了、地填平了）就照空表画 —— 不能一读档又给他长回来。
+## 唯一的例外是基地扩图：表里记着它是在多大的地图上编辑的，比现在小就把多出来的那一圈
+## 按出厂布置补上（老区域玩家改过的照样一格不动）。
+func _load_base_custom(payload: Dictionary, has_key: bool) -> Dictionary:
+	var want := int(Config.get_value("base.map_size", 64))
+	if not has_key:
+		var d := BaseCustomization.from_default_layout(want)
+		print("[Meta] 基地自定义：出厂默认布置（地面 %d / 水 %d / 摆件 %d 格）" % [
+			(d.get("ground", {}) as Dictionary).size(),
+			(d.get("water", {}) as Dictionary).size(),
+			(d.get("props", {}) as Dictionary).size()])
+		return d
+	var c := BaseCustomization.sanitize(payload.get("base_custom"))
+	var stored := int(c.get("size", 0))
+	if stored <= 0:
+		stored = LEGACY_BASE_SIZE
+	if stored < want:
+		c = BaseCustomization.pad_default_layout_band(c, stored, want)
+		print("[Meta] 基地扩图 %d→%d：外圈按出厂布置补铺（现 地面 %d / 水 %d / 摆件 %d 格）" % [
+			stored, want,
+			(c.get("ground", {}) as Dictionary).size(),
+			(c.get("water", {}) as Dictionary).size(),
+			(c.get("props", {}) as Dictionary).size()])
+	c["size"] = want
+	return c
+
+
+## 读建筑位置。config `base.layout_version` 涨版 = 官方重排过出厂网格，老档那份重摆位置
+## 是按旧网格摆的，留着会让每个老档一直停在旧构图上 → 丢掉，按新网格重排。
+func _load_base_layout(payload: Dictionary) -> Dictionary:
+	var want := int(Config.get_value("base.layout_version", 1))
+	base_layout_version = want
+	var raw = payload.get("base_layout", {})
+	var saved: Dictionary = raw if raw is Dictionary else {}
+	if int(payload.get("base_layout_version", 1)) < want and not saved.is_empty():
+		print("[Meta] 基地布局升到 v%d：丢弃 %d 条重摆位置，按新出厂网格重排" % [want, saved.size()])
+		return {}
+	return saved
 
 
 ## seeded_ids 清洗：只留字符串、去重（存档手改过 / 半截写入都不能让它变成脏数组）
@@ -116,7 +172,8 @@ func _prune_unknown_resources() -> void:
 
 func save_game() -> void:
 	if SaveSlots.has_active_slot():
-		SaveSlots.write_active(bank, upgrade_levels, base_layout, roster, seeded_ids)
+		SaveSlots.write_active(bank, upgrade_levels, base_layout, roster, seeded_ids,
+				base_custom, base_layout_version)
 		return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -124,7 +181,8 @@ func save_game() -> void:
 		return
 	f.store_string(JSON.stringify(
 			{"bank": bank, "upgrades": upgrade_levels, "base_layout": base_layout,
-			 "roster": roster, "seeded_ids": seeded_ids}, "\t"))
+			 "base_layout_version": base_layout_version,
+			 "roster": roster, "seeded_ids": seeded_ids, "base_custom": base_custom}, "\t"))
 
 
 ## 记录某建筑的新位置（占地左上角格）到本存档槽并落盘。

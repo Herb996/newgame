@@ -24,6 +24,7 @@ const COL_TEXT := Color(0.91, 0.89, 0.85)
 const COL_DIM := Color(0.70, 0.68, 0.63)
 const COL_WARN := Color(0.90, 0.55, 0.35)
 const COL_OK := Color(0.55, 0.78, 0.50)
+const COL_TROUGH := Color(0.09, 0.11, 0.16)           # 进度条底槽 / 滚动条轨道
 
 # --- 字号 ---
 const FS_HERO := 46
@@ -267,22 +268,93 @@ static func line_edit(text: String, min_w: float = 300) -> LineEdit:
 	return e
 
 
-## 弹层面板挂到 CanvasLayer 上并真正屏幕居中，返回该面板（调用方往里塞内容）。
-## 坑：Control 直接挂在 CanvasLayer 下时 PRESET_CENTER 不生效 —— 锚点参照不到屏幕矩形，
-## 1920×1080 下面板左上角落在 (960, 540)，整块往右下偏半个屏幕。
+## 弹层对话框骨架：遮罩 + 木框 + 石板芯 + 缎带标题（右上「关闭」），返回内容 VBox。
+## 基地的三个面板（仓库 / 升级 / 选人）与主菜单、设置面板共用同一套皮肤，
+## 差别只在这里是居中弹窗、不铺满屏幕。
+## 坑（保留原注释）：Control 直接挂在 CanvasLayer 下时 PRESET_CENTER 不生效 ——
+## 锚点参照不到屏幕矩形，1920×1080 下面板左上角落在 (960, 540)，整块往右下偏半个屏幕。
 ## 所以垫一层铺满屏幕的半透明遮罩当锚点父级，面板在遮罩里四向 grow 居中。
-static func centered_dialog(layer: CanvasLayer, min_w: float) -> PanelContainer:
+## 遮罩上设了 TEXTURE_FILTER_NEAREST：贴图是像素画，子节点全部继承。
+static func dialog(layer: CanvasLayer, min_w: float, header: String,
+		on_close: Callable = Callable()) -> VBoxContainer:
 	var scrim := ColorRect.new()
-	scrim.color = Color(0.0, 0.0, 0.0, 0.45)
+	scrim.color = COL_OVERLAY
+	scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	scrim.texture_filter = TS_NEAREST
 	scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(scrim)
-	var p := PanelContainer.new()
-	p.set_anchors_preset(Control.PRESET_CENTER)
-	p.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	p.grow_vertical = Control.GROW_DIRECTION_BOTH
-	p.custom_minimum_size = Vector2(min_w, 0)
-	scrim.add_child(p)
-	return p
+
+	var shell := PanelContainer.new()
+	shell.set_anchors_preset(Control.PRESET_CENTER)
+	shell.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	shell.grow_vertical = Control.GROW_DIRECTION_BOTH
+	shell.custom_minimum_size = Vector2(min_w, 0)
+	shell.add_theme_stylebox_override("panel", ts_nine("wood_panel", 44, 6, 6))
+	scrim.add_child(shell)
+
+	var core := panel(COL_PANEL, 18)
+	shell.add_child(core)
+
+	var col := vbox(10)
+	core.add_child(col)
+
+	# 标题行：左右各垫一个与「关闭」等宽的空白，缎带才是真的屏幕居中。
+	# 缎带宽度跟着弹窗宽度走（贴图 192×60 等比）：给死了会把窄面板强行撑宽，
+	# 而 head 行是最小宽度约束的来源 —— 缎带 + 两个平衡块 + 按钮一旦超过内容宽度，
+	# 面板就会被顶到比 min_w 更宽（窄弹窗实测会胖 100px 以上）。
+	var head := hbox(10)
+	head.add_child(_close_balancer())
+	var rib := ribbon_title(header, clampf(min_w * 0.34, 220, 320), FS_TITLE)
+	rib.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(rib)
+	if on_close.is_valid():
+		var x := small_button(tr_dl("关闭"), 84)
+		x.tooltip_text = tr_dl("关闭（E / ESC）")
+		x.pressed.connect(on_close)
+		head.add_child(x)
+	else:
+		head.add_child(_close_balancer())
+	col.add_child(head)
+	return col
+
+
+static func _close_balancer() -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(84, 0)
+	return c
+
+
+## 给滚动列表的滚动条换皮：深色底槽 + 琥珀拖拽块。
+## 默认滚动条是浅灰一条，压在深蓝石板芯上非常跳（面板整体是木框 + 石板语言）。
+## 坑：theme override 只对设置它的那个节点生效，设在 ScrollContainer 上没用，
+## 必须取它内部那条 VScrollBar / HScrollBar 本身。
+static func skin_scroll(scroll: ScrollContainer) -> void:
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = COL_TROUGH
+	bg.set_corner_radius_all(4)
+	var grab := StyleBoxFlat.new()
+	grab.bg_color = Color(COL_AMBER.r, COL_AMBER.g, COL_AMBER.b, 0.85)
+	grab.set_corner_radius_all(4)
+	for bar in [scroll.get_v_scroll_bar(), scroll.get_h_scroll_bar()]:
+		bar.add_theme_stylebox_override("scroll", bg)
+		bar.add_theme_stylebox_override("scroll_grabber", grab)
+		bar.add_theme_stylebox_override("scroll_focus", grab)
+
+
+## 资源小图标（config resources.<id>.sprite）。缺图返回 null，调用方自己决定留不留位。
+static func resource_icon(res_id: String, px: float = 28.0) -> TextureRect:
+	var path := str(Config.get_value("resources.%s.sprite" % res_id, ""))
+	if path == "" or not ResourceLoader.exists(path):
+		return null
+	var icon := TextureRect.new()
+	icon.texture = load(path)
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.custom_minimum_size = Vector2(px, px)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.texture_filter = TS_NEAREST
+	return icon
 
 
 ## 菜单背景：贴图平铺或整图（covered = 等比放大铺满裁边，用于地图/插画）+

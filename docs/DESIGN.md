@@ -128,23 +128,42 @@
 - 槽内除 `bank` / `upgrades` / `base_layout` 外还有 **`roster`（名册）**：跨局持久的单位实例列表 `[{uid,id,name,level,xp}]`。等级挂在**具体的人**身上而不是兵种上 —— 因为死亡永久（见 §5.10）。
 
 ### 2.4 主基地（Base，`base_system.gd`，含于 `Main.tscn`）
-- 64×64 **整片草地**（`base.map_size`；已去掉外圈挡边墙，四周边框与内部统一，基地无角色不需挡边）；建筑 **4×4 格**（`base.building_cells`）。**8 栋建筑**（2026-09-18 全量换上 Tiny Swords Blue Buildings 素材 `blue_*.png`，功能只做原有的 3 个，其余纯展示待接功能）：
+- **80×80** 整片草地（`base.map_size`，2026-09-21 从 64 扩来；已去掉外圈挡边墙，四周边框与内部统一，基地无角色不需挡边）；建筑 **4×4 格**（`base.building_cells`）。**12 栋建筑**按 **5 列 × 4 行 = 20 槽**排（列 x ∈ {12,25,38,51,64}、行 y ∈ {21,33,45,57}；建筑间横向空 9 格、纵向空 8 格，屋顶从占地顶边上探约 1.6 格，不会压到上一行）。剩下 8 个空槽里 **7 个已按类型预留给新建筑**（清单写在 `run.json` 建筑表注释里，美术规格与生图 prompt 见 `docs/BUILDING_ART_PROMPTS.md`）。⚠ **行距被相机钉死在 12，不能改回 18**：`camera_controller._refresh_zoom_limits` 把 `_zoom_lo` 收在「视口宽 ÷ 地图宽」（16:9 / 80×80 → 0.375，再远就露出地图外的黑边，所以宁可上下裁），进基地远景因此只框得住 **80×45 格**、纵向可视带只有 `y∈[17.5,62.5]`；行距 18 会把首末两行放到 11/65 → **上下各一整行在屏外**，`main._enter_base` 的「一眼看全所有建筑」落空（`frame_world_rect` 再怎么框都会被 `_zoom_lo` 夹回来）。这条是 `Dev/shot_base_grid.tscn` 里的断言，不是注释里说说而已。**只有 3 栋有功能**，其余 9 栋纯展示待接功能（`Data/config/run.json` 的 `base.buildings` 为准，下表 2026-09-21 随扩图重排）：
 
 | 建筑 | 默认 cell | sprite | 左键交互 |
 |---|---|---|---|
-| warehouse 仓库 | [24,30] | `blue_house1.png` | 打开仓库面板（只读展示 `Meta.bank`：种类数 / 仓库格数 / 叠加上限）|
-| statue 修道院 | [36,30] | `blue_monastery.png` | 打开升级面板（`meta_progression` 生存/搜刮两组升级，即时生效并存档）|
-| gate 出发大门 | [30,42] | `blue_castle.png` | 打开选人面板 →「出击」进局 |
-| archery 箭术场 | [22,22] | `blue_archery.png` | 无（纯展示，点击 push_warning）|
-| barracks 兵营 | [38,22] | `blue_barracks.png` | 无 |
-| tower 瞭望塔 | [46,30] | `blue_tower.png` | 无 |
-| house2 民居 | [20,38] | `blue_house2.png` | 无 |
-| house3 民居 | [40,38] | `blue_house3.png` | 无 |
+| archery 箭术场 | [12,21] | `blue_archery.png` | 无 |
+| barracks 兵营 | [25,21] | `blue_barracks.png` | 无 |
+| gate 出发大门 | [38,21] | `blue_castle.png` | 无（**2026-09-20 降为纯装饰**，见下条）|
+| tower 瞭望塔 | [51,21] | `blue_tower.png` | 无 |
+| catapult 弩车 | [64,21] | `blue_catapult.png` | 无 |
+| warehouse 仓库 | [12,33] | `blue_house1.png` | 打开仓库面板（只读展示 `Meta.bank`：种类数 / 仓库格数 / 叠加上限）|
+| statue 修道院 | [25,33] | `blue_monastery.png` | 打开升级面板（`meta_progression` 生存/搜刮两组升级，即时生效并存档）|
+| **portal 出击传送门** | **[38,33]** | `blue_portal.png` | **出击入口**：打开选人面板 →「出击」进局（挪到了基地正中，出生点 [40,38] 就在它正南）|
+| house2 民居 | [64,33] | `blue_house2.png` | 无 |
+| farm 谷仓 | [12,45] | `blue_farm.png` | 无（纯展示，点击走 default 分支 `push_warning`）|
+| house3 民居 | [25,45] | `blue_house3.png` | 无 |
+| quarry 采石场 | [51,45] | `blue_quarry.png` | 无（东南荒原那侧，与 `default_layout` 的群系/铁脉对上）|
+
+- **出击入口 = 传送门，不是出发大门**（2026-09-20 用户定）：`main._on_building_interacted` 的 `"portal"` 分支开选人面板，`"gate"` 落到 default 分支只 `push_warning`。理由是视觉重心：全基地最抓眼的就是那扇漩涡门，玩家第一反应就点它，让最该能点的建筑点不动等于把主行动藏起来。config 里判「有没有功能」的记号就是 **`hint` 空 = 纯装饰**（`hint` 字段目前只被 `building.gd` 的靠近提示用，见下方「交互」条的坑）。三条线一起改了：2D `main.gd`、3D `main3d.gd`（含 `flow_test` 的 `_try_building("portal")`）、选人面板缎带标题与文件头。⚠ **`Dev/probe_second_launch.gd::_sortie()` 必须走 "portal"** —— 走 "gate" 面板不弹，探针会 `_finish(2)` 假报环境坏了。存档无迁移：`Meta.base_layout` 按 id 存，id 一个没动（⚠ 这句只对当时成立 —— 2026-09-21 扩图重排引入了版本迁移，见下面「扩图迁移」条）。验证：`Dev/shot_base_ui.tscn` 走真实路由出正反两例（点传送门 `visible=true` / 点出发大门 `visible=false` + 那条 push_warning）。
 
 - **建筑渲染全自动**：`building.gd` 按贴图尺寸等比缩放进 4×4 格框（屋顶可向上探出 1.4 倍）、脚底对齐占地底边，缺图保底一块 id 配色方块不消失。新素材不覆盖旧图（`blue_` 前缀），旧 `castle/monastery/house_*` 仍被 3D 层 / 兜底引用。**新建筑 id 不在存档 `Meta.base_layout` 里 → 直接用配置 cell**；重摆过位置的旧建筑仍按存档摆放。
-- **实拍坑**：出厂 config `debug.auto_enter_run = true`（headless 回归用），开窗实拍基地必须先 `Config.set_override("debug.auto_enter_run", false)` 再 instantiate Main —— 否则进基地立刻被拉进局、`game_root` 被清空（建筑 0 栋、满屏黑局内）。验证场景 `Dev/shot_base_buildings.tscn`（顺带打印 8 栋运行时清单 + 贴图路径）。
+- **扩图迁移（2026-09-21，64→80）**：`base.map_size` 是纯配置，代码里除了默认值没有第二处 64，所以改一个数就能扩图 —— 麻烦全在老存档那两张按 64 写死的表上。两条各自处理：
+  - **地面/摆件 `base_custom`**：新增顶层 `size` 字段记下这张表是在多大的基地上编辑的（`BaseCustomization.empty/sanitize/from_default_layout` 三处一起改）。读档时 `size < base.map_size` 就调 `pad_default_layout_band(custom, old, new)`，**只把出厂布置补进任一坐标 ≥ old 的新格子**，老区域一格都不补 —— 玩家可能在那里自己种过树，补了就是覆盖（这条是断言，别"顺手"改成全量重铺）。没记 size 的老档按 `Meta.LEGACY_BASE_SIZE = 64` 认。不补的后果很直观：多出来的那条边带在稀疏表里没记录 → `ground_at` 兜底成草皮 → 基地外圈凭空多出一圈"太干净的新地面"。
+  - **建筑位置 `base_layout`**：新增 config `base.layout_version`（当前 2）与存档键 `base_layout_version`（`SaveSlots.write_active` 的最后一个参数）。存档版本落后 → `Meta._load_base_layout` 直接丢掉那份重摆位置，按新出厂网格重排。不这么做的话每个老档都会被自己那份旧 64 网格的位置钉住，新构图只对新建档生效 —— 而 `base_system.gd:60-64` 的优先级是存档 > config，改 config 里的 cell 完全没用。
+  - 验证：`Dev/probe_base_migrate.tscn`（headless，12 条断言覆盖"老格子保留 / 外圈补铺 / 缩图不补 / 版本落后丢弃 / 手改成非字典不崩"）+ `Dev/shot_base_grid.tscn`（开窗，逐栋核对运行时 cell 与贴图，并**按进基地的真实取景断言每栋建筑（含屋顶上探）都落在纵向可视带内** —— 只核对 cell 会放走"格子里但屏外"这种错法）。
+- **实拍坑**：出厂 config `debug.auto_enter_run = true`（headless 回归用），开窗实拍基地必须先 `Config.set_override("debug.auto_enter_run", false)` 再 instantiate Main —— 否则进基地立刻被拉进局、`game_root` 被清空（建筑 0 栋、满屏黑局内）。验证场景 `Dev/shot_base_buildings.tscn`（顺带打印 12 栋运行时清单 + 贴图路径）。
 
 - **交互 = 鼠标左键点建筑本体**（基地无玩家角色；`building.gd` Area2D `input_event`）。面板打开时 `get_tree().paused=true`；`E` 或 `ESC` 关闭。
+- **基地三个面板 2026-09-20 统一换皮**（仓库 / 升级 / 选人）：都走 `UiKit.dialog(layer, min_w, 标题, close)` —— 遮罩 `COL_OVERLAY`(0.72) + 木框 `wood_panel` + 石板芯 `panel()` + 缎带标题 + 右上「关闭」，与主菜单/设置面板同一套皮肤。此前这三块是全站唯一的裸 `Label`/`Button`/`CheckBox` 孤岛，且旧的 `centered_dialog` 只给一个没有 stylebox 的 `PanelContainer` → **建筑直接透过面板显示、字压在上面**（该函数已删，无消费点）。要点与踩过的坑：
+  - 缎带宽度按 `min_w * 0.34` 走，写死会把窄弹窗顶胖 100px 以上 —— head 行（平衡块 + 缎带 + 关闭钮）才是面板最小宽度的约束来源。
+  - 列表一律**固定限高的 `ScrollContainer`**（选人 500 / 升级 460 / 仓库 320）：名册上限 `progression.roster.max_size=8` 人时不这么做，「出击」按钮会被顶出屏幕看不见。
+  - 滚动条换皮走 `UiKit.skin_scroll()`。⚠ theme override **只对设置它的那个节点生效**，设在 `ScrollContainer` 上没用，必须取 `scroll.get_v_scroll_bar()` 本体。
+  - 经验条底槽与滚动条轨道统一 `UiKit.COL_TROUGH`；经验条用扁平 `StyleBoxFlat`，套滑条那套九宫格木条贴图压到 8px 高会糊成一整条白带。
+  - 选人面板每人一张行卡：勾选态 = 卡片提亮 + 2px 琥珀边框（只换 `COL_ROW`↔`COL_ROW_HI` 实测分不出来），点卡片任意处切换勾选。
+  - 仓库到叠加上限的那一行转 `COL_WARN` 并写明「（已满）」—— `COL_WARN` 与 `COL_AMBER` 差得太小，光换色看不出异常。
+  - 修掉一处老 bug：选人提示文字里的 markdown `**…**`，Label 不解析 markdown，两颗星直接画在屏幕上。
+  - 验证：`Dev/shot_base_ui.tscn`（**必须开窗**，见上面的实拍坑三连）一次出 6 张图：基地全景 / 近景 / 仓库 / 升级 / 选人 / 取消勾选一人（验选中态与出击计数跟着走）。探针只往内存里塞 `Meta.bank`，不调 `save_game`，不污染存档。
 - **右键建筑 = 重摆位置**：进入 `placement_mode.gd`（可复用组件）→ 铺瓦片网格、把该建筑 footprint 能放的左上角锚点覆盖区标**绿**、半透明幽灵跟随光标 → 左键点绿格落位、ESC/右键取消。落位后 `base_system.apply_reposition` → `Meta.set_building_cell` 写进**当前存档槽**（`base_layout`，每存档一套布局，覆盖 config 默认；合法锚点须留 1 格外圈墙且不与其它建筑重叠）。此组件后续进图放东西可复用。
 - **换模式必须收尾重摆**（2026-09-19）：`_enter_base()` 一直是 `_end_placement()` 开头的，`_enter_run()` 漏了 —— 而重摆中途也能出击（点大门走建筑交互，不经过放置模式的取消流程）。`PlacementMode` 挂在 `game_root` 下，`_clear_game_root()` 把它连带释放，但 `main._placement` 仍指着那个已死节点且**非 null**：`_overlay_open()` 从此恒真（ESC 退不出去），此后右键任何建筑也再也不肯进重摆（`if _placement != null: return` 永久拒）。现在两边都调，守卫见 `Dev/probe_second_launch.tscn` 的「出击 #4」。整条链路（基地 → 出击 → 撤离 → 再出击，共 4 次出击，23 项）由该探针守住：**双判据** = ①出击前记下 `GameRoot` 全部子节点的实例 id，回来逐一对残留；②按名字/挂载脚本判定"这是基地的东西"（`*Base*` / `building.gd`）—— 单看 id 会漏掉每局新建的同名节点，单看名字会把正常的 `Camera2D` 误报成残留。另验 `GameRoot` 子节点数逐局不增、相机恒 1 台。⚠ 它开头带**环境体检**：`GameRoot` 缺 `BaseMapRoot`/`MapRoot` 说明别处的脚本错误把 `_enter_base()/_enter_run()` 拦腰打断了，这时退出码 2（作废）而不是报一堆假失败。
 - **进基地默认最远视角**：`base.fit_camera_on_enter=true` 时 `_enter_base` 用整片基地尺寸调 `camera_controller.frame_world_rect()` → 相机落到最远档并居中，一眼看全基地与所有建筑。

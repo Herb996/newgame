@@ -23,3 +23,6 @@ Assets/Art/Source3D/
 # 临时文件
 *.log
 *.backup
+
+# F9 数值调试台「写入文件」前自动存的域文件快照（一次一份，留最近 20 份）
+Backups/

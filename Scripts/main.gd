@@ -607,7 +607,11 @@ func _sync_minimap_fog() -> void:
 ## 建筑交互路由（base_system 转发；基地无角色后，触发方式 = 鼠标左键点建筑）
 func _on_building_interacted(building_id: String) -> void:
 	match building_id:
-		"gate":
+		"portal":
+			# 出击入口（2026-09-20 用户定）：从「出发大门」搬到「出击传送门」。
+			# 理由见 DESIGN §2.4 —— 全基地最抓眼的就是这扇漩涡门，玩家第一反应就点它，
+			# 让最该能点的建筑反而点不动，等于把主行动藏起来。出发大门降为纯装饰
+			# （config `base.buildings` 里它的 hint 已清空 = 装饰，走下面的 default 分支）。
 			# 出发前先选人（可多选组成小队）：面板「出击」→ _on_launch 才进局；
 			# E/ESC 取消则留在基地。交互立刻复位，取消后可再点一次重开面板。
 			character_panel.open(_selected_units)

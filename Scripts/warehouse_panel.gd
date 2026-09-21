@@ -1,10 +1,13 @@
 extends CanvasLayer
 ## ============================================================
-## WarehousePanel — 仓库面板（靠近仓库按 E 打开）
-## 显示 Meta.bank 中全部资源。打开时暂停游戏，E/ESC 关闭。
+## WarehousePanel — 仓库面板（点仓库建筑打开）
+## 显示 Meta.bank 中全部资源。打开时暂停游戏，E/ESC 或右上「关闭」关闭。
+##
+## 皮肤走 UiKit.dialog()（与主菜单/设置面板同一套木框 + 石板芯），
+## 每行一个 row_box：资源图标（config resources.<id>.sprite）+ 名称 + 数量/叠加上限。
+## 行数上限 = storage.max_slots（可被升级顶到很大）→ 列表套 ScrollContainer。
 ## ============================================================
 
-var _panel: PanelContainer
 var _content: VBoxContainer
 var _slots_label: Label
 
@@ -16,34 +19,30 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	_panel = UiKit.centered_dialog(self, 360)
+	var col := UiKit.dialog(self, 560, "仓库", close)
 
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	_panel.add_child(vbox)
-
-	var title := Label.new()
-	title.text = "仓库"
-	title.add_theme_font_size_override("font_size", 24)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
-
-	_slots_label = Label.new()
-	_slots_label.add_theme_font_size_override("font_size", 14)
-	_slots_label.add_theme_color_override("font_color", Color(0.85, 0.62, 0.30))
+	_slots_label = UiKit.dim("", UiKit.FS_SMALL)
 	_slots_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(_slots_label)
+	col.add_child(_slots_label)
 
-	_content = VBoxContainer.new()
-	_content.add_theme_constant_override("separation", 4)
-	vbox.add_child(_content)
+	col.add_child(_scroll(320))
 
-	var hint := Label.new()
-	hint.text = "按 E 或 ESC 关闭"
-	hint.add_theme_font_size_override("font_size", 13)
-	hint.add_theme_color_override("font_color", Color(0.7, 0.68, 0.63))
+	var hint := UiKit.dim("按 E 或 ESC 关闭", UiKit.FS_SMALL)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(hint)
+	col.add_child(hint)
+
+
+## 资源列表的滚动容器：固定限高，免得仓库格数升上去后面板顶出屏幕，
+## 也免得「多一件物品」就撑一下面板。
+func _scroll(list_h: float) -> ScrollContainer:
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(0, list_h)
+	_content = UiKit.vbox(6)
+	_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_content)
+	UiKit.skin_scroll(scroll)
+	return scroll
 
 
 func open() -> void:
@@ -69,19 +68,38 @@ func _unhandled_input(event: InputEvent) -> void:
 func _refresh() -> void:
 	for c in _content.get_children():
 		c.queue_free()
-	# 格子占用 + 叠加上限提示
 	var stack_limit := int(Config.get_value("storage.stack_limit", 1000))
 	_slots_label.text = "格子 %d/%d · 每种物品叠加上限 %d" % [
 		Meta.bank.size(), Meta.warehouse_slots(), stack_limit]
 	if Meta.bank.is_empty():
-		var l := Label.new()
-		l.text = "空空如也——先去废墟搜刮吧"
+		var l := UiKit.dim("空空如也——先去废墟搜刮吧", UiKit.FS_BODY)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_content.add_child(l)
 		return
 	for res in Meta.bank:
-		var display: String = str(Config.get_value("resources.%s.name" % res, res))
-		var l := Label.new()
-		l.text = "%s：%d / %d" % [display, int(Meta.bank[res]), stack_limit]
-		l.add_theme_font_size_override("font_size", 18)
-		_content.add_child(l)
+		_content.add_child(_make_row(str(res), int(Meta.bank[res]), stack_limit))
+
+
+## 一行：图标 | 名称 | 数量/上限
+func _make_row(res: String, amount: int, stack_limit: int) -> PanelContainer:
+	var box := UiKit.row_box(UiKit.COL_ROW)
+	var h := UiKit.hbox(10)
+	box.add_child(h)
+
+	var icon := UiKit.resource_icon(res, 26.0)
+	if icon != null:
+		h.add_child(icon)
+	h.add_child(UiKit.label(
+			str(Config.get_value("resources.%s.name" % res, res)), UiKit.FS_BODY))
+
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(spacer)
+
+	# 到顶的转橙红并写明「已满」：COL_WARN 与 COL_AMBER 差得太小，光换色看不出异常
+	var full := amount >= stack_limit
+	var val := UiKit.value_label(150)
+	val.text = "%d / %d%s" % [amount, stack_limit, "（已满）" if full else ""]
+	val.add_theme_color_override("font_color", UiKit.COL_WARN if full else UiKit.COL_AMBER)
+	h.add_child(val)
+	return box

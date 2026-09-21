@@ -1,6 +1,7 @@
 extends CanvasLayer
 ## ============================================================
-## CharacterSelectPanel — 出发大门「名册」面板（鼠标点击大门 / 按 E 打开）
+## CharacterSelectPanel — 出击传送门「名册」面板（鼠标点击传送门 / 按 E 打开）
+## （2026-09-20：出击入口从「出发大门」换到「出击传送门」，见 DESIGN §2.4）
 ##
 ## 2026-09-17 改版：列表来源从 config `characters.list`（**兵种原型**）换成
 ## Meta.roster（**名册里的具体的人**）。起因是用户定了等级系统：
@@ -18,6 +19,10 @@ extends CanvasLayer
 ##
 ## 名册空/不满时提供「补招新兵」（progression.roster.recruit_free）——
 ## 没有这一步的话，「全员阵亡 + 还没有复活功能」会让玩家彻底卡死没得玩。
+##
+## 2026-09-20 换皮：与主菜单同一套 UiKit 皮肤，每人一张行卡（勾选时卡片提亮），
+## 名册上限 progression.roster.max_size 人 → 列表套固定限高的 ScrollContainer，
+## 否则 8 人会把「出击」按钮顶出屏幕。
 ## ============================================================
 
 signal launch_requested(characters: Array)
@@ -25,7 +30,7 @@ signal launch_requested(characters: Array)
 var _content: VBoxContainer
 var _launch_btn: Button
 var _recruit_row: HBoxContainer
-var _checks: Array = []   # [{uid, id, name, level, checkbox}]，保持名册顺序
+var _checks: Array = []   # [{uid, id, name, level, checkbox, box}]，保持名册顺序
 
 
 func _ready() -> void:
@@ -35,50 +40,42 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	# 遮罩 + 居中由 UiKit 统一处理：Control 直接挂在 CanvasLayer 下时 PRESET_CENTER 不生效
-	var panel := UiKit.centered_dialog(self, 720)
+	var vbox := UiKit.dialog(self, 820, "出击传送门", close)
 
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	panel.add_child(vbox)
+	var sub := UiKit.dim("从名册点人组成出击小队 · 可多选", UiKit.FS_SMALL)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(sub)
 
-	var title := Label.new()
-	title.text = "出发大门 — 选择出击小队（从名册点人，可多选）"
-	title.add_theme_font_size_override("font_size", 22)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
+	# 固定限高的滚动列表：4 人时刚好不裁卡片，8 人时滚动而不是把按钮顶出屏幕
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(0, 500)
+	UiKit.skin_scroll(scroll)
+	_content = UiKit.vbox(8)
+	_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_content)
+	vbox.add_child(scroll)
 
-	_content = VBoxContainer.new()
-	_content.add_theme_constant_override("separation", 10)
-	vbox.add_child(_content)
-
-	var hint := Label.new()
-	hint.text = "等级与经验跨局保留 · **阵亡即从名册除名（永久）**\n" \
-			+ "点「出击」出发 · 点「放弃」或按 E / ESC 返回基地"
-	hint.add_theme_font_size_override("font_size", 13)
-	hint.add_theme_color_override("font_color", Color(0.7, 0.68, 0.63))
+	var hint := UiKit.dim(
+			"等级与经验跨局保留 · 阵亡即从名册除名（永久）\n" \
+			+ "点「出击」出发 · 点「放弃」或按 E / ESC 返回基地", UiKit.FS_SMALL)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(hint)
 
 	# 补招行：名册不满 且 允许免费补招时才有内容（_refresh 里填）
-	_recruit_row = HBoxContainer.new()
-	_recruit_row.add_theme_constant_override("separation", 10)
+	_recruit_row = UiKit.hbox(10)
 	_recruit_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_child(_recruit_row)
 
-	var btn_row := HBoxContainer.new()
-	btn_row.add_theme_constant_override("separation", 12)
+	var btn_row := UiKit.hbox(12)
 	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_child(btn_row)
 
-	var cancel_btn := Button.new()
-	cancel_btn.text = "放弃 · 返回基地"
-	cancel_btn.custom_minimum_size = Vector2(220, 40)
+	var cancel_btn := UiKit.button("放弃 · 返回基地", 240)
 	cancel_btn.pressed.connect(close)
 	btn_row.add_child(cancel_btn)
 
-	_launch_btn = Button.new()
-	_launch_btn.custom_minimum_size = Vector2(240, 40)
+	_launch_btn = UiKit.button("出击", 280)
 	_launch_btn.pressed.connect(_on_launch_pressed)
 	btn_row.add_child(_launch_btn)
 
@@ -134,17 +131,21 @@ func _preselected_uids(preselected: Array) -> Dictionary:
 	return out
 
 
+## 一张行卡：勾选框 | 档位色块 | 名称+档位 / 描述 / 经验条 / 特性
 func _add_unit_row(u: Dictionary, want: Dictionary) -> void:
 	var uid := int(u.get("uid", 0))
 	var level := int(u.get("level", 0))
 	var tier_id := Meta.tier_id_of_level(level)
 	var arch_id := str(u.get("id", ""))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
+	var arch := _archetype(arch_id)
 
-	var check := CheckBox.new()
+	var box := UiKit.row_box(UiKit.COL_ROW)
+	var row := UiKit.hbox(12)
+	box.add_child(row)
+
 	# 预选规则：上次选过的按上次；从未选过时全选（一队默认全带上）
-	check.button_pressed = want.is_empty() or want.has(uid) or want.has(arch_id)
+	var check := UiKit.checkbox("", want.is_empty() or want.has(uid) or want.has(arch_id))
+	check.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	check.toggled.connect(func(_on: bool): _update_launch_btn())
 	row.add_child(check)
 
@@ -152,23 +153,79 @@ func _add_unit_row(u: Dictionary, want: Dictionary) -> void:
 	var chip := ColorRect.new()
 	chip.color = Color(str(Config.get_value(
 			"progression.badge.colors.%s" % tier_id, "#378ADD")))
-	chip.custom_minimum_size = Vector2(18, 18)
+	chip.custom_minimum_size = Vector2(16, 16)
 	chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(chip)
 
-	var arch := _archetype(arch_id)
-	var info := Label.new()
-	info.text = "%s · Lv%d %s\n%s\n%s\n%s" % [
-		str(u.get("name", arch_id)), level, Meta.tier_name_of_level(level),
-		str(arch.get("desc", "")), _xp_line(level, float(u.get("xp", 0.0))),
-		_traits_line(u)]
-	info.add_theme_font_size_override("font_size", 15)
-	info.custom_minimum_size = Vector2(560, 0)
+	var info := UiKit.vbox(2)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var title_row := UiKit.hbox(8)
+	title_row.add_child(UiKit.label(str(u.get("name", arch_id)), UiKit.FS_BODY))
+	title_row.add_child(UiKit.label(
+			"Lv%d · %s" % [level, Meta.tier_name_of_level(level)],
+			UiKit.FS_BODY, UiKit.COL_AMBER))
+	info.add_child(title_row)
+
+	info.add_child(UiKit.dim(str(arch.get("desc", "")), UiKit.FS_SMALL))
+	info.add_child(_xp_line(level, float(u.get("xp", 0.0))))
+	info.add_child(UiKit.dim(_traits_line(u), UiKit.FS_SMALL))
 	row.add_child(info)
 
-	_content.add_child(row)
+	box.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+			check.button_pressed = not check.button_pressed)
+	check.toggled.connect(func(_on: bool): _set_row_bg(box, _on))
+	_set_row_bg(box, check.button_pressed)
+
+	_content.add_child(box)
 	_checks.append({"uid": uid, "id": arch_id, "name": str(u.get("name", arch_id)),
 			"level": level, "checkbox": check})
+
+
+## 勾选态 = 卡片底色 + 左边框：选中提亮一档并描一圈琥珀。
+## 只换底色实测分不出来（COL_ROW 与 COL_ROW_HI 差得太小），所以加边框。
+func _set_row_bg(box: Control, on: bool) -> void:
+	var sb := box.get_theme_stylebox("panel") as StyleBoxFlat
+	if sb == null:
+		return
+	sb.bg_color = UiKit.COL_ROW_HI if on else UiKit.COL_ROW
+	sb.border_color = UiKit.COL_AMBER if on \
+			else Color(UiKit.COL_LINE.r, UiKit.COL_LINE.g, UiKit.COL_LINE.b, 0.55)
+	sb.set_border_width_all(2 if on else 1)
+
+
+## 经验行：文字 + 一条进度条
+func _xp_line(level: int, xp: float) -> Control:
+	var wrap := UiKit.hbox(8)
+	var maxed := level >= Meta.max_level()
+	var need := float(Meta.xp_to_next(level))
+	var txt := "已满级（Lv%d）" % Meta.max_level() if maxed \
+			else "经验 %d / %d" % [int(round(xp)), int(need)]
+	var lab := UiKit.dim(txt, UiKit.FS_SMALL)
+	lab.custom_minimum_size = Vector2(150, 0)
+	wrap.add_child(lab)
+
+	var bar := ProgressBar.new()
+	bar.custom_minimum_size = Vector2(0, 8)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bar.show_percentage = false
+	bar.max_value = 1.0 if maxed else need
+	bar.value = 1.0 if maxed else xp
+	# 底槽/填充用扁平 StyleBoxFlat：滑条那套九宫格木条贴图压到 8px 高会糊成一整条白带
+	var trough := StyleBoxFlat.new()
+	trough.bg_color = UiKit.COL_TROUGH
+	trough.border_color = Color(UiKit.COL_LINE.r, UiKit.COL_LINE.g, UiKit.COL_LINE.b, 0.6)
+	trough.set_border_width_all(1)
+	trough.set_corner_radius_all(3)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = UiKit.COL_AMBER
+	fill.set_corner_radius_all(3)
+	bar.add_theme_stylebox_override("background", trough)
+	bar.add_theme_stylebox_override("fill", fill)
+	wrap.add_child(bar)
+	return wrap
 
 
 ## 特性层数一览（升级随机攒的）：按 config progression.traits.list 的固定顺序列，
@@ -188,29 +245,20 @@ func _traits_line(u: Dictionary) -> String:
 	return "特性：" + " · ".join(parts)
 
 
-func _xp_line(level: int, xp: float) -> String:
-	if level >= Meta.max_level():
-		return "已满级（Lv%d）" % Meta.max_level()
-	return "经验 %d / %d（距下一级）" % [int(round(xp)), int(Meta.xp_to_next(level))]
-
-
 ## 补招行：每个兵种原型一个按钮，点了立刻入册并重画面板。
 ## 名册已满 / 不允许免费补招时不显示任何按钮。
 func _build_recruit_row(size_now: int) -> void:
 	var cap := int(Config.get_value("progression.roster.max_size", 8))
 	if not Meta.can_recruit() or size_now >= cap:
 		return
-	var label := Label.new()
-	label.text = "补招新兵（Lv0，占名额 %d/%d）：" % [size_now, cap]
-	label.add_theme_font_size_override("font_size", 13)
-	label.add_theme_color_override("font_color", Color(0.7, 0.68, 0.63))
+	var label := UiKit.dim("补招新兵（Lv0，占名额 %d/%d）：" % [size_now, cap], UiKit.FS_SMALL)
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_recruit_row.add_child(label)
 	for entry in Config.get_value("characters.list", []):
 		if not (entry is Dictionary):
 			continue
 		var id := str((entry as Dictionary).get("id", ""))
-		var b := Button.new()
-		b.text = str((entry as Dictionary).get("name", id))
+		var b := UiKit.small_button(str((entry as Dictionary).get("name", id)), 96)
 		b.pressed.connect(func():
 			var unit := Meta.recruit(id)
 			if unit.is_empty():

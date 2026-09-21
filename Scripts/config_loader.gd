@@ -315,3 +315,313 @@ func _leaf_count(d: Dictionary) -> int:
 		else:
 			n += 1
 	return n
+
+
+# ------------------------------------------------------------
+# 写回出厂域文件（局内数值调试台的「写入文件」用）
+#
+# ⚠ 为什么不是「解析 → 改字典 → JSON.stringify 写回去」：
+#   Godot 的 JSON.stringify 会把字典的键**按字母排序**（实测 4.7.2）。
+#   域文件是按功能顺序手写的，重新序列化一次 = ambience.json 652 行里 640 行改动，
+#   而这些文件是 git 跟踪的、另一个会话正在改的。所以这里走**原地替换**：
+#   在原文里按点路径定位到那一个值 token 的字符区间，只换这一小截，其余字节不动。
+#
+# ⚠ 导出成 exe 后 res:// 只读，这里会返回 ok=false + 原因，调用方负责提示。
+# ⚠ 只写标量（bool / int / float）。数组下标写成路径段（"map.biome_weights.0"）。
+# ------------------------------------------------------------
+
+const BACKUP_ROOT := "res://Backups/config"
+const BACKUP_KEEP := 20
+
+## 直接改内存里的出厂层。落盘之后要把文件里的新值同步进 _data，
+#  否则「文件已是新值、内存还是旧值」，重出击前看不到效果。
+func set_base_value(path: String, value) -> void:
+	_set_path(_data, path, value)
+
+
+## 把一批标量值原地写进某个域文件。edits = [{path, value}]。
+## 顺序是：定位 → 拼接 → 校验（能解析 + 回读值对得上）→ 备份 → 落笔。
+## 校验不过就整批不写，原文件一个字节都不会变。
+## 返回 {ok, error, missing, backup, wrote}。
+func write_domain_values(domain: String, edits: Array,
+		root: String = CONFIG_DIR, backup_root: String = BACKUP_ROOT) -> Dictionary:
+	var file_path := "%s/%s.json" % [root, domain]
+	var raw := FileAccess.get_file_as_string(file_path)
+	if raw == "":
+		return {"ok": false, "error": "读不到域文件（不存在或空）：" + file_path}
+	var wanted := {}
+	for e in edits:
+		wanted[str(e["path"])] = true
+	var spans := {}
+	if _scan_spans(raw, 0, int(raw.length()), "", wanted, spans) < 0:
+		return {"ok": false, "error": "JSON 结构读不懂，不敢动笔：" + file_path}
+	var missing: Array = []
+	for e in edits:
+		if not spans.has(str(e["path"])):
+			missing.append(str(e["path"]))
+	if not missing.is_empty():
+		return {"ok": false, "error": "这些路径在文件里找不到（结构变了？先重跑生成器）：%s" % file_path,
+			"missing": missing}
+	var jobs: Array = []
+	for e in edits:
+		var sp: Array = spans[str(e["path"])]
+		jobs.append([int(sp[0]), int(sp[1]), _json_literal(e["value"])])
+	jobs.sort_custom(func(a, b): return int(a[0]) > int(b[0]))
+	var out := raw
+	for j in jobs:
+		out = out.substr(0, int(j[0])) + str(j[2]) + out.substr(int(j[1]))
+	var parsed = JSON.parse_string(out)
+	if not (parsed is Dictionary):
+		return {"ok": false, "error": "改完的文本不是合法 JSON，放弃写入：" + file_path}
+	for e in edits:
+		var got := _probe(parsed, str(e["path"]))
+		if not bool(got[0]) or not _same_scalar(got[1], e["value"]):
+			return {"ok": false, "error": "回读校验不一致，放弃写入：%s" % str(e["path"])}
+	var stamp := _stamp()
+	var backup_dir := "%s/%s" % [backup_root, stamp]
+	if DirAccess.make_dir_recursive_absolute(backup_dir) != OK:
+		return {"ok": false, "error": "建不了备份目录：" + backup_dir}
+	if DirAccess.copy_absolute(file_path, "%s/%s.json" % [backup_dir, domain]) != OK:
+		return {"ok": false, "error": "备份失败，放弃写入：" + file_path}
+	var f := FileAccess.open(file_path, FileAccess.WRITE)
+	if f == null:
+		return {"ok": false, "error": "文件不可写（导出包里的 res:// 是只读的）：%s" % file_path,
+			"backup": backup_dir}
+	f.store_string(out)
+	f.close()
+	_prune_backups(backup_root)
+	var wrote: Array = []
+	for e in edits:
+		wrote.append(str(e["path"]))
+	return {"ok": true, "error": "", "missing": [], "backup": backup_dir, "wrote": wrote}
+
+
+## 备份清单（新的在前）：[{stamp, files}]
+func backup_list(backup_root: String = BACKUP_ROOT) -> Array:
+	var dir := DirAccess.open(backup_root)
+	if dir == null:
+		return []
+	var names: Array = dir.get_directories_at(backup_root)
+	names.sort()
+	names.reverse()
+	var out: Array = []
+	for n in names:
+		var sub := DirAccess.open("%s/%s" % [backup_root, str(n)])
+		var files: Array = []
+		if sub != null:
+			for f in sub.get_files_at("%s/%s" % [backup_root, str(n)]):
+				files.append(str(f))
+		out.append({"stamp": str(n), "files": files})
+	return out
+
+
+## 把某次备份整批拷回去（默认最近一次）。只还原文件，不碰内存层 ——
+## 调用方自己决定要不要 load_config() / 清覆盖层。
+func restore_backup(stamp: String = "", root: String = CONFIG_DIR, backup_root: String = BACKUP_ROOT) -> Dictionary:
+	var list := backup_list(backup_root)
+	if list.is_empty():
+		return {"ok": false, "error": "还没有任何备份", "stamp": "", "files": []}
+	var pick: Dictionary = list[0]
+	if stamp != "":
+		pick = {}
+		for b in list:
+			if str(b["stamp"]) == stamp:
+				pick = b
+				break
+		if pick.is_empty():
+			return {"ok": false, "error": "没有这个备份：" + stamp, "stamp": "", "files": []}
+	var done: Array = []
+	for f in (pick["files"] as Array):
+		var src := "%s/%s/%s" % [backup_root, str(pick["stamp"]), str(f)]
+		if DirAccess.copy_absolute(src, "%s/%s" % [root, str(f)]) != OK:
+			return {"ok": false, "error": "还原到一半失败，已恢复：%s；卡在 %s" % [str(done), str(f)],
+				"stamp": str(pick["stamp"]), "files": done}
+		done.append(str(f))
+	return {"ok": true, "error": "", "stamp": str(pick["stamp"]), "files": done}
+
+
+func _stamp() -> String:
+	var d := Time.get_datetime_dict_from_system()
+	return "%04d-%02d-%02d_%02d%02d%02d" % [d.year, d.month, d.day, d.hour, d.minute, d.second]
+
+
+func _prune_backups(backup_root: String = BACKUP_ROOT) -> void:
+	var dir := DirAccess.open(backup_root)
+	if dir == null:
+		return
+	var names: Array = dir.get_directories_at(backup_root)
+	names.sort()
+	while names.size() > BACKUP_KEEP:
+		DirAccess.remove_absolute("%s/%s" % [backup_root, str(names.pop_front())])
+
+
+## 值 -> JSON 字面量。float 要保住小数点：文件里写的是 52.0，回填成 52 会让
+#  整份配置的数值类型观感一夜回到解放前（而且 git 会把它算成一次改动）。
+func _json_literal(v) -> String:
+	if v is bool:
+		return "true" if v else "false"
+	if v is int:
+		return str(v)
+	if v is float:
+		var s := String.num(v)
+		if not ("." in s or "e" in s or "n" in s):
+			s += ".0"
+		return s
+	if v is String:
+		return JSON.stringify(v)
+	return "null"
+
+
+## JSON 读回来数字一律是 float，跟写进去的 int 比大小得先跨过这道类型坎。
+func _same_scalar(a, b) -> bool:
+	if a is bool or b is bool:
+		return bool(a) == bool(b)
+	if (a is int or a is float) and (b is int or b is float):
+		return is_equal_approx(float(a), float(b))
+	return str(a) == str(b)
+
+
+const _C_Q := 34          # "
+const _C_LB := 91         # [
+const _C_RB := 93         # ]
+const _C_LC := 123        # {
+const _C_RC := 125        # }
+const _C_CM := 44         # ,
+const _C_CL := 58         # :
+const _C_BS := 92         # \
+const _C_SP := 32
+const _C_TAB := 9
+const _C_LF := 10
+const _C_CR := 13
+
+
+## 扫一遍 JSON 原文，把 wanted 里那些点路径对应的**值 token** 区间记进 out。
+## 返回读完的游标；任何一处结构对不上就返回 -1（调用方据此放弃写入）。
+## 取字符一律走 unicode_at 而不是 String[i]：后者每次都要现造一个单字符 String，
+## 四万五千个字符扫一遍就是四万五千次分配。
+func _scan_spans(t: String, i: int, n: int, path: String, wanted: Dictionary, out: Dictionary) -> int:
+	i = _skip_ws(t, i, n)
+	if i >= n:
+		return -1
+	var c := t.unicode_at(i)
+	if c == _C_LC:
+		i = _skip_ws(t, i + 1, n)
+		if i >= n:
+			return -1
+		if t.unicode_at(i) == _C_RC:
+			return i + 1
+		while true:
+			i = _skip_ws(t, i, n)
+			if i >= n or t.unicode_at(i) != _C_Q:
+				return -1
+			var k := _read_str(t, i, n)
+			if int(k[1]) < 0:
+				return -1
+			i = _skip_ws(t, int(k[1]), n)
+			if i >= n or t.unicode_at(i) != _C_CL:
+				return -1
+			i = _scan_spans(t, i + 1, n, _child(path, str(k[0])), wanted, out)
+			if i < 0:
+				return -1
+			i = _skip_ws(t, i, n)
+			if i >= n:
+				return -1
+			if t.unicode_at(i) == _C_CM:
+				i = _skip_ws(t, i + 1, n)
+				continue
+			if t.unicode_at(i) == _C_RC:
+				return i + 1
+			return -1
+	if c == _C_LB:
+		i = _skip_ws(t, i + 1, n)
+		if i >= n:
+			return -1
+		if t.unicode_at(i) == _C_RB:
+			return i + 1
+		var idx := 0
+		while true:
+			i = _scan_spans(t, i, n, _child(path, str(idx)), wanted, out)
+			if i < 0:
+				return -1
+			idx += 1
+			i = _skip_ws(t, i, n)
+			if i >= n:
+				return -1
+			if t.unicode_at(i) == _C_CM:
+				i = _skip_ws(t, i + 1, n)
+				continue
+			if t.unicode_at(i) == _C_RB:
+				return i + 1
+			return -1
+	var start := i
+	if c == _C_Q:
+		var s := _read_str(t, i, n)
+		if int(s[1]) < 0:
+			return -1
+		i = int(s[1])
+	else:
+		while i < n and t.unicode_at(i) != _C_CM and t.unicode_at(i) != _C_RC and t.unicode_at(i) != _C_RB \
+				and t.unicode_at(i) != _C_SP and t.unicode_at(i) != _C_LF and t.unicode_at(i) != _C_CR and t.unicode_at(i) != _C_TAB:
+			i += 1
+	if wanted.has(path):
+		out[path] = [start, i]
+	return i
+
+
+## 从游标 i（必须停在引号上）读一个 JSON 字符串，返回 [内容, 结束游标]；坏了返回 ["", -1]。
+func _read_str(t: String, i: int, n: int) -> Array:
+	var s := ""
+	i += 1
+	while i < n:
+		var c := t.unicode_at(i)
+		if c == _C_Q:
+			return [s, i + 1]
+		if c == _C_BS:
+			i += 1
+			if i >= n:
+				return ["", -1]
+			var e := t.unicode_at(i)
+			match e:
+				110: s += "\n"
+				116: s += "\t"
+				114: s += "\r"
+				98: s += "\b"
+				102: s += "\f"
+				117:
+					# \uXXXX：不解码的话键名会悄悄变成 "u"，两个不同的键就可能撞成同一个路径
+					if i + 4 >= n:
+						return ["", -1]
+					var code := 0
+					for k in range(4):
+						var h := _hex(t.unicode_at(i + 1 + k))
+						if h < 0:
+							return ["", -1]
+						code = code * 16 + h
+					s += char(code)
+					i += 4
+				_: s += char(e)
+			i += 1
+			continue
+		s += char(c)
+		i += 1
+	return ["", -1]
+
+
+func _hex(c: int) -> int:
+	if c >= 48 and c <= 57:
+		return c - 48
+	if c >= 97 and c <= 102:
+		return c - 87
+	if c >= 65 and c <= 70:
+		return c - 55
+	return -1
+
+
+func _skip_ws(t: String, i: int, n: int) -> int:
+	while i < n and (t.unicode_at(i) == _C_SP or t.unicode_at(i) == _C_TAB or t.unicode_at(i) == _C_LF or t.unicode_at(i) == _C_CR):
+		i += 1
+	return i
+
+
+func _child(path: String, seg: String) -> String:
+	return seg if path == "" else "%s.%s" % [path, seg]

@@ -1,12 +1,13 @@
 extends CanvasLayer
 ## ============================================================
-## StatuePanel — 雕像升级面板（靠近雕像按 E 打开）
-## 两条养成线（生存/获取），每项显示：名称、等级、当前值、
-## 下一级费用、升级按钮（满级/资源不足自动禁用）。
-## 购买即时生效并存档（Meta.buy_upgrade）。打开时暂停，E/ESC 关闭。
+## StatuePanel — 雕像升级面板（点修道院建筑打开）
+## 两条养成线（生存/获取），每项一行卡片：名称 + 等级、当前值 → 下一级值、
+## 费用（资源图标，够=绿 / 不够=橙红）、升级按钮（满级/资源不足自动禁用）。
+## 购买即时生效并存档（Meta.buy_upgrade）。打开时暂停，E/ESC 或右上「关闭」关闭。
+##
+## 下一级值 = 当前值 + config 的 per_level（Meta.get_stat 是线性公式，见其注释）。
 ## ============================================================
 
-var _panel: PanelContainer
 var _content: VBoxContainer
 
 
@@ -17,28 +18,25 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	_panel = UiKit.centered_dialog(self, 560)
+	var col := UiKit.dialog(self, 680, "蒸汽先贤雕像", close)
 
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	_panel.add_child(vbox)
+	var sub := UiKit.dim("局外养成 · 升级永久生效，写进当前存档槽", UiKit.FS_SMALL)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(sub)
 
-	var title := Label.new()
-	title.text = "蒸汽先贤雕像 — 局外养成"
-	title.add_theme_font_size_override("font_size", 22)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
+	# 升级项共 6~8 条，加上两条线标题，限高滚动防顶出屏幕
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(0, 460)
+	_content = UiKit.vbox(10)
+	_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_content)
+	UiKit.skin_scroll(scroll)
+	col.add_child(scroll)
 
-	_content = VBoxContainer.new()
-	_content.add_theme_constant_override("separation", 12)
-	vbox.add_child(_content)
-
-	var hint := Label.new()
-	hint.text = "点击按钮购买升级 · 按 E 或 ESC 关闭"
-	hint.add_theme_font_size_override("font_size", 13)
-	hint.add_theme_color_override("font_color", Color(0.7, 0.68, 0.63))
+	var hint := UiKit.dim("点击按钮购买升级 · 按 E 或 ESC 关闭", UiKit.FS_SMALL)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(hint)
+	col.add_child(hint)
 
 
 func open() -> void:
@@ -66,66 +64,95 @@ func _refresh() -> void:
 		c.queue_free()
 
 	for line in [["survival", "生存线"], ["acquisition", "获取线"]]:
-		var header := Label.new()
-		header.text = "— %s —" % line[1]
-		header.add_theme_font_size_override("font_size", 17)
-		header.add_theme_color_override("font_color", Color(0.85, 0.62, 0.30))
-		header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_content.add_child(header)
-
+		_content.add_child(UiKit.section(line[1]))
 		for key in Meta.get_upgrade_keys():
 			if not String(key).begins_with(line[0] + "."):
 				continue
 			_content.add_child(_make_row(key))
 
 
-## 单个升级项一行：名称+等级+数值 | 费用 | 按钮
-func _make_row(key: String) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-
+## 单个升级项一行卡片：[名称/等级 + 当前值→下一级] | [费用] | [按钮]
+func _make_row(key: String) -> PanelContainer:
 	var lv: int = Meta.get_upgrade_level(key)
 	var max_lv: int = int(Config.get_value("meta_progression.%s.max_level" % key, 0))
 	var display_name: String = str(Config.get_value("meta_progression.%s.name" % key, key))
 	var fmt: String = str(Config.get_value("meta_progression.%s.format" % key, "int"))
+	var maxed := lv >= max_lv
+	var afford := Meta.can_afford(key)
 
-	var info := Label.new()
-	info.text = "%s  Lv.%d/%d  当前：%s" % [
-		display_name, lv, max_lv, _format_stat(Meta.get_stat(key), fmt)]
-	info.add_theme_font_size_override("font_size", 16)
-	info.custom_minimum_size = Vector2(300, 0)
-	row.add_child(info)
+	var box := UiKit.row_box(UiKit.COL_ROW)
+	var h := UiKit.hbox(12)
+	box.add_child(h)
 
-	var cost := Label.new()
-	cost.text = _cost_text(key)
-	cost.add_theme_font_size_override("font_size", 15)
-	cost.custom_minimum_size = Vector2(150, 0)
-	row.add_child(cost)
+	# 左：名称 + 等级 / 当前值 → 下一级值
+	var info := UiKit.vbox(2)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var title_row := UiKit.hbox(8)
+	title_row.add_child(UiKit.label(display_name, UiKit.FS_BODY))
+	var ttl := Control.new()
+	ttl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(ttl)
+	title_row.add_child(UiKit.label("Lv.%d/%d" % [lv, max_lv], UiKit.FS_BODY, UiKit.COL_AMBER))
+	info.add_child(title_row)
 
-	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(80, 0)
-	if lv >= max_lv:
-		btn.text = "已满级"
-		btn.disabled = true
+	var cur := _format_stat(Meta.get_stat(key), fmt)
+	var stat_line: Label
+	if maxed:
+		stat_line = UiKit.dim("当前 %s（已满级）" % cur, UiKit.FS_SMALL)
 	else:
-		btn.text = "升级"
-		btn.disabled = not Meta.can_afford(key)
+		var per_level := float(Config.get_value("meta_progression.%s.per_level" % key, 0))
+		var nxt := _format_stat(Meta.get_stat(key) + per_level, fmt)
+		stat_line = UiKit.label("当前 %s  →  下一级 %s" % [cur, nxt], UiKit.FS_SMALL, UiKit.COL_DIM)
+	info.add_child(stat_line)
+	h.add_child(info)
+
+	# 中：费用（图标 + 数量，竖排右对齐）。整行 tooltip 给「仓库现有」，
+	# 差多少一目了然，不用再去开仓库面板对数字。
+	var cost_box := UiKit.vbox(2)
+	cost_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	var cost: Dictionary = Meta.get_upgrade_cost(key)
+	if cost.is_empty():
+		cost_box.add_child(UiKit.dim("免费", UiKit.FS_SMALL))
+	else:
+		for res in cost:
+			cost_box.add_child(_cost_line(str(res), int(cost[res]), afford))
+		cost_box.tooltip_text = _bank_tooltip(cost)
+	h.add_child(cost_box)
+
+	# 右：按钮（皮肤同主菜单的蓝色小方块，禁用态自带半透明）
+	var btn := UiKit.small_button("已满级" if maxed else "升级", 96)
+	btn.disabled = maxed or not afford
+	if not maxed:
+		btn.tooltip_text = "消耗仓库资源，立即生效"
 		btn.pressed.connect(func():
 			Meta.buy_upgrade(key)
 			_refresh())
-	row.add_child(btn)
-	return row
+	h.add_child(btn)
+	return box
 
 
-func _cost_text(key: String) -> String:
-	var cost: Dictionary = Meta.get_upgrade_cost(key)
-	if cost.is_empty():
-		return "免费"
+## 单项费用一行：图标 + ×数量；够=绿、不够=橙红
+func _cost_line(res: String, need: int, afford: bool) -> Control:
+	var line := UiKit.hbox(6)
+	var icon := UiKit.resource_icon(res, 22.0)
+	if icon != null:
+		line.add_child(icon)
+	var have := int(Meta.bank.get(res, 0))
+	var lab := UiKit.label("×%d" % need, UiKit.FS_SMALL,
+			UiKit.COL_OK if afford else UiKit.COL_WARN)
+	lab.tooltip_text = "%s：仓库 %d / 需要 %d" % [
+		str(Config.get_value("resources.%s.name" % res, res)), have, need]
+	line.add_child(lab)
+	return line
+
+
+## 费用区总 tooltip：把每一项的「仓库现有 / 需要」列一遍
+func _bank_tooltip(cost: Dictionary) -> String:
 	var parts: Array = []
 	for res in cost:
-		var display: String = str(Config.get_value("resources.%s.name" % res, res))
-		parts.append("%s x%d" % [display, int(cost[res])])
-	return "，".join(parts)
+		parts.append("%s %d/%d" % [str(Config.get_value("resources.%s.name" % res, res)),
+				int(Meta.bank.get(res, 0)), int(cost[res])])
+	return "仓库现有 / 需要：" + "　".join(parts)
 
 
 func _format_stat(v: float, fmt: String) -> String:
