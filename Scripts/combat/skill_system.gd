@@ -167,6 +167,13 @@ func damage_of(id: String) -> float:
 			* (1.0 + float(Config.get_value("skills.progression.damage_per_level", 0.25)) * _lv_step(id))
 
 
+## 治疗量。成长**不**与伤害共用 damage_per_level：治疗招升级到底是"回得更多"还是
+## "转得更快"是两条不同的手感，所以给它自己那一档 progression.heal_per_level。
+func heal_of(id: String) -> float:
+	return param(id, "heal_flat") \
+			* (1.0 + float(Config.get_value("skills.progression.heal_per_level", 0.0)) * _lv_step(id))
+
+
 func radius_of(id: String) -> float:
 	return param(id, "radius_px") \
 			+ float(Config.get_value("skills.progression.radius_per_level_px", 0.0)) * _lv_step(id)
@@ -298,6 +305,9 @@ func _cast_aoe(id: String, d: Dictionary) -> void:
 	var fx_hit := str(d.get("fx_hit", ""))
 	# 击退距离按招走 param：没写这条键 = 0 = 不推，写了就把目标沿「施法者→目标」推开。
 	var kb := param(id, "knockback_px")
+	# 牵引是同一条位移通道的反方向（pull_px：把目标拽向施法者）。走 if/elif 而不是相加：
+	# 两个都写等于配表的人以为自己能同时做出推和拉，A 段那条断言会当场拦住这种配法。
+	var pull := param(id, "pull_px")
 	var dealt := 0
 	for t in nodes_in_radius(get_tree(), pos, radius, DAMAGEABLE_GROUPS):
 		var dmg := roll_damage(id)
@@ -306,13 +316,21 @@ func _cast_aoe(id: String, d: Dictionary) -> void:
 			dealt += dmg
 		if sid != "" and t.has_method("apply_status"):
 			t.call("apply_status", sid, sdef)
-		if kb > 0.0 and t.has_method("apply_knockback"):
-			var away: Vector2 = (t as Node2D).global_position - pos
-			if away.length() > 0.01:
-				t.call("apply_knockback", away.normalized(), kb)
+		var shift := kb if kb > 0.0 else pull
+		if shift > 0.0 and t.has_method("apply_knockback"):
+			var dir: Vector2 = (t as Node2D).global_position - pos
+			if kb <= 0.0:
+				dir = -dir
+			if dir.length() > 0.01:
+				t.call("apply_knockback", dir.normalized(), shift)
 		EffectLibrary.spawn(fx_hit, t.get_parent(), (t as Node2D).global_position, 0.0, tint)
 	if dealt > 0:
 		HitStop.pulse(get_tree(), "on_deal_damage")
+		# 吸血按"这一招打出去多少"结算，不看目标扣完防御实际掉了几滴 ——
+		# 三个出手点（普攻近战 / 弹道 / 范围技）都按同一个口径，否则同一层增益
+		# 打硬皮敌人和打脆皮敌人回的血不一样多，玩家读不出规律。
+		if unit.has_method("apply_lifesteal"):
+			unit.call("apply_lifesteal", dealt)
 
 
 func _cast_projectile(id: String, d: Dictionary) -> void:
@@ -332,38 +350,95 @@ func _cast_projectile(id: String, d: Dictionary) -> void:
 		cfg["status_def"] = status_def_of(id)
 	cfg["aoe_radius_px"] = float(d.get("aoe_radius_px", 0.0))
 	var dir := aim_dir(id)
-	var dmg := roll_damage(id)
-	unit.call("fire_skill_projectile", cfg, dir, dmg)
+	# 多重弹幕：一发变数发，绕着瞄准方向**对称**摊开（count=3 / spread=34 → −17°、0°、+17°）。
+	# 每发单独 roll_damage：暴击与浮动逐发抽，所以三发全中不会正好是单发的三倍 ——
+	# 弹幕的期望要按"每发各算一次"读，共用一个数会让面板与手感对不上。
+	# 上限是个防呆而不是可调项：配置手滑写成 999 会一帧塞出近千个弹道节点。
+	var count := clampi(int(param(id, "projectile_count")), 1, 12)
+	var spread := deg_to_rad(param(id, "spread_deg"))
+	for i in count:
+		var shot_dir := dir
+		if count > 1:
+			shot_dir = dir.rotated(spread * (float(i) / float(count - 1) - 0.5))
+		unit.call("fire_skill_projectile", cfg.duplicate(true), shot_dir, roll_damage(id))
 	var parent := _world_parent()
 	if parent != null:
+		# 施法条带只放一条，朝扇面正中：多发是"一次出手"，画出 count 条闪光会把这一发
+		# 读成 count 次施法，冷却与噪音也都是一次性的。
 		EffectLibrary.spawn(str(d.get("fx_cast", "")), parent, global_pos(), dir.angle(), fx_tint(d))
 
 
+## buff 型干两件事，各走各的、只做其中一件也行：
+##   · 一次性效果（治疗）：放完当场结算，不进状态容器 —— 血已经回去了，没有"剩余时长"可倒数；
+##   · 有时限的乘数（减伤 / 吸血 / 增伤 / 加速）：交给宿主 apply_buff，倒数与结算全归 UnitStatus。
+## 所以「buff 必须有 buff_duration_seconds」这条旧规矩放宽了：纯治疗招没有时长可言。
+## 只有"写了时长却没有任何乘数可挂"和"宿主挂不了"这两种情况才警告。
+##
+## 四条乘数键可以任意组合，狂战面具就是"增伤 + 负减伤"这一对：damage_reduction
+## 读成**带符号**的数（正=少挨打，负=多挨打），于是一招能同时写"砍得更痛"和"更扛不住"。
+## 升级对 buff 型只长时长（progression.duration_per_level），不涨幅度 ——
+## "多 40% 伤害持续 5 秒"和"多 60% 持续 3 秒"是两种手感，这里选前者，因为它只吃一个键。
 func _cast_buff(id: String, d: Dictionary) -> void:
-	if not unit.has_method("apply_buff"):
-		push_warning("[Skill] 宿主没有 apply_buff()，增益无处可挂")
-		return
-	var red := clampf(float(d.get("damage_reduction", 0.0)), 0.0, 0.95)
+	var healed := 0
+	var want_heal := int(round(heal_of(id)))
+	if want_heal > 0:
+		if unit.has_method("heal"):
+			# heal() 自己夹到 max_hp，所以过量治疗会返回一个比 want_heal 小的实收数
+			healed = int(unit.call("heal", want_heal))
+		else:
+			push_warning("[Skill] 宿主没有 heal()，%s 这口血回不去" % id)
+	var mods := {}
+	var red := clampf(float(d.get("damage_reduction", 0.0)), -0.95, 0.95)
+	if not is_zero_approx(red):
+		mods["damage_mult"] = 1.0 - red
+	var ls := clampf(param(id, "lifesteal"), 0.0, 1.0)
+	if ls > 0.0:
+		mods["lifesteal"] = ls
+	var db := clampf(param(id, "damage_bonus"), -0.95, 4.0)
+	if not is_zero_approx(db):
+		mods["damage_dealt_mult"] = 1.0 + db
+	var sb := clampf(param(id, "speed_bonus"), -0.95, 4.0)
+	if not is_zero_approx(sb):
+		mods["speed_mult"] = 1.0 + sb
 	var dur := float(d.get("buff_duration_seconds", 0.0)) \
 			* (1.0 + float(Config.get_value("skills.progression.duration_per_level", 0.0)) * _lv_step(id))
-	if dur <= 0.0:
-		push_warning("[Skill] %s 是 buff 型但 buff_duration_seconds<=0" % id)
-		return
-	# 承伤乘数走状态容器：与冻结/灼烧同一条倒数通道，宿主只要在 take_damage 里乘一次。
-	unit.call("apply_buff", id, {"damage_mult": 1.0 - red}, dur)
+	if not mods.is_empty():
+		if dur <= 0.0:
+			push_warning("[Skill] %s 有乘数却没写 buff_duration_seconds，这层增益挂不上" % id)
+		elif not unit.has_method("apply_buff"):
+			push_warning("[Skill] 宿主没有 apply_buff()，增益无处可挂")
+		else:
+			# 承伤/吸血乘数走同一个容器：与冻结、灼烧共用一条倒数通道，宿主只要在
+			# take_damage 里乘一次、在出手后加一句，不必为每种增益各开一个计时器。
+			unit.call("apply_buff", id, mods, dur)
+	elif dur > 0.0:
+		push_warning("[Skill] %s 写了 buff_duration_seconds 但没有任何乘数（damage_reduction / lifesteal / damage_bonus / speed_bonus 全是 0）" % id)
+	if healed > 0:
+		print("[Skill] %s 回了 %d 血（想回 %d，当前 HP %d/%d）" % [
+				id, healed, want_heal, int(unit.get("hp")), int(unit.get("max_hp"))])
 	var parent := _world_parent()
 	if parent != null:
 		EffectLibrary.spawn(str(d.get("fx_cast", "")), parent, global_pos(), 0.0, fx_tint(d))
 
 
 ## 一次伤害结算：走通用管线（暴击/浮动），防御由被击方自己扣（敌人那份在 incoming_damage 里）。
+## 出手侧的增伤增益（狂战面具）在抽之前乘，与 player.roll_hit_damage 同一个位置 ——
+## 两条出口都必须"先放大再抽暴击"，否则同一个 buff 在普攻和技能上手感不一致。
 func roll_damage(id: String) -> int:
-	var base := damage_of(id)
+	var base := damage_of(id) * dealt_mult()
 	if base <= 0.0:
 		return 0
 	var hit := DamagePipeline.roll(base, 0.0,
 			param(id, "crit_chance"), param(id, "crit_multiplier", 1.5), param(id, "variance"))
 	return int(hit["damage"])
+
+
+## 宿主身上的增伤乘数。宿主没这份容器（探针里的假靶子、敌人）就按 1.0 走 ——
+## 乘 1 与不乘逐字节等价，所以接这条线不会改动任何既有数值。
+func dealt_mult() -> float:
+	if unit == null or not is_instance_valid(unit) or not unit.has_method("damage_dealt_mult"):
+		return 1.0
+	return float(unit.call("damage_dealt_mult"))
 
 
 ## 出手方向：朝**这一招自己射程内**最近的那个敌人；一个都没有才沿角色朝向（手动那一发）。

@@ -38,6 +38,11 @@ var _map_root: Node2D = null
 ## 玩家用画笔摆出来的楼的容器（与出厂那 12 栋分开挂，互不干扰）。
 ## 编辑器要重建玩家楼时只清这个节点、不碰出厂楼；重摆出厂楼也不影响它。
 var _player_bld_root: Node2D = null
+## 出厂 12 栋的容器。单独挂一层，是为了「全部清空」能一次性把整组出厂楼
+## 从视图里隐掉（编辑器拿这个节点切 visible），而不用逐个节点去翻。
+## 出厂楼是否被「全部清空」抹掉由 Meta.base_custom.factory_disabled 决定，
+## 那个开关为 true 时下面的生成循环直接跳过 —— 出厂楼不再出现，但玩家楼照常。
+var _factory_root: Node2D = null
 
 
 ## 生成基地（由 main 调用），返回玩家出生点
@@ -70,19 +75,29 @@ func setup(root: Node2D) -> Vector2:
 	# 建筑布局：优先用存档槽里保存的位置（Meta.base_layout），否则用 config 默认
 	var saved: Dictionary = Meta.base_layout
 	var cfg_list: Array = Config.get_value("base.buildings", [])
-	for b in cfg_list:
-		var id := str(b["id"])
-		var cell_cfg: Array = saved[id] if saved.has(id) else b["cell"]
-		var cell := Vector2i(int(cell_cfg[0]), int(cell_cfg[1]))
-		var bld := BUILDING_SCENE.instantiate()
-		root.add_child(bld)
-		bld.setup(id, str(b["name"]), str(b.get("hint", "按 E")), str(b.get("sprite", "")),
-				int(b.get("anim_frames", 0)), float(b.get("anim_fps", 8.0)))
-		bld.set_cell(cell)
-		bld.interacted.connect(_on_building_interacted)
-		bld.reposition_requested.connect(_on_reposition_requested)
-		_buildings[id] = bld
-		_cells[id] = cell
+	var fb_root := Node2D.new()
+	fb_root.name = "BaseFactoryBuildings"
+	root.add_child(fb_root)
+	_factory_root = fb_root
+	# 「全部清空」把出厂楼也一起抹掉：factory_disabled=true 时跳过整组生成。
+	# 出厂楼是基地功能性建筑（传送门/仓库/升级……），没了就进不了局内，所以这是
+	# 一个持久开关，清完要手动「恢复出厂楼」才回来。
+	if not Meta.base_custom.get("factory_disabled", false):
+		for b in cfg_list:
+			var id := str(b["id"])
+			var cell_cfg: Array = saved[id] if saved.has(id) else b["cell"]
+			var cell := Vector2i(int(cell_cfg[0]), int(cell_cfg[1]))
+			var bld := BUILDING_SCENE.instantiate()
+			fb_root.add_child(bld)
+			bld.setup(id, str(b["name"]), str(b.get("hint", "按 E")), str(b.get("sprite", "")),
+					int(b.get("anim_frames", 0)), float(b.get("anim_fps", 8.0)))
+			bld.set_cell(cell)
+			bld.interacted.connect(_on_building_interacted)
+			bld.reposition_requested.connect(_on_reposition_requested)
+			_buildings[id] = bld
+			_cells[id] = cell
+	else:
+		print("[Base] 出厂楼已禁用（factory_disabled=true），本档不生成传送门/仓库等")
 
 	# 玩家用画笔摆出来的楼（存档里的 base_custom.buildings）。得在 _build_custom_props()
 	# 之前落好 —— 摆件层要靠「所有楼占地」把"房子里长树"的格子筛掉，玩家楼也算在内。
@@ -255,6 +270,7 @@ func edit_targets() -> Dictionary:
 		"blocked": _building_cells_set(),
 		"buildings_host": _player_bld_root,
 		"spawn_building": Callable(self, "make_building"),
+		"factory_root": _factory_root,
 	}
 
 

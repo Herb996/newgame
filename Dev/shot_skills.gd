@@ -2,13 +2,13 @@ extends Node
 ## ============================================================
 ## shot_skills — 实拍：技能在真窗口里到底画出了什么（2026-09-21）
 ##
-## 为什么还要这张：probe_skills 的 96 项断言证明的是**链路与表自洽**（id 解析得出来、
+## 为什么还要这张：probe_skills 的 201 项断言证明的是**链路与表自洽**（id 解析得出来、
 ## 冷却会转、状态挂得上、伤害算得对、撤离才写档）。它证明不了"这一帧屏幕上看得见" ——
 ## tint 把 alpha 乘成 0、FxRing 挂错层被地面盖住、弹道 modulate 写成透明色，
 ## 探针全是绿的而画面是空的。技能这一层尤其容易全绿却空画，因为它九成的表现
 ## 就是特效本身。
 ##
-## 十三张图各管一件事（前缀 sk_）：
+## 二十一张图各管一件事（前缀 sk_）：
 ##   sk_frost_cast     冰霜新星的施法条带（slam_ring 被水系 fx_tint 染成冰蓝）
 ##   sk_frost_ring     地面上那圈冲击环 —— 范围这一属性的唯一可见形式
 ##   sk_frost_frozen   冻住的敌人：模型发冰蓝 + 站着不动（halt_ai + speed_mult 0）
@@ -19,13 +19,32 @@ extends Node
 ##                     手动那条路 frost/ember 已经验过了，这里要的是自动门槛的画面证据）
 ##   sk_falling_rocks_cast / _ring   落石：bash_rock 条带 + 140px 那圈，靶子被推开 46px
 ##   sk_quake_split_cast / _ring     地裂：190px 那圈（半径最大的一招），推开 78px
+##   sk_holy_cross   圣光十字：hit_holy 落在自己身上，日志里 HP 从 44 涨到 95
+##                   （血条被钉在"回完"那一格 —— _keep_alive 每帧钉血，不挪钉子这口血会被抹平）
+##   sk_blood_hunger 嗜血：挂着这层时落石打出去的伤害按 25% 回给自己，日志给涨了多少
+##   sk_battle_madness 狂战面具：burst_charge 落在自己身上。增伤这件事静帧看不出来，
+##                   证据是日志里同一招冰爆的两下伤害（戴前面具打多少、戴了之后打多少）
+##   sk_swift_feather 疾风羽：puff_dust 那一团。加速在一张静帧里根本不可见，
+##                   所以真正的读数是日志里"在动的那几帧平均多少 px/s"的两次实测与倍率
+##                   （只量像素距离会被场地骗：撞一次"受阻即停"，+50% 能实测成 ×2.6）
+##   sk_cinder_sparks 火星溅：空中同时三发（扇形摊开，各自带灼烧）。日志给三发之间的
+##                   夹角与逐发抽出来的伤害——"一次出手"与"三发"两件事都要看得见
+##   sk_leaf_blade   落叶刃：同时两发 + 靶子身上挂上眩晕（日志点名是哪只被钉住）
+##   sk_snake_bite   蛇咬：空中那一发（slash_bite 条带 + 米色弹道）。弹道只活十几帧，
+##                   轮询的是"有东西在飞"；命中发生在图之后，所以流血挂没挂上要另扫一轮
+##   sk_spore_cloud  孢子雾：地上那圈 128px 的雾（spit_web 落在自己身上）。这招是持续物，
+##                   轮询的是圈画出来没有；一圈两只靶子全挂上中毒才叫打中了一群人
 ##   sk_grimoire / sk_grimoire_near   魔法书本体：图标 + 柔光圈，第二张带人当尺寸参照
 ##
 ## 判据与 shot_fx 同一条规矩：**不猜时间**，逐帧轮询到"要拍的那样东西真的在场上"
 ## 才截；没等到就是真没有，写进 _missed 并以退出码 3 收场，不交空白图。
 ##
 ## 用法（**必须开窗**，无头是 dummy 驱动、viewport 贴图恒空）：
-##   python tools/run_probe.py _shot_skills.log Dev/shot_skills.tscn --window
+##   直接开一条重定向到文件的窗口跑，别走 run_probe.py 的管道抓输出 ——
+##   同一份脚本经管道连挂两次（600s 超时、进程停在 0.4% CPU 上不前进），
+##   下面这条两分半跑完还留下可实时看的日志：
+##   Godot_v4.7.2-stable_win64_console.exe --path D:/SteamPunkExtraction \
+##       res://Dev/shot_skills.tscn > _shot_skills.log 2>&1
 ##
 ## ⚠ 会走一次 _on_launch，开跑备份 user://save.json、收尾原样还原。
 ## ⚠ 靶子是把场上真实敌人挪到角色脚边（不造新节点）；魔法书同理挪过来并手动
@@ -44,6 +63,11 @@ const LEVELS := {"frost_nova": 3, "ember_shot": 3, "gear_guard": 3,
 const BURN_MIN_HP := 100.0
 ## 残血开盾的钉血比例：要低于 gear_guard 的 auto_cast_hp_below（0.55）才叫得动自动那一档
 const GUARD_HP_FRAC := 0.4
+## 圣光十字 / 嗜血那一段的钉血比例。要留够余量：Lv3 一口回 51，钉在 0.65（71/110）会
+## 直接回满，而"满血"和"没回"在一张静帧里长得一模一样 —— 钉到 0.4（44/110）才看得见涨。
+## 自动释放不靠"把血钉在门槛上面"躲开，而是每段只注入本段要用的招 + 钉血到放招之间
+## 一个 await 都不给。
+const HEAL_HP_FRAC := 0.4
 
 var _save_backup := ""
 var _save_existed := false
@@ -95,10 +119,20 @@ func _ready() -> void:
 			float(_player.call("vision_px")),
 			SkillSystem.default_val("shock_ring_seconds", 0.5)])
 
+	if _sweep_requested():
+		await _sweep_all()
+		print("[Sweep] 共出图 %d 张；缺失 %s" % [_n, "无" if _missed.is_empty() else str(_missed)])
+		_finish(0 if _missed.is_empty() else 3)
+		return
+
 	await _frost_phase()
 	await _ember_phase()
 	await _guard_phase()
 	await _knockback_phase()
+	await _sustain_phase()
+	await _boon_phase()
+	await _volley_phase()
+	await _toxin_phase()
 	await _grimoire_phase()
 
 	print("[ShotSkill] 共出图 %d 张；缺失 %s" % [_n, "无" if _missed.is_empty() else str(_missed)])
@@ -184,7 +218,7 @@ func _ember_phase() -> void:
 		await _shot("sk_ember_cast", fx as Node2D)
 	var proj := await _wait_projectile(50.0, 240)
 	if proj == null:
-		_missed.append("ember_shot 弹道在飞（技能弹道没有专属 id，按 status_id 认）")
+		_missed.append("ember_shot 弹道在飞（按 skill_projectile 分组认）")
 	else:
 		var spr: CanvasItem = proj.get_node_or_null("Icon") as CanvasItem
 		var icon_mod := "-" if spr == null else str(spr.modulate)
@@ -295,6 +329,414 @@ func _knockback_phase() -> void:
 
 
 # ------------------------------------------------------------
+# 圣光十字（当场回血）+ 嗜血（打人就回血）
+# ------------------------------------------------------------
+func _sustain_phase() -> void:
+	var max_hp := int(_player.get("max_hp"))
+	var hd := SkillSystem.def_of("holy_cross")
+	# 每一段只注入这一阶段要用的招：holy_cross 的自动门槛是残血 60%，留着它拍嗜血，
+	# 它会在那几张图里抢放同一条 hit_holy，照片就分不清那朵白光是谁开的。
+	_ss.set_known({"holy_cross": 3})
+	# 钉血 → 清零冷却 → 放招，**中间一个 await 都不给**：一插帧自动释放就可能先把
+	# 这一发放掉，我读到的 h0 就成了"回完之后"的数。
+	_hp_frac = HEAL_HP_FRAC
+	_keep_alive()
+	_ss.reset()
+	var h0 := int(_player.get("hp"))
+	var ok_heal := _ss.cast("holy_cross")
+	var h1 := int(_player.get("hp"))
+	print("[ShotSkill] ---- 圣光十字 Lv%d（回 %.0f 血，冷却 %.2fs，噪音 %.0f，残血 %.0f%% 自己开）----" % [
+			_ss.level_of("holy_cross"), _ss.heal_of("holy_cross"),
+			_ss.cooldown_of("holy_cross"), SkillSystem.param("holy_cross", "noise"),
+			float(hd.get("auto_cast_hp_below", 0.0)) * 100.0])
+	print("[ShotSkill]   手动放=%s｜HP %d → %d（涨 %d，上限 %d）" % [
+			str(ok_heal), h0, h1, h1 - h0, max_hp])
+	if not ok_heal or h1 <= h0:
+		_missed.append("holy_cross 没把血回上去")
+	else:
+		# _keep_alive 每帧把血钉回 _hp_frac，回上去的那一截会被抹平 —— 所以把钉子挪到
+		# 回完的位置，照片里的血条就停在"刚被回过"那一格。
+		_hp_frac = float(h1) / float(max_hp)
+		var hfx := await _wait_fx(str(hd.get("fx_cast", "")), 240, _player, 120.0)
+		if hfx == null:
+			_missed.append("holy_cross 施法条带 %s" % str(hd.get("fx_cast", "")))
+		else:
+			await _shot("sk_holy_cross", _player)
+
+	# 嗜血：挂上之后拿落石当"打人"的那一下。这一段普攻是关掉的（见 _ready 那句
+	# set_auto_attack(false)），而三个出手点走的是同一句 apply_lifesteal，
+	# 图里要的证据是"血条因为自己打出去的伤害涨回去"，用哪条出口不影响它。
+	# 先等圣光十字那条 hit_holy 播完：序列帧有 0.3~1.5s 寿命，不等干净的话这张
+	# "嗜血"照片里那朵白光其实是上一招的残留，两张图就成了同一张。
+	# 放在 set_known 之前：这时候场上只有 holy_cross，而它已经进了冷却，等帧不会放出新东西。
+	await _wait_no_fx(_player, 200.0, 240)
+	_ss.set_known({"blood_hunger": 3, "falling_rocks": 3})
+	_hp_frac = HEAL_HP_FRAC
+	_keep_alive()
+	var bd := SkillSystem.def_of("blood_hunger")
+	_ss.reset()
+	var ok_buff := _ss.cast("blood_hunger")
+	print("[ShotSkill] ---- 嗜血 Lv%d（吸血 %.0f%%，持续 %.1fs，冷却 %.2fs）挂上=%s｜身上「%s」----" % [
+			_ss.level_of("blood_hunger"),
+			SkillSystem.param("blood_hunger", "lifesteal") * 100.0,
+			float(bd.get("buff_duration_seconds", 0.0)), _ss.cooldown_of("blood_hunger"),
+			str(ok_buff), _status_summary(_player)])
+	var targets := _stage_targets(2, _ss.radius_of("falling_rocks") * 0.55)
+	if targets.size() < 2 or not ok_buff:
+		_missed.append("blood_hunger（靶子或增益没齐）")
+	else:
+		var a0 := int(_player.get("hp"))
+		_ss.reset()
+		var ok_rocks := _ss.cast("falling_rocks")
+		var a1 := int(_player.get("hp"))
+		print("[ShotSkill]   落石打出去之后 HP %d → %d（涨 %d，命中 %d 只）" % [
+				a0, a1, a1 - a0, targets.size()])
+		if not ok_rocks or a1 <= a0:
+			_missed.append("blood_hunger 没让落石回出血来")
+		else:
+			_hp_frac = float(a1) / float(max_hp)
+			var bfx := await _wait_fx(str(bd.get("fx_cast", "")), 240, _player, 120.0)
+			if bfx == null:
+				_missed.append("blood_hunger 施法条带 %s" % str(bd.get("fx_cast", "")))
+			else:
+				await _shot("sk_blood_hunger", _player)
+	_restore_targets(targets)
+	_hp_frac = 0.0
+	_ss.set_known(LEVELS)
+
+
+# ------------------------------------------------------------
+# 狂战面具（增伤换承伤）+ 疾风羽（只改腿）
+# ------------------------------------------------------------
+func _boon_phase() -> void:
+	var md := SkillSystem.def_of("battle_madness")
+	var fd := SkillSystem.def_of("swift_feather")
+	# 这一段只注入面具 + 量增伤的那把尺（frost_nova）：疾风羽和圣光十字都留到各自的
+	# 小节再挂，否则残血那几张图里会同时开出好几条 hit_holy，照片分不清是谁。
+	_hp_frac = 0.0
+	# 上一段那两层（齿轮护盾 / 嗜血）还在自己倒数，不清就会混进"身上「…」"的摘要，
+	# 并把承伤乘数叠成 0.6×1.15=0.69 —— 读数没错，但照片旁的日志就说不清哪层是谁给的了。
+	var st = _statuses_of(_player)
+	if st != null:
+		st.call("clear")
+	_ss.set_known({"battle_madness": 3, "frost_nova": 3})
+	_ss.reset()
+	var targets := _stage_targets(1, _ss.radius_of("frost_nova") * 0.5)
+	if targets.is_empty():
+		_missed.append("battle_madness（场上没有可借的靶子）")
+	else:
+		var t: Node2D = targets[0]["node"]
+		# 靶子的血被 _stage_targets 钉到 999999，所以"掉了几点"= 这一发实际打进去几点。
+		# 两次出手之间必须等屏幕干净：第一发的 slam_ring 还在播，第二张就成了两张图共用
+		# 同一朵白光（圣光十字那一段就栽过一次）。
+		var b0 := int(t.get("hp"))
+		_ss.reset()
+		_ss.cast("frost_nova")
+		var d_plain := b0 - int(t.get("hp"))
+		await _wait_no_fx(_player, 240.0, 240)
+		_ss.reset()
+		var ok_mask := _ss.cast("battle_madness")
+		print("[ShotSkill] ---- 狂战面具 Lv%d（出手 +%.0f%%，承伤 ×%.2f，持续 %.1fs，冷却 %.2fs，噪音 %.0f，残血 %.0f%% 自己戴）----" % [
+				_ss.level_of("battle_madness"),
+				SkillSystem.param("battle_madness", "damage_bonus") * 100.0,
+				1.0 - float(md.get("damage_reduction", 0.0)),
+				float(md.get("buff_duration_seconds", 0.0)) \
+						* (1.0 + float(Config.get_value("skills.progression.duration_per_level", 0.0)) * 2.0),
+				_ss.cooldown_of("battle_madness"), SkillSystem.param("battle_madness", "noise"),
+				float(md.get("auto_cast_hp_below", 0.0)) * 100.0])
+		print("[ShotSkill]   戴上=%s｜身上「%s」" % [str(ok_mask), _status_summary(_player)])
+		var mfx := await _wait_fx(str(md.get("fx_cast", "")), 240, _player, 120.0)
+		if mfx == null:
+			_missed.append("battle_madness 施法条带 %s" % str(md.get("fx_cast", "")))
+		else:
+			await _shot("sk_battle_madness", _player)
+		var b1 := int(t.get("hp"))
+		_ss.reset()
+		_ss.cast("frost_nova")
+		var d_masked := b1 - int(t.get("hp"))
+		var mult := _status_mult(_player)
+		print("[ShotSkill]   同一招冰爆：戴面具前打 %d，戴了之后打 %d（表里 +%.0f%%，承伤乘数读数 %.2f）" % [
+				d_plain, d_masked, SkillSystem.param("battle_madness", "damage_bonus") * 100.0, mult])
+		if d_plain <= 0 or d_masked <= d_plain:
+			_missed.append("battle_madness 没让同一招打出更多伤害（%d → %d）" % [d_plain, d_masked])
+	_restore_targets(targets)
+
+	# 疾风羽：加速在一张静帧里是看不出来的（角色画得一模一样，只是脚底下多一团灰）。
+	# 所以图只负责"这团灰真的画出来了"，真正的证据是**在动的那几帧里跑多少 px/s** ——
+	# 量出来的，不是从乘数读数上抄的。基线那一次放在**挂上之前**跑：清 known 并不会
+	# 清掉身上已经挂着的层，反过来排就得干等 4.8 秒。
+	# 只量像素距离上一版栽过一次：途中撞到装饰物就"受阻即停"，那一次的距离不是速度
+	# （+50% 实测成 ×2.6 就是这一坑）。速度读数只取"在动"的帧，停下只少采样。
+	# 精确倍率由探针在纯读数上兜（那里没有地形与路），这里只断 1.3~1.8 这一档。
+	if st != null:
+		st.call("clear")
+	await _wait_no_fx(_player, 240.0, 240)
+	var run_plain := await _speed_run("没加速", 24)
+	_ss.set_known({"swift_feather": 3})
+	_ss.reset()
+	var ok_feather := _ss.cast("swift_feather")
+	print("[ShotSkill] ---- 疾风羽 Lv%d（移速 +%.0f%%，持续 %.1fs，冷却 %.2fs，噪音 %.0f，auto_cast=%s）挂上=%s｜身上「%s」----" % [
+			_ss.level_of("swift_feather"),
+			SkillSystem.param("swift_feather", "speed_bonus") * 100.0,
+			float(fd.get("buff_duration_seconds", 0.0)) \
+					* (1.0 + float(Config.get_value("skills.progression.duration_per_level", 0.0)) * 2.0),
+			_ss.cooldown_of("swift_feather"), SkillSystem.param("swift_feather", "noise"),
+			str(SkillSystem.flag("swift_feather", "auto_cast", true)), str(ok_feather),
+			_status_summary(_player)])
+	var ffx := await _wait_fx(str(fd.get("fx_cast", "")), 240, _player, 120.0)
+	if ffx != null:
+		await _shot("sk_swift_feather", _player)
+	else:
+		_missed.append("swift_feather 施法条带 %s" % str(fd.get("fx_cast", "")))
+	var run_fast := await _speed_run("带着疾风羽", 24)
+	var sp_plain := float(run_plain["pxs"])
+	var sp_fast := float(run_fast["pxs"])
+	var ratio := sp_fast / maxf(sp_plain, 1.0)
+	print("[ShotSkill]   24 帧里：没加速跑 %.0f px（%.0f px/s），带疾风羽跑 %.0f px（%.0f px/s）"
+			% [float(run_plain["px"]), sp_plain, float(run_fast["px"]), sp_fast])
+	print("[ShotSkill]   速度实测 ×%.2f（表里 +%.0f%% = ×%.2f）" % [
+			ratio, SkillSystem.param("swift_feather", "speed_bonus") * 100.0,
+			1.0 + SkillSystem.param("swift_feather", "speed_bonus")])
+	if int(run_plain["n"]) < 6 or int(run_fast["n"]) < 6:
+		_missed.append("swift_feather 这两次跑动在动的帧太少（%s / %s 帧），倍率不作数"
+				% [str(run_plain["n"]), str(run_fast["n"])])
+	elif ratio < 1.3 or ratio > 1.8:
+		_missed.append("swift_feather 实测倍率 ×%.2f 对不上表里 +50%%（1.3~1.8 之外）" % ratio)
+	_ss.set_known(LEVELS)
+	_ss.reset()
+
+
+## 命令角色真的朝 pin 右侧走一段，量两件事：固定帧数里跑掉多少像素（"他真的动了"），
+## 以及**在动的那几帧里**速度读数的平均值（"跑多快"）。然后把他放回钉位。
+## 为什么要后者：只量像素会被场地骗 —— 途中撞到装饰物就"受阻即停"，那一次的距离
+## 不是速度，于是 +50% 的增益能实测出 ×2.6。取"在动的那些帧"的平均速度就不受这个影响
+## （停下 = 少几个采样，不是把剩下的采样改小）。
+## 用 physics_frame 逐帧自己跑，而不是 _wait_* 那几个助手：它们每帧都调 _keep_alive，
+## 会把人按回原地 —— 那样量出来的距离恒等于 0，看起来像"加速没用"。
+func _speed_run(label: String, frames: int) -> Dictionary:
+	var p0 := _player.global_position
+	var summed := 0.0
+	var moving := 0
+	_player.call("set_move_target", _pin + Vector2(400.0, 0.0))
+	for _i in range(frames):
+		await get_tree().physics_frame
+		var v: Vector2 = _player.get("velocity")
+		if v.length() > 1.0:
+			moving += 1
+			summed += v.length()
+	var got := p0.distance_to(_player.global_position)
+	var avg := summed / float(moving) if moving > 0 else 0.0
+	_player.call("stop_moving")
+	_player.call("clear_move_target")
+	_player.global_position = _pin
+	print("[ShotSkill]   %s：%d 帧走了 %.0f px，其中 %d 帧在动，在动时 %.0f px/s" % [
+			label, frames, got, moving, avg])
+	return {"px": got, "pxs": avg, "n": moving}
+
+
+# ------------------------------------------------------------
+# 多重弹幕：火星溅（一次三发）+ 落叶刃（一次两发带眩晕）
+# ------------------------------------------------------------
+func _volley_phase() -> void:
+	var sd := SkillSystem.def_of("cinder_sparks")
+	var ld := SkillSystem.def_of("leaf_blade")
+	_hp_frac = 0.0
+	# 上一段那两层（面具 / 羽毛）与满地特效都可能还没走完：面具那两张图要的是"身上只有
+	# battle_madness"，这里同理 —— 弹幕这一张要的是"空中只有我这次放的那几发"。
+	var st = _statuses_of(_player)
+	if st != null:
+		st.call("clear")
+	await _wait_no_fx(_player, 240.0, 240)
+
+	# 火星溅：三发同飞的瞬间只有一小段（680 px/s、40~130 px 之间那几帧），
+	# 所以轮询条件写的是"场上同时有几发"，而不是"等到第一发飞出去"。
+	_ss.set_known({"cinder_sparks": 1})
+	_ss.reset()
+	var want := int(SkillSystem.param("cinder_sparks", "projectile_count"))
+	# 靶子推远 + 等弹道飞出去再截：三发之间 lateral 差 = 离手距离 × sin(半扇角)，
+	# 上一次只等 40px（17° 摊开不到 12px）等于把三发拍成一坨，画面证明不了"扇形"。
+	var targets := _stage_targets(3, float(sd.get("range_px", 200.0)) * 0.9)
+	if targets.size() < 3:
+		_missed.append("cinder_sparks（场上凑不出 3 个靶子）")
+	else:
+		var cast_now := _ss.cast("cinder_sparks")
+		print("[ShotSkill] ---- 火星溅 Lv%d（单发伤害 %.0f，%d 发摊开 %.0f°，射程 %.0f，冷却 %.2fs，噪音 %.0f）手动放=%s ----" % [
+				_ss.level_of("cinder_sparks"), _ss.damage_of("cinder_sparks"), want,
+				SkillSystem.param("cinder_sparks", "spread_deg"),
+				_ss.range_of("cinder_sparks"), _ss.cooldown_of("cinder_sparks"),
+				SkillSystem.param("cinder_sparks", "noise"), str(cast_now)])
+		var shots := await _wait_projectiles(want, 130.0, 240)
+		if shots.is_empty():
+			_missed.append("cinder_sparks 没等到 %d 发同时在飞（按 skill_projectile 分组认）" % want)
+		else:
+			# 读数必须在截图**之前**抄：_shot 要等好几帧渲染，弹道在这段时间里会命中并
+			# queue_free，事后再 get("dir") 拿到的是 null → 赋给 Vector2 直接脚本报错。
+			var read: Array = _shot_reading(shots)
+			await _shot("sk_cinder_sparks", _player, 280)
+			var parts: Array = []
+			for r in read:
+				parts.append("%.0f°/伤%d" % [float(r["ang"]), int(r["dmg"])])
+			print("[ShotSkill]   空中同时 %d 发（以第一发为 0°）：%s｜表里 %d 发 / 共 %.0f°" % [
+					read.size(), ", ".join(PackedStringArray(parts)), want,
+					SkillSystem.param("cinder_sparks", "spread_deg")])
+			if read.size() != want:
+				_missed.append("cinder_sparks 放出 %d 发，与表里 %d 发不符" % [read.size(), want])
+	_restore_targets(targets)
+	await _wait_no_fx(_player, 240.0, 240)
+
+	# 落叶刃：两发 + 打上的那一下要真的把对面钉住（眩晕 0.8s，画在靶子身上）
+	_ss.set_known({"leaf_blade": 1})
+	_ss.reset()
+	var t2 := _stage_targets(2, float(ld.get("range_px", 200.0)) * 0.9)
+	if t2.size() < 2:
+		_missed.append("leaf_blade（场上凑不出 2 个靶子）")
+	else:
+		var n2 := int(SkillSystem.param("leaf_blade", "projectile_count"))
+		var cast2 := _ss.cast("leaf_blade")
+		print("[ShotSkill] ---- 落叶刃 Lv%d（单发伤害 %.0f，%d 发摊开 %.0f°，带「%s」，冷却 %.2fs，噪音 %.0f）手动放=%s ----" % [
+				_ss.level_of("leaf_blade"), _ss.damage_of("leaf_blade"), n2,
+				SkillSystem.param("leaf_blade", "spread_deg"), str(ld.get("status", "")),
+				_ss.cooldown_of("leaf_blade"), SkillSystem.param("leaf_blade", "noise"),
+				str(cast2)])
+		var pairs := await _wait_projectiles(n2, 110.0, 240)
+		if pairs.is_empty():
+			_missed.append("leaf_blade 没等到 %d 发同时在飞" % n2)
+		else:
+			var read2: Array = _shot_reading(pairs)   # 同样：读数在截图之前抄，见 _shot_reading
+			await _shot("sk_leaf_blade", _player, 190)
+			var o2: Array = []
+			for r in read2:
+				o2.append("%.0f°/伤%d" % [float(r["ang"]), int(r["dmg"])])
+			print("[ShotSkill]   空中同时 %d 发：%s（表里两发左右各 %.0f°）" % [
+					read2.size(), ", ".join(PackedStringArray(o2)),
+					SkillSystem.param("leaf_blade", "spread_deg") * 0.5])
+		# 眩晕这一条要**再放一次**来验：stun 只有 0.8 秒，而上面那张图要等若干帧渲染，
+		# 等完再扫早就过期了 —— 把"拍到两发同飞"与"打上会钉住"押在同一次出手上，
+		# 实跑就是图有了、眩晕报没有。第二发不拍图，出手后立刻逐帧扫全场。
+		# 而且这一趟只求"打上"：靶子摆到 0.9 射程之外它们是活的、会自己走开，
+		# 三次实跑都是"两发飞出去了、全场没有一个眩晕"。所以先把瞄准方向抄下来，
+		# 再把两只靶子按半扇角让开、挪到这条线上 70px 处 —— 近到几帧就命中。
+		_ss.reset()
+		var a3: Vector2 = _ss.aim_dir("leaf_blade")
+		var half_fan := deg_to_rad(SkillSystem.param("leaf_blade", "spread_deg") * 0.5)
+		for i in range(mini(t2.size(), 2)):
+			var tt: Node2D = t2[i]["node"]
+			if is_instance_valid(tt):
+				tt.global_position = _pin + a3.rotated(half_fan if i == 0 else -half_fan) * 70.0
+		var cast3 := _ss.cast("leaf_blade")
+		var stunned: Node2D = null
+		for _i in range(180):
+			await get_tree().physics_frame
+			_keep_alive()
+			for e in get_tree().get_nodes_in_group("enemies"):
+				if e is Node2D and is_instance_valid(e) and _has_status(e as Node, "stun"):
+					stunned = e as Node2D
+					break
+			if stunned != null:
+				break
+		if stunned == null:
+			_missed.append("leaf_blade 第二次出手（手动放=%s）没把任何敌人打出眩晕" % str(cast3))
+		else:
+			var is_dummy := false
+			for item in t2:
+				if item["node"] == stunned:
+					is_dummy = true
+			print("[ShotSkill]   钉住了：%s（%s）｜身上「%s」" % [str(stunned.name),
+					"摆的靶子" if is_dummy else "路上乱逛的那只", _status_summary(stunned)])
+			_restore_targets(t2)
+	_ss.set_known(LEVELS)
+	_ss.reset()
+
+
+# ------------------------------------------------------------
+# 中毒 / 流血：蛇咬拍"空中那一发"，孢子雾拍"地上那圈雾"。
+# 两段的等法不一样是有理由的：弹道只活十几帧，轮询的是"有东西在飞"；而雾是持续物，
+# 轮询的是地面那圈画出来没有。状态读数照旧全部在 await _shot **之前**抄完。
+# ------------------------------------------------------------
+func _toxin_phase() -> void:
+	var bd := SkillSystem.def_of("snake_bite")
+	var cd := SkillSystem.def_of("spore_cloud")
+	var st = _statuses_of(_player)
+	if st != null:
+		st.call("clear")
+	await _wait_no_fx(_player, 240.0, 240)
+
+	# 蛇咬：靶子必须摆到瞄准线上。900 px/s 的一发从出手到命中只有几帧，
+	# 而 _stage_targets 是按圆周撒的、撒到哪算哪 —— 摆偏了就是"拍着一发往别处飞的牙"。
+	_ss.set_known({"snake_bite": 1})
+	_ss.reset()
+	var tb := _stage_targets(1, 70.0)
+	if tb.is_empty():
+		_missed.append("snake_bite（场上没有活靶子）")
+	else:
+		var bt: Node2D = tb[0]["node"]
+		bt.global_position = _pin + _ss.aim_dir("snake_bite") * 70.0
+		var cast_b := _ss.cast("snake_bite")
+		print("[ShotSkill] ---- 蛇咬 Lv%d（伤害 %.0f，射程 %.0f，冷却 %.2fs，噪音 %.0f，带「%s」）手动放=%s ----" % [
+				_ss.level_of("snake_bite"), _ss.damage_of("snake_bite"),
+				_ss.range_of("snake_bite"), _ss.cooldown_of("snake_bite"),
+				SkillSystem.param("snake_bite", "noise"), str(bd.get("status", "")),
+				str(cast_b)])
+		# min_travel 必须明显小于「靶子距离 − 命中半径」（这里 70−14=56）：
+		# 弹道一到靶子就 queue_free，门槛设在 56 之外等于永远等不到"在飞的那一发"。
+		var fang := await _wait_projectiles(1, 30.0, 240)
+		if fang.is_empty():
+			_missed.append("snake_bite 没等到在飞的弹道（按 skill_projectile 分组认）")
+		else:
+			var read: Array = _shot_reading(fang)     # 截图之前抄读数，见 _shot_reading
+			await _shot("sk_snake_bite", _player, 200)
+			print("[ShotSkill]   空中 1 发：伤 %d" % int(read[0]["dmg"]))
+		# 流血挂上没有 —— 单独扫，不押在截图那一帧上（这一发命中得太快，图等到时早跳完了）
+		var bled := false
+		for _i in range(120):
+			await get_tree().physics_frame
+			_keep_alive()
+			if is_instance_valid(bt) and _has_status(bt, "bleed"):
+				bled = true
+				break
+		if not bled:
+			_missed.append("snake_bite 没把流血挂上靶子")
+		else:
+			print("[ShotSkill]   靶子身上「%s」" % _status_summary(bt))
+	_restore_targets(tb)
+	await _wait_no_fx(_player, 240.0, 240)
+
+	# 孢子雾：半径 128 的一圈。中毒有 6 秒长尾，不像眩晕那样会等完图就过期，
+	# 所以这一段不需要"再放一次"，一次出手两张判据都够用。
+	_ss.set_known({"spore_cloud": 1})
+	_ss.reset()
+	var radius := float(cd.get("radius_px", 128.0))
+	var tc := _stage_targets(2, radius * 0.6)
+	if tc.size() < 2:
+		_missed.append("spore_cloud（场上凑不出 2 个靶子）")
+	else:
+		var cast_c := _ss.cast("spore_cloud")
+		print("[ShotSkill] ---- 孢子雾 Lv%d（伤害 %.0f，半径 %.0f，冷却 %.2fs，噪音 %.0f，带「%s」，自动门槛 %d 人）手动放=%s ----" % [
+				_ss.level_of("spore_cloud"), _ss.damage_of("spore_cloud"), radius,
+				_ss.cooldown_of("spore_cloud"), SkillSystem.param("spore_cloud", "noise"),
+				str(cd.get("status", "")),
+				int(SkillSystem.param("spore_cloud", "auto_cast_targets_min")), str(cast_c)])
+		var ring := await _wait_ring(radius, 90)
+		if ring == null:
+			_missed.append("spore_cloud 没等到地面那圈雾")
+		else:
+			await _shot("sk_spore_cloud", ring as Node2D, int(radius) + 120)
+		var poisoned := 0
+		for item in tc:
+			var tt: Node2D = item["node"]
+			if is_instance_valid(tt) and _has_status(tt, "poison"):
+				poisoned += 1
+		if poisoned < 2:
+			_missed.append("spore_cloud 只把中毒挂上了 %d / 2 个靶子" % poisoned)
+		else:
+			print("[ShotSkill]   雾里 %d 只靶子全挂上了：%s" % [
+					poisoned, _status_summary(tc[0]["node"] as Node)])
+	_restore_targets(tc)
+	_ss.set_known(LEVELS)
+	_ss.reset()
+
+
+# ------------------------------------------------------------
 # 魔法书：真 LootNode 摆到角色脚边（图标 + 柔光圈 + 人当尺寸参照）
 # ------------------------------------------------------------
 func _grimoire_phase() -> void:
@@ -309,10 +751,19 @@ func _grimoire_phase() -> void:
 		return
 	# --no-fog 关掉了雾的实体显隐管线，而 LootNode 在 _ready 里把自己藏了 —— 出图专用补一句。
 	book.visible = true
-	# 放在拾取圈外（loot.pickup_radius_px 通常 20px），不然下一帧就被吃掉，图就没了
+	# 站在拾取圈外挡不住跑过来的同伴：LootNode 每物理帧自己扫"最近的活人"，
+	# 上一次实拍就是在两张图之间被同伴翻掉（日志 [Loot] 独行 翻开魔法书），
+	# 节点没了还去读它的 global_position → 整个函数死掉，两张图静默丢掉。
+	# 这两帧期间改用它的拾取冷却把书冻住（_physics_process 开头在冷却里直接 return）。
+	var freeze := float(Config.get_value("loot.pickup_retry_seconds", 0.5)) * 200.0
+	book.set("_retry_cooldown", freeze)
+	# 放在拾取圈外（loot.pickup_radius_px 通常 20px），拍完要踩的那一下再挪回脚下
 	var stand := float(Config.get_value("loot.pickup_radius_px", 20.0)) + 42.0
 	book.global_position = _pin + Vector2(stand, stand * 0.42)
 	await _frames(6)
+	if not is_instance_valid(book):
+		_missed.append("魔法书：摆好位置之后、拍之前就不见了（谁翻的？）")
+		return
 	print("[ShotSkill] ---- 魔法书：%s｜图标 %s｜圈色 %s｜离手 %.0f px（拾取半径 %.0f，故意站在圈外）----" % [
 			str(Config.get_value("skills.grimoire.name", "")),
 			str(Config.get_value("skills.grimoire.sprite", "")).get_file(),
@@ -321,7 +772,11 @@ func _grimoire_phase() -> void:
 			float(Config.get_value("loot.pickup_radius_px", 20.0))])
 	await _shot("sk_grimoire", book, 110)
 	await _shot("sk_grimoire_near", book)
-	# 顺手验一次"走进圈里当场学会"：把书挪到脚下，让 LootNode 自己的物理帧判定触发
+	if not is_instance_valid(book):
+		_missed.append("魔法书：两张图之间书不见了（sk_grimoire_near 没拍到）")
+		return
+	# 顺手验一次"走进圈里当场学会"：解冻 + 挪到脚下，让 LootNode 自己的物理帧判定触发
+	book.set("_retry_cooldown", 0.0)
 	_ss.set_known({})
 	book.global_position = _pin
 	await _frames(10)
@@ -474,32 +929,72 @@ func _find_ring(want_radius: float) -> Node2D:
 	return null
 
 
-## 等那颗在飞的技能弹道。弹道没有组、也没有专属 id，认它身上的 status_id：
-## 普攻那支箭这个字段是空的，所以"有 burning"就是技能那一发。
+## 等那颗在飞的技能弹道。认的是 skill_projectile 分组（见下面 _flying_projectiles）：
+## 普攻那支箭不在这个组里，所以两条路的读数互不污染。
 func _wait_projectile(min_travel: float, max_frames: int) -> Node2D:
 	for _i in range(max_frames):
-		var p := _flying_projectile()
-		if p != null and p.global_position.distance_to(_player.global_position) >= min_travel:
-			return p
+		var list := _flying_projectiles()
+		if not list.is_empty() \
+				and (list[0] as Node2D).global_position.distance_to(_player.global_position) >= min_travel:
+			return list[0] as Node2D
 		await get_tree().physics_frame
 		_keep_alive()
 	print("[ShotSkill] !! 没等到飞行中的技能弹道")
 	return null
 
 
-func _flying_projectile() -> Node2D:
+## 弹幕用的那一版：等到"至少 want 发同时离手 min_travel px"才返回。
+## 空表 = 到点没等够（调用方记进 _missed，不交一张只有一支箭的图冒充三发）。
+## 返回的是当时那一批节点的快照：之后它们会命中消失，图就定格在那一刻。
+func _wait_projectiles(want: int, min_travel: float, max_frames: int) -> Array:
+	var last: Array = []
+	for _i in range(max_frames):
+		last = _flying_projectiles()
+		var enough := last.size() >= want
+		if enough:
+			for p in last:
+				if (p as Node2D).global_position.distance_to(_player.global_position) < min_travel:
+					enough = false
+					break
+		if enough:
+			return last
+		await get_tree().physics_frame
+		_keep_alive()
+	print("[ShotSkill] !! 没等到 %d 发同时在飞（最后只数到 %d 发）" % [want, last.size()])
+	return []
+
+
+## 场上所有在飞的技能弹道。单发那版（_wait_projectile）先于多重弹幕存在，只会报一条；
+## 弹幕这张图要的是"同屏几支"，所以两条都走这个数组版。
+## 认分组不认名字：Godot 强制"兄弟不重名"，多重弹幕第 2 发起会被改名成 SkillProjectile2/3/4；
+## 也不认 _status_id：那等于"这招带状态才数得到"，不带控制的弹幕招会整批发不出来。
+func _flying_projectiles() -> Array:
+	var out: Array = []
 	var world := _player.get_parent()
 	if world == null:
-		return null
+		return out
 	for n in world.get_children():
 		if not (n is Node2D) or not is_instance_valid(n) or n.is_queued_for_deletion():
 			continue
-		var sid = n.get("_status_id")
-		# 必须是"有且是字符串"：get() 对不存在的属性返回 null，而 str(null) 是 "<null>"
-		# 不等于空串 —— 不这么挡，敌人和资源点都会被当成弹道。
-		if sid is String and sid != "":
-			return n as Node2D
-	return null
+		if n.is_in_group("skill_projectile"):
+			out.append(n as Node2D)
+	return out
+
+
+## 趁弹道还在场上把读数抄成普通值（相对第一发的带符号夹角 + 这一发的伤害）。
+## 两段弹幕都调它：截图要等若干帧渲染，弹道会在这期间命中并 queue_free，事后再读就没了。
+## 夹角用 atan2(叉积, 点积) 自己算：Vector2.angle_to() 本身就是带符号的，
+## 再按叉积补一次符号等于翻两遍（探针那边把对称的三发读成了 -17/-17/0）。
+func _shot_reading(shots: Array) -> Array:
+	var out: Array = []
+	if shots.is_empty():
+		return out
+	var first: Vector2 = shots[0].get("dir")
+	for p in shots:
+		var d: Vector2 = p.get("dir")
+		out.append({"ang": rad_to_deg(atan2(first.x * d.y - first.y * d.x, first.dot(d))),
+				"dmg": int(p.get("damage"))})
+	return out
 
 
 ## 拍摄期间角色必须死不了，也要站得住：整组图要跑上千帧，镜头是插值跟角色的，
@@ -538,6 +1033,26 @@ func _wait_fx(id: String, max_frames: int, near: Node2D, radius: float) -> Node:
 	print("[ShotSkill] !! %d 帧内没等到「%s」；期间场上出现过的条带 = %s" % [
 			max_frames, id, str(seen)])
 	return null
+
+
+## 等"角色附近一条特效都不剩"。两段共用的理由见 _sustain_phase 里那句调用。
+func _wait_no_fx(near: Node2D, radius: float, max_frames: int) -> bool:
+	var live: Array = []
+	for _i in range(max_frames):
+		live.clear()
+		for n in get_tree().get_nodes_in_group(&"fx_sprite"):
+			if not is_instance_valid(n) or n.is_queued_for_deletion():
+				continue
+			if near != null and is_instance_valid(near) \
+					and (n as Node2D).global_position.distance_to(near.global_position) > radius:
+				continue
+			live.append(_fx_tag(n))
+		if live.is_empty():
+			return true
+		await get_tree().physics_frame
+		_keep_alive()
+	print("[ShotSkill] !! %d 帧内没等干净，场上还剩 %s" % [max_frames, str(live)])
+	return false
 
 
 func _fx_tag(n: Node) -> String:
@@ -628,3 +1143,195 @@ func _restore_save() -> void:
 			f.close()
 	elif FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+
+
+# ------------------------------------------------------------
+# 通用扫描（--sweep）：池里每一招各放一次、各出一张自动构图的图
+#
+# 为什么要这一条：手工取景那 21 段每段几十行，技能从 21 涨到 100 就是 100 段拍摄
+# 代码，铺不动。扫描只问一件事 —— **这一招放出去，场上有没有真的多出东西**：
+# 条带、地面圈、在飞的弹道、挂在自身/靶子身上的状态、回的那口血，五样里任一样
+# 出现才截（前缀 sw_）。一样都没有 = 这招是空画，记进 _missed 并以退出码 3 收场。
+# 构图是机器默认的（范围技按半径外扩 120，其余角色居中 ±200），不做手工取景；
+# 观感层面的挑选仍然归那 21 段。
+#
+# 用法：Godot.exe --path D:/SteamPunkExtraction res://Dev/shot_skills.tscn \
+#           -- --sweep                          （全池）
+#           -- --sweep --only a,b,c             （只扫本批）
+# ------------------------------------------------------------
+
+func _sweep_requested() -> bool:
+	return _user_args().has("--sweep")
+
+
+func _user_args() -> Array:
+	var out: Array = []
+	for a in OS.get_cmdline_user_args():
+		out.append(str(a))
+	return out
+
+
+## --only a,b,c：只扫这批（一批 4-5 招时不必把整池重跑一遍）
+func _sweep_only() -> Array:
+	var ua := _user_args()
+	for i in range(ua.size() - 1):
+		if ua[i] == "--only":
+			return String(ua[i + 1]).split(",")
+	return []
+
+
+func _sweep_all() -> void:
+	var defs: Dictionary = SkillSystem.all_defs()
+	var all: Array = []
+	for raw in defs.keys():
+		all.append(str(raw))
+	all.sort()
+	var only := _sweep_only()
+	var ids: Array = []
+	for x in all:
+		if only.is_empty() or only.has(x):
+			ids.append(x)
+	if not only.is_empty() and ids.size() < only.size():
+		for want in only:
+			if not ids.has(str(want)):
+				_missed.append("--only 里的 %s 不在技能表里（打错名？）" % str(want))
+	print("[Sweep] 池里 %d 招，本批扫 %d 招%s" % [
+			all.size(), ids.size(), "" if only.is_empty() else "（--only）"])
+	for id in ids:
+		await _sweep_one(str(id))
+	_hp_frac = 0.0
+	_ss.set_known(LEVELS)
+	_ss.reset()
+
+
+func _sweep_one(id: String) -> void:
+	var d := SkillSystem.def_of(id)
+	if d.is_empty():
+		_missed.append("%s：表里查不到定义" % id)
+		return
+	var ty := str(d.get("type", ""))
+	var st = _statuses_of(_player)
+	if st != null:
+		st.call("clear")
+	# 治疗要有缺口才看得见：钉在四成血，回完的那一口才会留在血量差里（不钉则满血，
+	# "回了 51"和"没回"在数值上完全一样 —— 与圣光十字那一段同一个理由）。
+	_hp_frac = 0.4
+	await _wait_no_fx(_player, 240.0, 240)
+	_ss.set_known({id: 1})
+	_ss.reset()
+
+	# 靶子：aoe 要圈里有人、projectile 要那一发真打得到人，buff 不需要靶子。
+	var want := 2 if ty == "aoe_self" else 1
+	var dist := 110.0
+	if ty == "aoe_self":
+		dist = clampf(_ss.radius_of(id) * 0.55, 60.0, 150.0)
+	elif ty == "projectile":
+		dist = clampf(_ss.range_of(id) * 0.45, 90.0, 170.0)
+	var tg: Array = [] if ty == "buff" else _stage_targets(want, dist)
+	if ty != "buff" and tg.size() < want:
+		_missed.append("%s：场上摆不出 %d 个靶子" % [id, want])
+		_restore_targets(tg)
+		return
+	if ty == "projectile" and not tg.is_empty():
+		# 摆到瞄准线上：_stage_targets 是按圆周撒的，撒偏了就是"拍着一发往别处飞的弹道"，
+		# 而且靶子身上永远挂不上状态。
+		var aim := _ss.aim_dir(id)
+		if aim.length() > 0.01:
+			for i in range(tg.size()):
+				(tg[i]["node"] as Node2D).global_position = \
+						_pin + aim.rotated(deg_to_rad(9.0 * float(i))) * dist
+	# 上一招收的账别算到这一招头上：靶子是场上真敌人，状态会跨段残留
+	if ty != "buff":
+		for item in tg:
+			var ts = _statuses_of(item["node"])
+			if ts != null:
+				ts.call("clear")
+	var hp0 := int(_player.get("hp"))
+	if not _ss.cast(id):
+		_missed.append("%s：cast() 返回 false（冷却没转完 / 宿主挂了招 / 表里 type 不认识）" % id)
+		_restore_targets(tg)
+		return
+	# 血量差必须在下一个 await 之前抄：_keep_alive 每帧把血钉回四成，晚一帧就读成 0。
+	var healed := int(_player.get("hp")) - hp0
+	# 画得出来的那三样只活十几条帧，等到就立刻截；状态要等弹道飞完才挂上，截完再读。
+	var ev: Dictionary = await _sweep_wait_visual(id, d)
+	ev["heal"] = healed
+	if ev["self"] == "" and _has_status(_player, id):
+		ev["self"] = _status_summary(_player)
+	var seen := _sweep_seen(ev)
+	if seen.is_empty():
+		_missed.append("%s：cast 成功但场上五样证据（条带/地面圈/弹道/状态/回血）一样都没有 = 空画" % id)
+	else:
+		# 地面圈本来就以角色为心，所以锚点一律用角色：拿圈或弹道当锚点的话，
+		# 它在 await _shot 等渲染的那几帧里就没了（蛇咬那张踩过）。
+		var half := 200
+		if ty == "aoe_self":
+			half = int(_ss.radius_of(id)) + 120
+		await _shot("sw_" + id, _player, half)
+		if str(d.get("status", "")) != "" and ev["tgt"] == "":
+			ev["tgt"] = await _sweep_read_status(id, d, tg)
+		seen = _sweep_seen(ev)
+		var measure := "—" if ty == "buff" else (
+				"半径 %.0f" % _ss.radius_of(id) if ty == "aoe_self" else "射程 %.0f" % _ss.range_of(id))
+		print("[Sweep] %-16s %-6s %-10s 伤 %.0f｜%s｜冷却 %.2fs｜噪音 %.0f｜证据：%s" % [
+				id, str(d.get("element", "")), ty, _ss.damage_of(id), measure,
+				_ss.cooldown_of(id), SkillSystem.param(id, "noise"), ", ".join(seen)])
+	_restore_targets(tg)
+
+
+## 只轮询"画得出来"的那三样：施法条带、地面那圈、在飞的弹道。
+## 一样都不出现 = 这招是空画（tint 把 alpha 乘成 0、挂错层被地面盖住那一类）。
+func _sweep_wait_visual(id: String, d: Dictionary) -> Dictionary:
+	var ty := str(d.get("type", ""))
+	var fx_cast := str(d.get("fx_cast", ""))
+	var want_ring := float(_ss.radius_of(id)) if ty == "aoe_self" else 0.0
+	var ev := {"fx": "", "ring": 0.0, "shots": 0, "self": "", "tgt": "", "heal": 0}
+	for _i in range(90):
+		await get_tree().physics_frame
+		_keep_alive()
+		if ev["fx"] == "" and fx_cast != "":
+			for n in get_tree().get_nodes_in_group(&"fx_sprite"):
+				if is_instance_valid(n) and not n.is_queued_for_deletion() \
+						and _fx_tag(n) == fx_cast:
+					ev["fx"] = fx_cast
+					break
+		if ev["ring"] == 0.0 and want_ring > 0.0 and _find_ring(want_ring) != null:
+			ev["ring"] = want_ring
+		var shots := _flying_projectiles().size()
+		if shots > int(ev["shots"]):
+			ev["shots"] = shots
+		if str(ev["fx"]) != "" or float(ev["ring"]) > 0.0 or int(ev["shots"]) > 0:
+			return ev
+	return ev
+
+
+## 截图之后补读状态：弹道要飞一段才挂得上，而状态一挂就是几秒，图早拍完了。
+## 读到就返回，读不到返回空串（扫描不因为一条状态读数而失败——那归探针断言管）。
+func _sweep_read_status(id: String, d: Dictionary, tg: Array) -> String:
+	var sid := str(d.get("status", ""))
+	for _i in range(40):
+		for item in tg:
+			var t: Node2D = item["node"]
+			if is_instance_valid(t) and _has_status(t, sid):
+				return _status_summary(t)
+		await get_tree().physics_frame
+		_keep_alive()
+	return ""
+
+
+## 把证据字典翻成人话；空表 = 这一招什么都没画出来
+func _sweep_seen(ev: Dictionary) -> Array:
+	var out: Array = []
+	if str(ev["fx"]) != "":
+		out.append("条带 " + str(ev["fx"]))
+	if float(ev["ring"]) > 0.0:
+		out.append("地面圈 %.0f" % float(ev["ring"]))
+	if int(ev["shots"]) > 0:
+		out.append("弹道 %d 发" % int(ev["shots"]))
+	if str(ev["self"]) != "":
+		out.append("自身「" + str(ev["self"]) + "」")
+	if str(ev["tgt"]) != "":
+		out.append("靶子「" + str(ev["tgt"]) + "」")
+	if int(ev["heal"]) > 0:
+		out.append("回血 +%d" % int(ev["heal"]))
+	return out

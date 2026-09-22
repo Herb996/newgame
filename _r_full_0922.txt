@@ -1,0 +1,314 @@
+==============================================================================
+Dev/probe_registry.tscn   EXIT=0
+   [Probe] 群系分布：草地=16750 / 荒原=5065 / 森林=6357 / 沼泽=4596
+   [Probe] OK   群系数 = 4（草地/荒原/森林/沼泽），实际 4
+   [Probe] OK   群系 0「草地」有格数 16750（应 > 0）
+   [Probe] OK   群系 1「荒原」有格数 5065（应 > 0）
+   [Probe] OK   群系 2「森林」有格数 6357（应 > 0）
+   [Probe] OK   群系 3「沼泽」有格数 4596（应 > 0）
+   [Probe] OK   格数最多的群系是「草地」(id=0，16750 格)；期望草地(id=0)
+   [Probe] OK   权重边界单调递增且末项=1.0：[0.51127819548872, 0.66917293233083, 0.85714285714286, 1.0]
+   [Probe] OK   草地独占噪声区间 0.511（应 > 0.4，即大部分平地）
+   [Probe] OK   群系 0「草地」面积占比 51.1%（权重期望 51.1%，容差 5pp）
+   [Probe] OK   群系 1「荒原」面积占比 15.5%（权重期望 15.8%，容差 5pp）
+   [Probe] OK   群系 2「森林」面积占比 19.4%（权重期望 18.8%，容差 5pp）
+   [Probe] OK   群系 3「沼泽」面积占比 14.0%（权重期望 14.3%，容差 5pp）
+   [Probe] 装饰物：树 266 / 石 83 / 残骸 25 / 灌木 97 / 裂缝 0 / 河水 0
+   [Probe] OK   装饰 kind=1 数量 266（应 > 0）
+   [Probe] OK   装饰 kind=2 数量 83（应 > 0）
+   [Probe] OK   装饰 kind=3 数量 25（应 > 0）
+   [Probe] OK   装饰 kind=6 数量 97（应 > 0）
+   [Probe] OK   河水不阻挡通行（被阻挡的格数 0，应 0）
+   [Probe] OK   裂缝不阻挡通行（被阻挡的格数 0，应 0）
+   [Probe] OK   map.resource_clusters.types 有内容（空 = 整段无意义）
+   [Probe] 矿脉：{ "iron": 53, "oil": 31 }
+   [Probe] OK   iron 矿脉节点数 53（应 > 0；为 0 通常是 map.resource_clusters.types 里没有 iron）
+   [Probe] OK   oil 矿脉节点数 31（应 > 0；为 0 通常是 map.resource_clusters.types 里没有 oil）
+   [Probe] OK   veins 里不出现配置之外的 res_id（多余的 {  }）
+   [Probe] OK   矿脉只落在各自配置的限定群系（越界 0 个，应 0）
+   [Probe] -- 缺口：map.resource_clusters.types 没有 gold 条目 ? 全图无金矿脉（代码支持，见 map_generator.gd:1210 / VEIN_RES）
+   [Probe] OK   result 含 speed_mult 网格
+   [Probe] OK   沼泽格 4596 全部 <1.0（异常 0）
+   [Probe] OK   河水格 0 全部 ≤ 0.22（异常 0；地图已移除河水，0 格视为通过）
+   [Probe] OK   草地空格 16598 全部 ==1.0（异常 0）
+   [Probe] OK   配置里沼泽 speed = 0.62（应 < 1.0）
+   [Probe] 资源节点分类：{ "wood": 266, "stone": 83, "iron": 53, "oil": 31 }
+   [Probe] OK   wood 节点数 266（应 > 0）
+   [Probe] OK   stone 节点数 83（应 > 0）
+   [Probe] OK   有未采集的 wood 节点
+   [Probe] OK   harvest 返回 ok
+   [Probe] OK   harvest 后 amount 20 → 19
+   [Probe] OK   get_by_grid(80,1) 反查到 id=1
+   [Probe] 总储量 wood=5319 stone=1660
+   [Probe] OK   wood 总储量 5319（应 > 0）
+   [Probe] ==== 共 35 项断言，失败 0 项 ====
+   异常行: 0
+==============================================================================
+Dev/probe_player_anim.tscn   EXIT=0
+   [ProbeAnim] walk(right) 贴图序列 10 项：
+   [ProbeAnim] 朝上 →res://Assets/Art/Sprites/Player/player_walk_up_01.png
+   [ProbeAnim] attack（无帧，应回退 idle）→res://Assets/Art/Sprites/Player/player_idle_right_00.png offset=(3.0, -24.0)
+   [ProbeAnim] 验证全部通过：序列帧播放 / 朝向切换 / 缺帧回退均正常
+   异常行: 0
+==============================================================================
+Dev/probe_zoom.tscn   EXIT=0
+   [ZoomProbe] OK   A1 步进对称：46.0000 →(上3格)→ 32.7419 →(下3格)→ 46.0000（应回到 46.0000）
+   [ZoomProbe] OK   A1 单档进/出乘数互为倒数：0.892857 × 1.120000 = 1.000000000
+   [ZoomProbe] OK   A2 光标锚点 (32,32)：地面点 (64.000, 64.000) → (64.000, 64.000)，偏移 0.0000 世界单位
+   [ZoomProbe] OK   A2 光标锚点 (32,14)：地面点 (47.345, 47.345) → (47.345, 47.345)，偏移 0.0000 世界单位
+   [ZoomProbe] OK   A2 光标锚点 (15,32)：地面点 (52.969, 75.031) → (52.969, 75.031)，偏移 0.0000 世界单位
+   [ZoomProbe] OK   A2 光标锚点 (46,44)：地面点 (84.041, 65.373) → (84.041, 65.373)，偏移 0.0000 世界单位
+   [ZoomProbe] OK   A3 基地缩到底 hi=67.84：可见地面 67.8×95.1（地图 64×64，应不小于）
+   [ZoomProbe] OK   A3 上限确实被地图收敛：hi=67.84 < config 上限 150
+   [ZoomProbe] OK   A4 一直放大：target=16.000 停在 lo=16.000
+   [ZoomProbe] OK   A4 一直缩小：target=67.840 停在 hi=67.840
+   [ZoomProbe] OK   A5 缩到底时焦点被居中到 (32,32)，实测 (32.00,32.00)
+   [ZoomProbe] OK   B1 Main3D 相机已装配
+   [ZoomProbe] OK   B2 真实输入管线注入滚轮：size 26.00 → 23.21（应变小=放大）
+   [ZoomProbe] OK   B3 视野提示已亮（含祖先可见性）：visible=true in_tree=true text="视野 ×1.12   滚轮缩放"
+   [ZoomProbe] OK   B4 视野倍数 zoom_ratio=1.120（>1 表示放大）
+   [ZoomProbe] OK   B5 基地模式下 HUD 整体隐藏（hud.visible=false），视野提示仍可见 —— 提示必须独立成层
+   异常行: 0
+==============================================================================
+Dev/probe_terrain_map.tscn   EXIT=0
+   [Map] 装饰碰撞体：313 格（树/石，物理层与寻路层已对齐）
+   [Map] 地图生成完成：128x256 瓦片（8192x16384 像素），地板 26004 格，可达 25933 格（100%），贴图=AI
+   [Map] 装饰物：树 240 / 石头 73 / 灌木 75 / 碎石 59 / 裂缝 0 / 河水 0，出生点 (4128.0, 8224.0)
+   [Map] 矿脉 92 处
+   [Map] 群系分布：草地 9775, 荒原 9942, 森林 9826, 沼泽 3225
+   [TerrainProbe] 已输出 terrain_stats.png / terrain_decor.png（512x1024）
+   异常行: 0
+==============================================================================
+Dev/probe_level.tscn   EXIT=1
+   [probe_level] 通过 158 / 164
+   异常行: 0
+   <<< 退出码 1（探针自己的断言没全过；回归以退出码为准）
+==============================================================================
+Dev/probe_supplies.tscn   EXIT=0
+   [probe_supplies] 通过 39 / 39
+   异常行: 0
+==============================================================================
+Dev/probe_inventory.tscn   EXIT=0
+   [probe_inventory] 通过 103 / 103
+   异常行: 0
+==============================================================================
+Dev/probe_click_move.tscn   EXIT=0
+   [probe_click_move] 通过 7 / 7
+   异常行: 0
+==============================================================================
+Dev/probe_dead_body.tscn   EXIT=0
+   [probe_dead_body] fails=0 -> PASS
+   异常行: 0
+==============================================================================
+Dev/probe_hit_feedback.tscn   EXIT=0
+   [HitFbProbe] 通过 52 / 52
+   [HitFbProbe] fails=0 -> PASS
+   异常行: 0
+==============================================================================
+Dev/probe_collision_separation.tscn   EXIT=0
+   [SepProbe] 通过 40 / 40
+   [SepProbe] fails=0 -> PASS
+   异常行: 0
+==============================================================================
+Dev/probe_move_giveup.tscn   EXIT=0
+   [GiveupProbe] 通过 15 / 15
+   [GiveupProbe] fails=0 -> PASS
+   异常行: 0
+==============================================================================
+Dev/probe_second_launch.tscn   EXIT=0
+   [probe_second_launch] 通过 23 / 23
+   异常行: 0
+==============================================================================
+Dev/probe_water_step.tscn   EXIT=0
+   [Weather] 波纹子视口建好 32x32（scale=0.50）
+   [Weather] 雨湿地面 14616 格（占全图 44.6%）＝群系 [0.0, 2.0]，半径 2 格 × 3 轮模糊
+   [WaterProbe]   OK   地图上确实有湿地
+   [WaterProbe]   OK   漫出 allowed_biomes=[0, 2] 的湿格 ≤ 湿格总数的 5%（实测 289 / 14616）
+   [WaterProbe]   OK   湿地覆盖 ≥ 可选格的 70%（实测 93.8%）
+   [WaterProbe]   OK   地图上有水面格可测
+   [WaterProbe]   OK   水面格的湿度场一颗都不带（实测漏 0）
+   [WaterProbe]   OK   水面格的逻辑判定全干（实测漏 0）
+   [WaterProbe]   OK   边界模糊真的产出了连续过渡格
+   [WaterProbe]   OK   过渡格成规模（实测 19841 个 / 湿格 14616 个）
+   [WaterProbe]   OK   从出生点能找到湿地（找不到 = 玩家开局永远看不到踩水效果）
+   [WaterProbe]   OK   湿地在出生点 20 步以内（草地/森林连片，本就该贴着出生点）
+   [WaterProbe]   OK   邻域判定命中率不低于单格硬判定（r=1：16570 vs 14392）
+   [WaterProbe]   OK   找到一个湿格用于定点判定 (17,4)
+   [WaterProbe]   OK   湿格中心 is_wet_at 为真
+   [WaterProbe]   OK   离湿地 (r+2) 格以上的干地不误判 (34,4)
+   [WaterProbe]   OK   越界坐标安全返回 false
+   [WaterProbe]   OK   波纹池建好 16 条
+   [WaterProbe]   OK   一次踩水占用一条波纹（实际占用 1）
+   [WaterProbe]   OK   波纹生成在脚步坐标上
+   [WaterProbe]   OK   展开半径来自 config（66.0 px）
+   [WaterProbe]   OK   寿命来自 config（0.60 s）
+   [WaterProbe]   OK   波纹可见（不可见＝踩水等于没做）
+   [WaterProbe]   OK   椭圆压扁系数在 (0,1)（实测 0.45）
+   [WaterProbe]   OK   每次踩水掷出 4 段碎片弧（实际 4）
+   [WaterProbe]   OK   单段是部分弧不是整圈（28.1°）
+   [WaterProbe]   OK   碎片亮度非零
+   [WaterProbe]   OK   单段是部分弧不是整圈（53.6°）
+   [WaterProbe]   OK   碎片亮度非零
+   [WaterProbe]   OK   单段是部分弧不是整圈（60.1°）
+   [WaterProbe]   OK   碎片亮度非零
+   [WaterProbe]   OK   单段是部分弧不是整圈（34.1°）
+   [WaterProbe]   OK   碎片亮度非零
+   [WaterProbe]   OK   碎片合计只占 176°＜360°（必然留缺口）
+   [WaterProbe]   OK   各碎片半径倍率不同（4 种）→ 不共圆，读不成白色虚线靶子
+   [WaterProbe]   OK   各碎片角度彼此分开（最近间隔 71.9°）
+   [WaterProbe]   OK   重掷一次碎片角度就变了（每次踩水图案不同）
+   [WaterProbe]   OK   干地脚步不出波纹
+   [WaterProbe]   OK   连续两脚出两条波纹（实际 2）
+   [WaterProbe]   OK   波纹播完全部回池、池子不扩容（节点数不增长）
+   [WaterProbe]   OK   雨湿地面层 = 覆盖全图的 ColorRect
+   [WaterProbe]   OK   雨湿地面层不吃鼠标（否则局内点不动）
+   [WaterProbe]   OK   雨湿地面层尺寸 == 地图格数 × tile（(8192.0, 16384.0)）
+   [WaterProbe]   OK   雨湿地面层挂 rain_ground.gdshader
+   [WaterProbe]   OK   斑驳水光开着
+   [WaterProbe]   OK   亮斑 0.35 / 暗斑 0.12 成对（缺一边就读成油渍）
+   [WaterProbe]   OK   亮斑增益来自 config（0.35）
+   [WaterProbe]   OK   各向异性方向没写反：x 低频 y 高频 → 横向条带（(0.8, 1.4)）
+   [WaterProbe]   OK   湿地明暗与水光都不滚动（scroll_dir=(0.0, 0.0) mottle_speed=(0.0, 0.0)）
+   [WaterProbe]   OK   阈值 0.74 两侧留得下过渡带 0.06（否则亮斑恒满或恒空）
+   [WaterProbe]   OK   雨湿地面层排在 MapRoot 子序 1（地形之后、装饰之前）
+   [WaterProbe]   OK   波纹子视口已建
+   [WaterProbe]   OK   雨滴层数 == config.weather.rain.layers 条数（3）
+   [WaterProbe]   OK   RainFar：preprocess == lifetime（参考步骤 2）
+   [WaterProbe]   OK   RainFar：世界空间模拟，镜头平移不拖雨滴
+   [WaterProbe]   OK   RainFar：叠加混合材质已挂上
+   [WaterProbe]   OK   RainMid：preprocess == lifetime（参考步骤 2）
+   [WaterProbe]   OK   RainMid：世界空间模拟，镜头平移不拖雨滴
+   [WaterProbe]   OK   RainMid：叠加混合材质已挂上
+   [WaterProbe]   OK   RainNear：preprocess == lifetime（参考步骤 2）
+   [WaterProbe]   OK   RainNear：世界空间模拟，镜头平移不拖雨滴
+   [WaterProbe]   OK   RainNear：叠加混合材质已挂上
+   [WaterProbe]   OK   节点结构 = RainFar/RainMid/RainNear（实得 ["RainFar", "RainMid", "RainNear"]）
+   [WaterProbe]   OK   同屏总滴数 800 在参考区间 400-800 附近
+   [WaterProbe]   OK   屏幕雨幕已建且不吃鼠标
+   [WaterProbe] 通过 63 / 63
+   [WaterProbe] fails=0 -> PASS
+   异常行: 0
+==============================================================================
+Dev/probe_menu_hover.tscn   EXIT=0
+   [probe_menu_hover] fails=0 -> PASS
+   异常行: 0
+==============================================================================
+Dev/probe_step_audio.tscn   EXIT=0
+   [probe_step_audio] fails=0 -> PASS
+   异常行: 0
+==============================================================================
+Dev/probe_enemy_attack.tscn   EXIT=0
+   [EnemyAttackProbe] 通过 56 / 56
+   异常行: 0
+==============================================================================
+Dev/probe_biome_blend.tscn   EXIT=0
+   [BlendProbe] 已输出 probe_blend_on.png / probe_blend_off.png（24 格）
+   [BlendProbe] 通过 45 / 45
+   异常行: 0
+==============================================================================
+Dev/probe_biome_outline.tscn   EXIT=0
+   [OutlineProbe] 已输出 probe_outline_off / _light / _dark.png（24 格）
+   [OutlineProbe] 通过 18 / 18
+   异常行: 0
+==============================================================================
+Dev/probe_enemy_facing.tscn   EXIT=0
+   [EnemyFacingProbe] 通过 57 / 57
+   异常行: 0
+==============================================================================
+Dev/probe_build_button.tscn   EXIT=0
+   [BuildButtonProbe] 通过 15 / 15
+   异常行: 0
+==============================================================================
+Dev/probe_fx.tscn   EXIT=0
+   [FxProbe] 通过 73 / 73
+   异常行: 0
+==============================================================================
+Dev/probe_stat_panel.tscn   EXIT=1
+   [Probe] --- S1 挂载 / 快捷键 / 布局 ---
+   [Probe]   OK   面板随 Main 自动挂上（debug 包闸门通过）
+   [Probe]   OK   出击成功，拿到真实角色
+   [Probe]   OK   场上有真实敌人（面板的敌人段有对象）
+   [Probe]   OK   场上有真实中立生物（面板的生物段有对象）
+   [Probe]   OK   快捷键 = F9（物理键码 4194340，出厂 4194340.0）
+   [Probe]   OK   出厂默认关着（不干扰正常游玩）
+   [Probe]   OK   按一次 F9 → 面板打开（_build 跑通）
+   [Probe]   OK   再按一次 F9 → 关闭
+   [Probe]   OK   栏体在 debug_dock 组里（camera_controller 据此豁免边缘滚屏）
+   [Probe]   OK   栏体 mouse_filter=STOP（在栏里拖滑块不会顺手给世界下移动令）
+   [Probe]   OK   栏体最小宽度 0.000000 ≤ DOCK_W 272.000000（超了就会被内容撑出右锚，栏越画越宽）
+   [Probe]   ·· 视口 (64.0, 64.0) 不是真实尺寸，跳过绝对位置断言（窗口实拍另测）
+   [Probe] --- S2 A 类（每次现算，不需要通知）---
+   [Probe]   OK   伤害 26.000000 → 999 立刻生效（路径 combat.weapons.spear.damage，全程没调用任何重算）
+   [Probe]   OK   trait_damage 走的是现算链（基础值跟着配置走）
+   [Probe]   OK   清掉覆盖 → 伤害回到 26.000000（现算类没有残留）
+   [Probe]   OK   视野 640.000000 → 192.000000（3 格 × 64 px）立刻生效
+   [Probe]   OK   敌人游速现算：patrol_speed() = 700 × 兵种倍率 1.150000
+   [Probe]   OK   刷怪数量 = 出击前覆盖的 6（本局没再读配置：? 类只能重出击）
+   [Probe] --- S3 B 类：玩家缓存项 ---
+   [Probe]   OK   移速确实是开局缓存：裸改配置后 p.speed 仍是 140.000000（面板因此标 ?）
+   [Probe]   OK   refresh_live_units() → 在场角色移速重算成 333
+   [Probe]   OK   面板改移速 111 → 当场 p.speed=111
+   !! SCRIPT ERROR: Invalid call. Nonexistent function '_read (via call)' in base 'CanvasLayer (debug_stat_panel.gd)'.
+   !! SCRIPT ERROR: Invalid call. Nonexistent 'float' constructor.
+   [Probe] --- S4 B 类：敌人 ---
+   [Probe]   OK   敌人兵种 ep_spider 在 enemy_types.types 里找得到（索引 4）
+   [Probe]   FAIL 改兵种 hp 321 → 在场敌人 max_hp 当场变 321
+   [Probe]   FAIL 敌人同样遵守「上限变了就回满」
+   [Probe]   FAIL 改的是类型字典本身（EnemySystem 抽样池与 _type_cfg 共用引用）
+   [Probe]   FAIL 新刷的怪按新兵种数值出生（max_hp=32，无需通知）
+   [Probe]   OK   敌人出手冷却 ?：0.25s 当场写进成员
+   [Probe]   OK   听力倍率确实被 _ai_cache 挡住：不重算就仍是 1.000000（? 标记不是装饰）
+   [Probe]   OK   refresh_debug_stats 作废 _ai_cache → 读到 5.0
+   [Probe]   OK   清掉覆盖后回到 1.000000
+   [Probe]   ·· 兵种 ep_spider 没写 attack_range_px，射程行本轮不验（走全局回落）
+   [Probe] --- S5 B 类：中立生物 ---
+   [Probe]   OK   生物兵种在 animal_types.types 里找得到
+   [Probe]   FAIL 羊 hp 77 → 当场 max_hp/HP 都是 77（生物缓存的只有 max_hp）
+   [Probe]   OK   还原 → 羊回到出厂 hp 12
+   [Probe] --- S6 覆盖层归属 ---
+   [Probe]   OK   has_override 认得点路径
+   [Probe]   OK   override_paths() 列出全部改动：["animals.count", "combat.player.invincible_after_hit_seconds", "debug.auto_enter_run", "enemy.count", "meta_progression.survival.max_hp.base
+   [Probe]   OK   面板没动用户层：settings.json 那棵树一个字节都没变（写的是内存覆盖层）
+   [Probe]   OK   _is_dirty：覆盖层项标「已改」
+   [Probe]   OK   _is_dirty：兵种表项按快照认「已改」
+   [Probe]   OK   单行还原后不再标脏
+   [Probe]   FAIL 顶部状态条在计数：角色 / 全部域 ｜ 列出 134 行 ｜ 待写入 2 项（内存已生效，点「写入文件」落盘）
+   [Probe] --- S7 在场单位读数 ---
+   [Probe]   OK   读数行建出来了（10 行）
+   [Probe]   OK   角色行有 HP 与伤害拆解：枪手 Lv0　HP 310/310　速 222 / 伤 26（基础 26 ） / 视野 640　射程 180　有效 180 / 攻速 +0%　长枪 / 敌 蜘蛛×2 HP32 速138 伤10 / 敌 猪骑兵×1 HP70 速120 伤14 / 敌 骷髅×1 HP42 速120 伤12 / 敌 鱼叉鲨
+   [Probe]   FAIL 没有一条读数被折成两行（折行 = 文案比栏宽长）：["396px高「枪手 Lv0　HP 310/310　速 」", "207px高「伤 26（基础 26 ）」", "333px高「视野 640　射程 180　有效 180」", "165px高「攻速 +0%　长枪」", "354px高「敌 蜘蛛×2 HP32 速138 伤10」"
+   [Probe]   OK   敌人按兵种汇总了一行
+   [Probe]   OK   生物按兵种汇总了一行（羊没有 damage/射程，靠成员存在判断拼）
+   [Probe]   FAIL 整表重建后行容器仍在
+   [Probe]   OK   重建没有留下第二块栏体（旧节点是 queue_free，不当帧计数）
+   [Probe] --- S8 全部还原 ---
+   [Probe]   OK   覆盖层清空：[]
+   !! SCRIPT ERROR: Invalid cast: could not convert value to 'Dictionary'.
+   [Probe] --- S9 窗口实拍：headless 跳过（改用 --window 跑本探针）---
+   [Probe]
+   [Probe] === 共 47 项断言，失败 8 项 ===
+   [Probe]   !! 改兵种 hp 321 → 在场敌人 max_hp 当场变 321
+   [Probe]   !! 敌人同样遵守「上限变了就回满」
+   [Probe]   !! 改的是类型字典本身（EnemySystem 抽样池与 _type_cfg 共用引用）
+   [Probe]   !! 新刷的怪按新兵种数值出生（max_hp=32，无需通知）
+   [Probe]   !! 羊 hp 77 → 当场 max_hp/HP 都是 77（生物缓存的只有 max_hp）
+   [Probe]   !! 顶部状态条在计数：角色 / 全部域 ｜ 列出 134 行 ｜ 待写入 2 项（内存已生效，点「写入文件」落盘）
+   [Probe]   !! 没有一条读数被折成两行（折行 = 文案比栏宽长）：["396px高「枪手 Lv0　HP 310/310　速 」", "207px高「伤 26（基础 26 ）」", "333px高「视野 640　射程 180　有效 180」", "165px高「攻速 +0%　长枪」", "354px高「敌 蜘蛛×2 HP32 速138 伤10」", 
+   [Probe]   !! 整表重建后行容器仍在
+   [Probe] 写出 user://_probe_stat_panel.txt
+   异常行: 3
+   <<< 退出码 1（探针自己的断言没全过；回归以退出码为准）
+==============================================================================
+Dev/probe_damage_pipeline.tscn   EXIT=0
+   [DmgProbe] 通过 40 / 40
+   [DmgProbe] fails=0 -> PASS
+   异常行: 0
+==============================================================================
+Dev/probe_skills.tscn   EXIT=0
+   [probe_skills]   进场时场上已有技能弹道 0 个（自动释放的残留，不参与本段计数）
+   [probe_skills] 通过 172 / 172
+   异常行: 0
+==============================================================================
+flow_test 已跳过（--no-flow）：Data/config.json 一个字节没动
+==============================================================================
+全部异常行合计: 5

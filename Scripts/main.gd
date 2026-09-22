@@ -678,6 +678,8 @@ func _open_custom_editor() -> void:
 		add_child(_custom_panel)
 		_custom_panel.save_requested.connect(_on_custom_saved)
 		_custom_panel.cancel_requested.connect(_on_custom_cancelled)
+		if not _custom_panel.is_connected("restore_default_requested", _on_restore_factory):
+			_custom_panel.restore_default_requested.connect(_on_restore_factory)
 	_custom_editor = CUSTOM_EDITOR_SCRIPT.new()
 	_custom_editor.name = "BaseCustomEditor"
 	game_root.add_child(_custom_editor)
@@ -715,6 +717,20 @@ func _on_custom_saved(_custom: Dictionary = {}) -> void:
 
 func _on_custom_cancelled() -> void:
 	_base_custom_teardown()
+
+
+## 面板「恢复出厂楼」：把被「全部清空」一并抹掉的出厂楼（传送门/仓库/升级……）拉回来。
+## 只复位 factory_disabled、保留玩家自定义的地表/摆件/楼，然后全量重建基地让出厂楼重新生成
+## （否则清了传送门就永远进不了局内）。先收摊编辑器（保留改动、不回滚），再 _enter_base 重建。
+func _on_restore_factory() -> void:
+	if mode != Mode.BASE or _custom_editor == null:
+		return
+	var c := Meta.base_custom.duplicate(true)
+	c["factory_disabled"] = false
+	Meta.set_base_custom(c)
+	_end_custom_editor(true)      # 收摊编辑器、不回滚（数据我们已经写好了）
+	_enter_base()                  # 拆 game_root + base_system.setup（factory_disabled=false → 重新生成出厂楼）
+	print("[Base] 恢复出厂楼：传送门/仓库等已重新生成，玩家自定义地表保留")
 
 
 ## 拆 editor 节点，但**不**再调一次 cancel —— 回调里再 cancel 会无限递归。

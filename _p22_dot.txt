@@ -1,0 +1,17 @@
+  OK   burning 施加成功
+  OK   burning 4.0s / 每 0.5s 一跳 = 8 跳（实得 8）
+  OK   burning 一跳 4 伤 × 8 跳 = 累计 32（实得 32）
+  OK   burning 跳完自己结束
+  OK   burning 叠到 max_stacks 就顶住（实得 3 层 / 上限 3）
+  OK   poison 施加成功
+  OK   poison 6.0s / 每 1.0s 一跳 = 6 跳（实得 6）
+  OK   poison 一跳 2 伤 × 6 跳 = 累计 12（实得 12）
+  OK   poison 跳完自己结束
+  OK   poison 叠到 max_stacks 就顶住（实得 4 层 / 上限 4）
+  OK   bleed 施加成功
+  OK   bleed 2.5s / 每 0.5s 一跳 = 5 跳（实得 5）
+  OK   bleed 一跳 3 伤 × 5 跳 = 累计 15（实得 15）
+  OK   bleed 跳完自己结束
+  OK   bleed 叠到 max_stacks 就顶住（实得 3 层 / 上限 3）
+  OK   半径内只有一个人 → 自动释放不开火（这一招等的是一圈人）
+  OK   雾里两个人各挨了一下（实得 1 / 1 次）

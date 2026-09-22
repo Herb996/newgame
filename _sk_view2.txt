@@ -1,0 +1,150 @@
+defaults={
+ "_comment": "技能段里没写的键从这里取。noise 与 noise.sources 同一量纲（walk 22 / dodge 40 / attack 120）；range_px 是『技能自己的攻击距离』，与普攻一样会被 min(射程, 观察视野) 截断 —— 打不到看不见的目标这条项目不变式对技能同样成立。auto_cast_targets_min = 自动释放所需的最少目标数（手动不受限）。**释放是瞬时的**：技能不进攻击状态机（用户定：普攻照旧、技能另算），所以这里没有 windup/active/recovery 三个键 —— 那是近战挥砍才有的分段，给技能配上就是三个没人读的数值。shock_ring_seconds = aoe_self 那圈地面冲击波的扩散时长（只有这一种 type 用）。knockback_px = aoe_self 把目标沿「施法者→目标」推开多少像素（0 = 不推；写了才推，所以推不推得动是配置差异，代码里只有一句 has_method）。heal_flat = buff 型放完当场回多少点血（整数血，与 max_hp 同一把尺；0 = 不回，heal() 自己夹到上限，所以满血放治疗不浪费冷却之外的任何东西）。lifesteal = buff 型给自己那层嗜血的比例：此后**任何**来源的我方伤害（普攻近战、箭、技能）按打出去的伤害回这么多成。damage_bonus = buff 型的出手侧增伤：+0.40 表示此后我方**所有**伤害（普攻、箭、技能）在抽暴击之前先乘 1.4。与 damage_reduction 是两把独立的尺，一张面具可以既砍得痛又扛不住。speed_bonus = buff 型的移速加成：+0.50 表示这 4 秒里跑得快一半，走的是 UnitStatus.speed_mult 那条既有通道（冻结把它乘成 0，加速把它乘大，同一句）。四条乘数键全是按招覆盖，没写的技能一个都不碰。projectile_count = projectile 型一次出手放出几发（1 = 单发，就是老行为；只有 projectile 型读它，写在别的 type 上不生效）。spread_deg = 这几发一共摊开多少度，以瞄准方向为**正中**对称散开，所以 count=3、spread=34 是三发分别在 −17°/0°/+17°。两个键配套用：只写 count 不写 spread 会打出一串重叠的弹道（等于浪费），只写 spread 则是单发偏个角度。**升级不加发数**——发数是一招的身份，随等级长的仍然是伤害/冷却/半径那几条（见 progression），不然顶级招会把低级招的观感整个换掉。",
+ "cooldown_seconds": 8.0,
+ "noise": 60.0,
+ "auto_cast": true,
+ "auto_cast_targets_min": 1,
+ "range_px": 160.0,
+ "shock_ring_seconds": 0.5,
+ "knockback_px": 0.0,
+ "damage": 0,
+ "heal_flat": 0,
+ "lifesteal": 0.0,
+ "damage_bonus": 0.0,
+ "speed_bonus": 0.0,
+ "projectile_count": 1,
+ "spread_deg": 0.0,
+ "element": "",
+ "status": "",
+ "crit_chance": 0.0,
+ "crit_multiplier": 1.5,
+ "variance": 0.12
+}
+
+progression={
+ "_comment": "技能升级：捡到**已经学过**的魔法书 = 该技能 +1 级（见 grimoire.level_up_on_repeat）。成长全是乘算：伤害 ×(1 + damage_per_level×(等级−1))、治疗 ×(1 + heal_per_level×(等级−1))（治疗单独一档，因为「回得更多」与「转得更快」是两种手感，共用一条曲线就再也调不动其中一个）、冷却 ×(1 + cooldown_per_level×(等级−1))（系数为负=缩减，并夹到最低 0.2 倍，免得升到顶级把冷却抹平）、半径 +(radius_per_level_px×(等级−1))、状态时长 ×(1 + status_duration_per_level×(等级−1))。等级属于**名册身份**，随 Meta 存档跨局；但只有撤离成功才写盘（见 grimoire.persist_on）—— 死了就退回上一局的状态。",
+ "max_level": 5,
+ "damage_per_level": 0.25,
+ "heal_per_level": 0.25,
+ "cooldown_per_level": -0.08,
+ "min_cooldown_scale": 0.2,
+ "radius_per_level_px": 8.0,
+ "duration_per_level": 0.1,
+ "status_duration_per_level": 0.1
+}
+
+elements={
+ "_comment": "五行。本轮**只做配色与标签**（用户 2026-09-21 定的首发范围：属性先当身份标识，不做克制表）。color 给 UI（技能名/角标），fx_tint 传给 EffectLibrary.spawn() 的 tint 参数叠在特效自身 modulate 上 —— 同一条 slash 弧换个 tint 就是另一个属性，素材不用复制。以后要加克制矩阵，就在这一段里给每个属性配一张 {被谁克: 倍率} 的表；伤害侧的口子本来就是乘数数组（DamagePipeline.compute 的 multipliers），只需给 roll() 多带一个可选入参，所有现有调用点不动。",
+ "metal": {
+  "name": "金",
+  "color": "#e6c76a",
+  "fx_tint": "#f6e3a8"
+ },
+ "wood": {
+  "name": "木",
+  "color": "#6fbf5a",
+  "fx_tint": "#9ae082"
+ },
+ "water": {
+  "name": "水",
+  "color": "#5ab6e8",
+  "fx_tint": "#a6dcff"
+ },
+ "fire": {
+  "name": "火",
+  "color": "#ef7a3c",
+  "fx_tint": "#ffa657"
+ },
+ "earth": {
+  "name": "土",
+  "color": "#b08a5a",
+  "fx_tint": "#d3ad7c"
+ }
+}
+
+ember_shot={
+ "name": "余烬弹",
+ "element": "fire",
+ "type": "projectile",
+ "key": 50,
+ "damage": 26,
+ "range_px": 300.0,
+ "cooldown_seconds": 5.0,
+ "noise": 70.0,
+ "status": "burning",
+ "variance": 0.15,
+ "aoe_radius_px": 44.0,
+ "fx_cast": "cast_staff",
+ "projectile": {
+  "_comment": "技能弹道**自带一份**，不复用 combat.weapons.<武器>.projectile：普攻的箭不该被技能改动污染。modulate 是本段新增的可选键（弹道贴图整体染色，余烬=橙），texture 沿用现成的箭图，scale 放大一点让『这发不一样』看得出来。",
+  "texture": "res://Assets/Art/Sprites/Projectiles/arrow.png",
+  "modulate": "#ffab52",
+  "scale": 1.25,
+  "speed": 760.0,
+  "hit_radius_px": 16.0,
+  "muzzle_offset_px": 22.0,
+  "fx_impact": "spark_hit",
+  "fx_miss": "puff_dust"
+ },
+ "drop_weight": 1
+}
+
+statuses={
+ "_comment": "状态层：任何可受伤单位（enemies / animals / player）身上挂一份通用容器（Scripts/combat/unit_status.gd），键=状态 id，值={remaining, stacks}。重复施加按 stack_mode：refresh=只把时长填满、stack=层数 +1 并填满时长（上限 max_stacks）。speed_mult 乘在移动速度上（敌方 patrol_speed()/chase_speed()，我方 move_speed）；halt_ai=true 时整段 AI/输入更新被跳过，写法和敌人现有的 _hit_stun 完全一样 —— 区别只是这里的时长与减免都来自配置。thaw_immunity_seconds = 状态自然结束后的一段免疫期，用来防止冰链永冻（被冻醒→立刻再被冻住）。DoT 按 tick_interval_seconds 结算，每跳伤害 = damage_per_tick × stacks。color + tint_blend 管画面：宿主 modulate 往 color 那边插 tint_blend 这么多（0 = 不染），所以「冻住发冰蓝、烧起来发红」也是改数值的活。",
+ "frozen": {
+  "name": "冻结",
+  "color": "#9adcff",
+  "tint_blend": 0.45,
+  "duration_seconds": 1.6,
+  "stack_mode": "refresh",
+  "speed_mult": 0.0,
+  "halt_ai": true,
+  "thaw_immunity_seconds": 0.9
+ },
+ "burning": {
+  "name": "灼烧",
+  "color": "#ff7a3c",
+  "tint_blend": 0.3,
+  "duration_seconds": 4.0,
+  "stack_mode": "stack",
+  "max_stacks": 3,
+  "tick_interval_seconds": 0.5,
+  "damage_per_tick": 4,
+  "thaw_immunity_seconds": 0.0
+ },
+ "stun": {
+  "_comment": "眩晕：停 AI + 速度归零，但比冻结短得多，且解冻免疫期更长 —— 落石/地裂这类控制技一旦能无缝续上，敌人就永远动不了了。",
+  "name": "眩晕",
+  "color": "#ffd166",
+  "tint_blend": 0.25,
+  "duration_seconds": 0.8,
+  "stack_mode": "refresh",
+  "speed_mult": 0.0,
+  "halt_ai": true,
+  "thaw_immunity_seconds": 2.0
+ },
+ "poison": {
+  "_comment": "中毒：跳得慢、每跳轻，但持续最长、层数上限最高 —— 与灼烧的分工是「灼烧烧的是站在那儿的他，毒死的是跑掉的他」。结算完全走 burning 那条既有通道（tick_interval × damage_per_tick × stacks），所以加这一条只是往表里添行，代码一行不动。tint_blend 比灼烧低一档：中毒常和别的状态叠着挂，两层染色叠上去就看不出是谁在生效了。",
+  "name": "中毒",
+  "color": "#9ad15c",
+  "tint_blend": 0.22,
+  "duration_seconds": 6.0,
+  "stack_mode": "stack",
+  "max_stacks": 4,
+  "tick_interval_seconds": 1.0,
+  "damage_per_tick": 2,
+  "thaw_immunity_seconds": 0.0
+ },
+ "bleed": {
+  "_comment": "流血：比中毒短一半、跳得密、层数少但每层高 —— 它是「刚被撕开的那几秒」，不是长尾。所以这两条 DoT 是一对而不是重复：一个管追不上的目标，一个管当场要死的目标。不写 speed_mult / halt_ai：见数值就减速/停 AI 会让「流血但不妨碍他砍你」这种手感做不出来，要慢是缓滞那条状态的活。",
+  "name": "流血",
+  "color": "#c8323c",
+  "tint_blend": 0.3,
+  "duration_seconds": 2.5,
+  "stack_mode": "stack",
+  "max_stacks": 3,
+  "tick_interval_seconds": 0.5,
+  "damage_per_tick": 3,
+  "thaw_immunity_seconds": 0.0
+ }
+}

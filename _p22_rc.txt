@@ -1,0 +1,63 @@
+EXIT = 0
+LOG  = D:\SteamPunkExtraction\_p_skills22.log 20759 bytes
+----- tail -----
+  OK   auto_cast=false：残血 + 空冷却喂满 2 秒，疾风羽一次都没自己开
+  OK   同一时刻同一批条件下，圣光十字自己开了（身上「无状态」，HP 35）
+--- 中毒 / 流血：蛇咬单体挂流血，孢子雾群体挂中毒且要两个人才自动放 ---
+  OK   两招各带一条新状态（蛇咬→bleed / 孢子雾→poison）
+  OK   孢子雾的 auto_cast_targets_min 真的读到了 2（没落回 defaults 的 1）
+  OK   蛇咬一格都不推：把人推开等于把他刚撕开的伤口合上
+  OK   蛇咬是全池冷却最短的一招（4.5s，次短的是别人）
+  OK   孢子雾是全池最静的一招（噪音 15，压在疾风羽 20 之下）
+  OK   蛇咬自带一份弹道表，贴图在位
+  OK   蛇咬的弹道命中了正面目标（实得 1 次）
+  OK   这一口把流血挂上了（实得 ["bleed"]）
+  OK   没有溅射：蛇咬一次只咬一个人（实得 0 次）
+  OK   半径内只有一个人 → 自动释放不开火（这一招等的是一圈人）
+  OK   凑到两个人（本来 0 个）→ 门槛开
+  OK   手动抢放不受门槛限制
+  OK   雾里两个人各挨了一下（实得 1 / 1 次）
+  OK   这一下把中毒挂到了每个人身上（实得 ["poison"] / ["poison"]）
+  OK   人撤空 → 门槛又关上（证明上面靠的是人数不是运气）
+--- G 段：魔法书拾取（学招 + 书消失）---
+  OK   踩上魔法书就学会一招（实得 { "gear_guard": 1 }）
+  OK   魔法书不是资源：resource_id 留空，不会被带进仓库
+  OK   书读完了就从场上消失（不会反复重掷）
+--- 负对照：skills.enabled=false ---
+  OK   开关开着时先放掉一发，留下冷却读数
+  OK   刚放完确实有冷却（9.00s）
+  OK   关开关后 can_cast=false
+  OK   关开关后 cast 放不出去
+  OK   关开关后 tick 里一次自动释放都没有（多 0 次）
+  OK   关开关后噪音表纹丝不动
+  OK   关开关后连冷却都不推进
+  OK   重新打开开关就又能放了
+--- F 段：撤离才永久 + 存档 round-trip ---
+  OK   场上这名角色有名册身份（uid=1）
+  OK   开局：名册里这个人一招不会
+  OK   局内学会 frost_nova
+  OK   这局没学新东西 → 名册里已有的技能原样保留（实得 { "ember_shot": 2 }）
+  OK   撤离成功 → 局内学的招进名册（实得 { "frost_nova": 3, "ember_shot": 1 }）
+  OK   阵亡的角色一个字节都不写（死了就是白学）
+  OK   _sanitize_skills 丢掉技能表里已删的 id（实得 { "frost_nova": 1, "ember_shot": 5 }）
+  OK   越界等级钳到 max_level（实得 5）
+  OK   读档清洗同样钳等级、删死 id（实得 { "frost_nova": 5 }）
+  OK   存盘 → 读档一轮技能表不变（{ "frost_nova": 1, "ember_shot": 5 } → { "ember_shot": 5, "frost_nova": 1 }）
+
+=== 共 201 项断言，失败 0 项 ===
+[probe_skills] 通过 201 / 201
+
+WARNING: [Status] skills.statuses 里没有 "no_such_status" 这一条 —— 同类缺失只警告这一次
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] apply (res://Scripts/combat/unit_status.gd:49)
+       [1] _b_status (res://Dev/probe_skills.gd:379)
+       [2] _ready (res://Dev/probe_skills.gd:148)
+       [3] _frames (res://Dev/probe_skills.gd:78)
+WARNING: [Skill] 想学一个不存在的技能：no_such_skill
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] learn (res://Scripts/combat/skill_system.gd:126)
+       [1] _c_learn (res://Dev/probe_skills.gd:402)
+       [2] _ready (res://Dev/probe_skills.gd:149)
+       [3] _frames (res://Dev/probe_skills.gd:78)

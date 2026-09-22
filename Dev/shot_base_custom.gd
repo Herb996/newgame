@@ -92,6 +92,7 @@ func _ready() -> void:
 	editor.call("set_tool", 3, 0)
 	await _wait(2)
 	var bbefore := int((editor.call("current_custom") as Dictionary)["buildings"].size())
+	var nb0 := _bld_count(main)        # 地图上玩家楼节点数（清空前基线）
 	var placed_anchor := Vector2i(-1, -1)
 	for ax in [30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10]:
 		var cand := Vector2i(ax, 52)
@@ -101,14 +102,50 @@ func _ready() -> void:
 			break
 	await _wait(4)
 	var bafter := int((editor.call("current_custom") as Dictionary)["buildings"].size())
-	print("[CustomShot] 建筑层：放置前 %d 栋 → 放置后 %d 栋，锚点=%s" % [bbefore, bafter, str(placed_anchor)])
+	var nb1 := _bld_count(main)
+	print("[CustomShot] 建筑层：表 放置前 %d → 放置后 %d 栋（锚点=%s）｜节点 %d → %d" % [
+			bbefore, bafter, str(placed_anchor), nb0, nb1])
 	_report_panel(panel)
 	await _grab(OUT_DIR + "/base_custom_building.png")
 
-	# ---- ESC 放弃：出图不写档 ----
-	_type_key(KEY_ESCAPE)
-	await _wait(6)
-	print("[CustomShot] ESC 后编辑器仍在？%s（应为 false）" % str(_find_editor() != null))
+	# ---- 模拟点击「全部清空」按钮（emit pressed，走真实按钮链路）----
+	var bc := editor.call("current_custom") as Dictionary
+	var b4 := {"地面": (bc["ground"] as Dictionary).size(),
+			"水": (bc["water"] as Dictionary).size(),
+			"摆件": (bc["props"] as Dictionary).size(),
+			"建筑": (bc["buildings"] as Dictionary).size()}
+	var nb2 := _bld_count(main)        # 清空前节点数（应 == nb1）
+	_click_clear(panel)
+	await _wait(8)
+	var ac := editor.call("current_custom") as Dictionary
+	var a4 := {"地面": (ac["ground"] as Dictionary).size(),
+			"水": (ac["water"] as Dictionary).size(),
+			"摆件": (ac["props"] as Dictionary).size(),
+			"建筑": (ac["buildings"] as Dictionary).size()}
+	var all_empty: bool = a4["地面"] == 0 and a4["水"] == 0 and a4["摆件"] == 0 and a4["建筑"] == 0
+	var nb3 := _bld_count(main)        # 清空后节点数（应 == nb0，玩家楼全没了，出厂楼不动）
+	print("[CustomShot] 全部清空：清空前 %s → 清空后 %s｜四表全空=%s｜改动计数=%d" % [
+			str(b4), str(a4), str(all_empty), int(editor.call("change_count"))])
+	print("[CustomShot] 清空后节点：放置前 %d → 放置后 %d → 清空后 %d（应回到 %d）" % [nb0, nb1, nb3, nb0])
+	_report_panel(panel)
+	await _grab(OUT_DIR + "/base_custom_cleared.png")
+
+	# ---- 点「恢复出厂楼（传送门等）」：出厂楼应重新生成，玩家自定义地表保留 ----
+	var fr_before := _factory_count(main)     # 清空前出厂楼节点数（应==12）
+	var fvis_before := _factory_visible(main)
+	_click_restore(panel)
+	await _wait(12)
+	var bs2 = main.get_node_or_null("BaseSystem")
+	var fr_after := -1
+	var fvis_after := false
+	if bs2 != null:
+		var fr = bs2.edit_targets().get("factory_root")
+		if fr != null:
+			fr_after = (fr as Node2D).get_children().size()
+			fvis_after = (fr as Node2D).visible
+	print("[CustomShot] 恢复出厂楼：清空前 %d 栋（可见=%s）→ 恢复后 %d 栋（可见=%s）｜编辑器仍在=%s" % [
+		fr_before, str(fvis_before), fr_after, str(fvis_after), str(_find_editor() != null)])
+	await _grab(OUT_DIR + "/base_custom_restored.png")
 	get_tree().quit(0)
 
 
@@ -232,3 +269,70 @@ func _grab(path: String) -> void:
 	if src.get_format() != Image.FORMAT_RGBA8:
 		src.convert(Image.FORMAT_RGBA8)
 	print("[CustomShot] %s -> err=%d（0=成功）" % [path, src.save_png(path)])
+
+
+## 地图上「玩家用画笔摆出来的楼」节点数（BasePlayerBuildings 下）。
+## 出厂那 12 栋挂在 BaseSystem 根下、不在这里，所以这个数只数玩家楼 ——
+## 正好用来验证「全部清空」有没有把玩家楼从地图删掉、又没误伤出厂楼。
+func _bld_count(main: Node) -> int:
+	var bs := main.get_node_or_null("BaseSystem")
+	if bs == null:
+		print("[CustomShot] !! 找不到 BaseSystem")
+		return -1
+	var host = bs.edit_targets()["buildings_host"]
+	if host == null:
+		return -1
+	return (host as Node2D).get_children().size()
+
+
+## 模拟点「全部清空」：找到那个 Button 直接 emit pressed（和真实鼠标点击同一条链路，
+## 会触发连接的 lambda → _on_clear() → editor.clear_all()）。不走 call("_on_clear")
+## 是因为它以下划线开头、Object.call 会拒，而 emit pressed 才是玩家实际触发的动作。
+func _click_clear(panel: CanvasLayer) -> void:
+	var col = panel.get("_col")
+	if col == null:
+		print("[CustomShot] !! 找不到面板 _col")
+		return
+	for c in col.get_children():
+		var b := c as Button
+		if b != null and b.text == "全部清空":
+			b.pressed.emit()
+			return
+	print("[CustomShot] !! 没找到「全部清空」按钮")
+
+
+## 模拟点「恢复出厂楼（传送门等）」：emit restore_default_requested，
+## 走真实按钮链路 → main._on_restore_factory → 重建基地。
+func _click_restore(panel: CanvasLayer) -> void:
+	var col = panel.get("_col")
+	if col == null:
+		print("[CustomShot] !! 找不到面板 _col")
+		return
+	for c in col.get_children():
+		var b := c as Button
+		if b != null and b.text.begins_with("恢复出厂楼"):
+			b.pressed.emit()
+			return
+	print("[CustomShot] !! 没找到「恢复出厂楼」按钮")
+
+
+func _factory_root_node(main: Node) -> Node2D:
+	var bs = main.get_node_or_null("BaseSystem")
+	if bs == null:
+		return null
+	var fr = bs.edit_targets().get("factory_root")
+	return fr as Node2D
+
+
+func _factory_count(main: Node) -> int:
+	var fr = _factory_root_node(main)
+	if fr == null:
+		return -1
+	return fr.get_children().size()
+
+
+func _factory_visible(main: Node) -> bool:
+	var fr = _factory_root_node(main)
+	if fr == null:
+		return false
+	return fr.visible

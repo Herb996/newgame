@@ -1353,6 +1353,9 @@ func take_damage(amount: int) -> void:
 ## 一个实例只有一个特性，实际只会命中其中一条；两条并列是为了将来能叠加。
 func incoming_damage(amount: int) -> int:
 	var out := amount
+	# 状态层先乘（易伤 ×1.3 / 冻结那类 ×1.0）：player 那边同一个位置，两边口径要一致，
+	# 否则"同一层易伤挂在我方和敌方身上效果不同"这种问题只会靠肉眼发现。
+	out = int(round(float(out) * _statuses.damage_taken_mult()))
 	var red := damage_reduction_ratio()
 	if red > 0.0:
 		out = maxi(_dr_min_damage(), int(round(float(out) * (1.0 - red))))

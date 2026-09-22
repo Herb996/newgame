@@ -178,6 +178,20 @@ func _run(main: Node) -> void:
 	# 取消 = 丢弃整段编辑会话（设计如此，与 cancel 的语义一致）：两段建筑改动都回滚
 	_check(final_b.size() == 0, "取消回滚整段编辑会话（建筑归零，实得 %d 栋）" % final_b.size())
 
+	# ---- 5d) 出厂楼「全部清空」一并禁用 + 取消回滚 ----
+	editor.begin(opts)
+	editor.clear_all()
+	await _wait(2)
+	var fcust: Dictionary = editor.call("current_custom")
+	_check(fcust.get("factory_disabled", false) == true, "全部清空：factory_disabled 置 true（出厂楼一并抹掉）")
+	var froot = opts.get("factory_root")
+	_check(froot != null and (froot as Node).visible == false, "出厂楼容器被隐藏（视图即时隐掉，不等存档重生）")
+	editor.call("cancel")
+	await _wait(2)
+	var fback: Dictionary = editor.call("current_custom")
+	_check(fback.get("factory_disabled", true) == false, "取消后 factory_disabled 回滚到 false")
+	_check(froot != null and (froot as Node).visible == true, "取消后出厂楼容器重新显示")
+
 	# ---- 6) 越界素材 id 会被夹住而不是留黑洞 ----
 	var wild := {"v": 1, "size": size, "ground": {"40,40": 999}, "water": {}, "props": {}}
 	var cleaned := BaseCustomization.sanitize(wild)

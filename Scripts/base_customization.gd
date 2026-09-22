@@ -49,7 +49,8 @@ const BIOME_MAX := 3           # 群系数量由 config map.biomes 决定，这�
 # ------------------------------------------------------------
 
 static func empty() -> Dictionary:
-	return {"v": DATA_VERSION, "size": 0, "ground": {}, "water": {}, "props": {}, "buildings": {}}
+	return {"v": DATA_VERSION, "size": 0, "ground": {}, "water": {}, "props": {},
+			"buildings": {}, "factory_disabled": false}
 
 
 static func is_empty(custom: Dictionary) -> bool:
@@ -85,6 +86,8 @@ static func sanitize(raw) -> Dictionary:
 	out["water"] = _sanitize_cells(src.get("water"), 1, true)
 	out["props"] = _sanitize_cells(src.get("props"), maxi(PROP_MAX, BaseMaterials.prop_count()), false)
 	out["buildings"] = _sanitize_buildings(src.get("buildings"))
+	# 出厂楼是否被「全部清空」一并抹掉。bool 原样保留；缺失=没动过=正常显示。
+	out["factory_disabled"] = bool(src.get("factory_disabled", false))
 	return out
 
 

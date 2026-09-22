@@ -27,6 +27,8 @@ const CONTENT_W := PANEL_W - FRAME_PAD * 2.0 - CORE_PAD_LR * 2.0
 
 signal save_requested
 signal cancel_requested
+## 把被「全部清空」抹掉的出厂楼拉回来（只恢复传送门/仓库那 12 栋，不动玩家自定义的地表）。
+signal restore_default_requested
 
 var _editor: Node = null
 var _shell: PanelContainer
@@ -121,8 +123,16 @@ func _build_ui() -> void:
 
 	var clear_btn := UiKit.small_button("全部清空")
 	clear_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	clear_btn.pressed.connect(func(): _on_clear)
+	clear_btn.pressed.connect(func(): _on_clear())
 	col.add_child(clear_btn)
+
+	# 「恢复出厂楼」：专门救被上面「全部清空」一并抹掉的出厂楼（传送门/仓库等）。
+	# 只把 factory_disabled 设回 false 并重建基地，玩家自己涂的地面/摆件/楼都留着 ——
+	# 否则清了传送门就永远进不了局内，那是比崩溃更难发现的死局。
+	var restore_btn := UiKit.small_button("恢复出厂楼（传送门等）")
+	restore_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	restore_btn.pressed.connect(func(): restore_default_requested.emit())
+	col.add_child(restore_btn)
 
 
 # ------------------------------------------------------------

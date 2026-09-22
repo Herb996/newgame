@@ -24,6 +24,11 @@ const PROJECTILE := preload("res://Scripts/combat/projectile.gd")
 ## 改这里时两处都要动。
 const DAMAGEABLE_GROUPS := ["enemies", "animals"]
 
+## 技能弹道的身份分组。多重弹幕一次出手就是数发同名节点，Godot 又强制兄弟不重名
+## （第 2 发起变成 SkillProjectile2/3/4），所以"这发是不是技能放出去的"只能靠分组认。
+## 普攻那发不带这个分组，两条路的读数因此互不污染。
+const SKILL_PROJECTILE_GROUP := "skill_projectile"
+
 ## 武器表里不是武器 id 的键（说明性字段），遍历时跳过。
 const WEAPON_META_KEYS := ["_comment"]
 
@@ -688,7 +693,10 @@ func trait_damage(base: float) -> float:
 ## 目标的减免**不在这里算**（玩家防御、敌人血量越低越硬都留在各自 take_damage），
 ## 理由见 Scripts/combat/damage_pipeline.gd 的头注释。
 func roll_hit_damage(base: float) -> Dictionary:
-	return DamagePipeline.roll(trait_damage(base), 0.0,
+	# 增伤类增益在**抽之前**乘：暴击与浮动都跟着一起放大，反过来（先抽再乘）会让
+	# "面板 +40%"的实际期望低于面板，玩家照着数字算对不上。
+	# 身上没这层时乘数是 1.0 —— 出厂那条"恒等于 int(trait_damage(base))"仍然成立。
+	return DamagePipeline.roll(trait_damage(base) * _statuses.damage_dealt_mult(), 0.0,
 			attack_param("crit_chance", 0.0),
 			attack_param("crit_multiplier", 1.5),
 			attack_param("variance", 0.0))
@@ -1110,6 +1118,9 @@ func resolve_attack_hit() -> void:
 		var hit := roll_hit_damage(attack_param("damage", 25.0))
 		var dmg := int(hit["damage"])
 		area.take_damage(dmg)
+		# 嗜血对普攻同样生效（用户要的是"打人就回血"，不限技能那一档）；口径与
+		# 弹道、范围技一致：按打出去的伤害算，没挂增益时这句直接 return。
+		apply_lifesteal(dmg)
 		# 「受到攻击也要动」（用户 2026-09-17）：把攻击者位置告诉它，它自己转调查朝我走来。
 		# 用 has_method 而不是硬调：命中目标可能是动物（另一个脚本），它没有这个方法。
 		if area.has_method("alert_from_attacker"):
@@ -1151,6 +1162,7 @@ func fire_projectile() -> bool:
 	var p := PROJECTILE.new()
 	p.name = "Projectile"
 	parent.add_child(p)
+	p.source = self        # 命中后按射手身上的嗜血回血（见 projectile.gd::source）
 	p.global_position = global_position + facing * float(cfg.get("muzzle_offset_px", 22.0))
 	# 出膛那一帧就把这一发结算完（含暴击/浮动各抽一次）：弹道节点只搬运一个算好的整数，
 	# 不在命中帧回头找射手要武器参数 —— 它可能射出视野、射手可能已经换了武器。
@@ -1168,8 +1180,12 @@ func fire_skill_projectile(cfg: Dictionary, dir: Vector2, damage: int) -> bool:
 	if parent == null:
 		return false
 	var p := PROJECTILE.new()
-	p.name = "SkillProjectile"
 	parent.add_child(p)
+	# 名字只给调试台看：Godot 强制"兄弟不重名"，多重弹幕的第 2、3 发会自动变成
+	# SkillProjectile2/3/4，所以**认得这发是不是技能弹道要靠分组**，不能按名字精确匹配。
+	p.name = "SkillProjectile"
+	p.add_to_group(SKILL_PROJECTILE_GROUP)
+	p.source = self        # 技能弹道同样回血：嗜血不挑伤害来源
 	p.global_position = global_position + dir * float(cfg.get("muzzle_offset_px", 22.0))
 	p.setup(cfg, dir, damage, _walls, _tile_size)
 	return true
@@ -1179,6 +1195,12 @@ func fire_skill_projectile(cfg: Dictionary, dir: Vector2, damage: int) -> bool:
 ## 倒数与承伤计算全在 UnitStatus 里 —— 与敌方减益共用一条管线，不另开一套计时。
 func apply_buff(id: String, mods: Dictionary, duration: float) -> bool:
 	return _statuses.apply_modifier(id, mods, duration)
+
+
+## 出手侧的增伤乘数（狂战面具那类）。SkillSystem 只认这一个公开读数，不去翻 _statuses；
+## 承伤那一侧不用方法是因为 take_damage 就在本文件里，直接读就行。
+func damage_dealt_mult() -> float:
+	return _statuses.damage_dealt_mult()
 
 
 ## 学一招 / 升一级（魔法书拾取调用）。返回原样的结果字典，让调用方决定怎么向玩家交代。
@@ -1237,6 +1259,20 @@ func heal(amount: int) -> int:
 	var before := hp
 	hp = mini(hp + amount, max_hp)
 	return hp - before
+
+
+## 吸血结算的唯一出口：我方三个出手点（普攻近战 / 弹道命中 / 技能范围）打完伤害后
+## 各调这一句，比例取自自己身上那层嗜血（见 UnitStatus.lifesteal_mult 与 skills.defaults.lifesteal）。
+## 回血一律走 heal()，于是"夹到 max_hp""死了不回"这两条规矩只有一份实现。
+func apply_lifesteal(dealt: int) -> void:
+	if dealt <= 0:
+		return
+	var frac := _statuses.lifesteal_mult()
+	if frac <= 0.0:
+		return
+	var got := heal(int(round(float(dealt) * frac)))
+	if got > 0:
+		print("[Combat] 嗜血回血 %d（打出 %d × %.0f%%），HP %d/%d" % [got, dealt, frac * 100.0, hp, max_hp])
 
 
 ## 直接扣血（饥饿等非战斗来源）：不进硬直、不击退、不吃无敌帧。

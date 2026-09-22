@@ -404,7 +404,7 @@
     "custom_editor_note": "**基地地面编辑器（B 键开关）**：进编辑态后会把瓦片网格铺出来，左键笔刷涂上当前素材、右键擦回默认（草地）、Shift + 左键拖矩形整块填充。点「保存」才写进当前存档槽，点「取消」丢弃本次改动。",
     "custom_editor": {
       "toggle_key": 66,
-      "brush_sizes": [1, 2, 3, 5],
+      "brush_sizes": [1, 4, 8],
       "default_brush": 1,
       "default_material": 0,
       "grid_alpha": 0.10,

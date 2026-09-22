@@ -125,6 +125,29 @@ func damage_taken_mult() -> float:
 	return m
 
 
+## 打出伤害乘数（狂战那类增益）。与上面那条**故意是两个键**：一张面具可以既让你
+## 砍得更痛、又让你更挨得住不了打（增伤 1.4 / 承伤 1.15），合成一个数就表达不了
+## "两头都动"，只能表达"要么硬要么脆"。
+## 结算点在出手那一侧（player.roll_hit_damage / SkillSystem.roll_damage 各乘一次），
+## 不在 take_damage 里 —— 目标自己的减伤仍归目标算。
+func damage_dealt_mult() -> float:
+	var m := 1.0
+	for e in _entries.values():
+		m *= float((e as Dictionary)["def"].get("damage_dealt_mult", 1.0))
+	return m
+
+
+## 吸血比例（嗜血那类自我增益）：打出伤害后按这个成数回血。
+## 与上面两个乘数的**算法**不同：speed/damage 是"叠乘的系数"，而吸血是"几条来源
+## 各回各的、加在一起"—— 两条各 25% 应该回 50%，乘起来反而越叠越少，讲不通。
+## 走同一条倒数通道是重点：时长归 UnitStatus 管，宿主那边不用另开一个计时器。
+func lifesteal_mult() -> float:
+	var sum := 0.0
+	for e in _entries.values():
+		sum += float((e as Dictionary)["def"].get("lifesteal", 0.0))
+	return sum
+
+
 ## 是否有状态要求"整段 AI/输入更新都跳过"。宿主按它走已有的 _hit_stun 那条分支。
 func halts_ai() -> bool:
 	for e in _entries.values():

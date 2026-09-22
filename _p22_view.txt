@@ -1,0 +1,302 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[Config] 配置已加载（17 个域文件）：地图 128.0x128.0 | 撤离点 3.0 个 | 局内 3600.0 秒
+[Config] 用户设置已加载：44 项（user://settings.json）
+[SaveSlots] 6 个槽位可用｜上次游玩：槽 1
+[DisplaySettings] 已创建音频总线：Music
+[DisplaySettings] 已创建音频总线：SFX
+[Meta] 存档加载完成（本地默认槽）：仓库 {  } | 升级 { "survival.max_hp": 1.0 } | 基地 0 栋 | 名册 4 人
+[DebugPanel] 数值目录 1320 行（跑 tools/gen_stat_catalog.py 重新生成）
+[Base] 基地就绪：80x80 地面=自定义（地面 2812 / 水 110 / 摆件 224 格），建筑 12 栋，出生点 (2592.0, 2464.0)
+[Run] 一局开始：时长 3600 秒 | 玩家属性 { "survival.max_hp": 110.0, "survival.backpack_capacity": 10.0, "survival.extraction_speed": 1.0, "survival.warehouse_capacity": 20.0, "acquisition.resource_find_chance": 0.5, "acquisition.rare_resource_chance": 0.05 }
+[Map] 装饰碰撞体：329 格（树/石，物理层与寻路层已对齐）
+[Map] 地图生成完成：128x256 瓦片（8192x16384 像素），地板 26403 格，可达 26326 格（100%），贴图=AI
+[Map] 装饰物：树 253 / 石头 76 / 灌木 91 / 碎石 52 / 裂缝 0 / 河水 0，出生点 (4128.0, 8224.0)
+[Map] 矿脉 111 处
+[Map] 群系分布：草地 9714, 荒原 9987, 森林 10309, 沼泽 2758
+[ResourceRegistry] 已登记资源节点：{ "stone": 76, "wood": 253, "iron": 71, "oil": 40 }
+[PlayerAnimator] 帧序列就绪：idle=12帧/8fps walk=6帧/12fps attack=3帧/12fps dodge=程序化 hit=6帧/12fps dead=程序化 graze=程序化
+[Combat] 本局生命上限 110（含局外养成/升级特性）
+[Enemy] 幻影分身：火把哥布林 召唤 1 个分身（队列共 1）
+[Enemy] 幻影分身：火把哥布林 召唤 1 个分身（队列共 2）
+[Enemy] 幻影分身：火把哥布林 召唤 2 个分身（队列共 4）
+[Enemy] 幻影分身：火把哥布林 召唤 2 个分身（队列共 6）
+[Enemy] 幻影分身：火把哥布林 召唤 2 个分身（队列共 8）
+[Enemy] 幻影分身：火把哥布林 召唤 2 个分身（队列共 10）
+[Enemy] 幻影分身：火把哥布林 召唤 1 个分身（队列共 11）
+[Enemy] 幻影分身：火把哥布林 召唤 2 个分身（队列共 13）
+[Enemy] 幻影分身：火把哥布林 召唤 2 个分身（队列共 15）
+[Enemy] 敌人生成完成：250 个（距出生点 ≥ 20 格，AI = 巡逻 + 追击）｜兵种 { "ep_spider": 9, "ep_pig_rider": 16, "ep_skull": 14, "ep_harpoon_shark": 14, "ep_panda": 20, "ep_snake": 11, "ep_turtle": 10, "ep_gnome": 11, "ep_cave": 14, "ep_torch_goblin": 9, "ep_bomb_fish": 8, "ep_pig": 10, "ep_lizard": 12, "ep_spear_goblin": 12, "ep_minotaur": 7, "ep_hex_shaman": 27, "ep_bear": 11, "ep_gnoll": 14, "ep_paddle_shark": 7, "ep_thief": 5, "ep_troll": 9 }
+[Animal] 中立生物生成完成：15 个（距出生点 ≥ 10 格）｜种类 { "sheep": 15 }
+[Loot] 资源点生成完成：1185 个（密度 5%，6 种资源按稀有度加权）+ 魔法书 2 本
+[Weather] 波纹子视口建好 32x32（scale=0.50）
+[Weather] 雨湿地面 14892 格（占全图 45.4%）＝群系 [0.0, 2.0]，半径 2 格 × 3 轮模糊
+[Meta] 补招新兵：枪手（spearman，Lv0）
+[Meta] 补招新兵：弓兵（archer，Lv0）
+[Meta] 补招新兵：剑士（swordsman，Lv0）
+[Meta] 补招新兵：僧侣（monk，Lv0）
+[Meta] 名册初始化：枪手(Lv0) 弓兵(Lv0) 剑士(Lv0) 僧侣(Lv0)
+[Map] 装饰碰撞体：329 格（树/石，物理层与寻路层已对齐）
+[Map] 地图生成完成：128x256 瓦片（8192x16384 像素），地板 26403 格，可达 26326 格（100%），贴图=AI
+[Map] 装饰物：树 253 / 石头 76 / 灌木 91 / 碎石 52 / 裂缝 0 / 河水 0，出生点 (4128.0, 8224.0)
+[Map] 矿脉 111 处
+[Map] 群系分布：草地 9714, 荒原 9987, 森林 10309, 沼泽 2758
+[ResourceRegistry] 已登记资源节点：{ "stone": 76, "wood": 253, "iron": 71, "oil": 40 }
+[PlayerAnimator] 帧序列就绪：idle=12帧/8fps walk=6帧/12fps attack=3帧/12fps dodge=程序化 hit=6帧/12fps dead=程序化 graze=程序化
+[Combat] 本局生命上限 110（含局外养成/升级特性）
+[Enemy] 幻影分身：火把哥布林 召唤 1 个分身（队列共 1）
+[Enemy] 敌人生成完成：250 个（距出生点 ≥ 20 格，AI = 巡逻 + 追击）｜兵种 { "ep_spider": 9, "ep_pig_rider": 16, "ep_skull": 14, "ep_harpoon_shark": 14, "ep_panda": 20, "ep_snake": 11, "ep_turtle": 10, "ep_gnome": 11, "ep_cave": 14, "ep_torch_goblin": 9, "ep_bomb_fish": 8, "ep_pig": 10, "ep_lizard": 12, "ep_spear_goblin": 12, "ep_minotaur": 7, "ep_hex_shaman": 27, "ep_bear": 11, "ep_gnoll": 14, "ep_paddle_shark": 7, "ep_thief": 5, "ep_troll": 9 }
+[Animal] 中立生物生成完成：15 个（距出生点 ≥ 10 格）｜种类 { "sheep": 15 }
+[Loot] 资源点生成完成：1185 个（密度 5%，6 种资源按稀有度加权）+ 魔法书 2 本
+[Weather] 波纹子视口建好 32x32（scale=0.50）
+[Weather] 雨湿地面 14892 格（占全图 45.4%）＝群系 [0.0, 2.0]，半径 2 格 × 3 轮模糊
+[Combat] 玩家受到 40 伤害（减免 0），剩余 HP 70/110
+[Combat] 玩家受到 20 伤害（减免 20），剩余 HP 50/110
+[probe_skills]   进场时场上已有技能弹道 0 个（自动释放的残留，不参与本段计数）
+[Skill] holy_cross 回了 34 血（想回 34，当前 HP 67/110）
+[Skill] holy_cross 回了 5 血（想回 34，当前 HP 110/110）
+[Skill] holy_cross 回了 68 血（想回 68，当前 HP 69/110）
+[Combat] 嗜血回血 10（打出 40 × 25%），HP 11/110
+[Combat] 嗜血回血 6（打出 23 × 25%），HP 7/110
+[Combat] 玩家受到 40 伤害（减免 0），剩余 HP 70/110
+[Combat] 玩家受到 46 伤害（减免 -6），剩余 HP 64/110
+[Skill] holy_cross 回了 34 血（想回 34，当前 HP 35/110）
+[Loot] 枪手 翻开魔法书 → 学会 齿轮护盾（Lv1）
+[Meta] 补招新兵：枪手（spearman，Lv0）
+[Meta] 补招新兵：弓兵（archer，Lv0）
+[Meta] 补招新兵：剑士（swordsman，Lv0）
+[Meta] 补招新兵：僧侣（monk，Lv0）
+[Meta] 名册初始化：枪手(Lv0) 弓兵(Lv0) 剑士(Lv0) 僧侣(Lv0)
+  OK   无头跑在默认槽（active_slot=0）→ 备份 user://save.json 才有效
+--- A 段：skills.json 表自洽 ---
+  OK   技能池 13 招 ≥ 身上 3 个槽（池子按批长大，槽数不动）
+  OK   skills.enabled 默认开着
+  OK   skills.allowed_keys 是一张非空表（实得 26 个键码）
+  OK   别系统的热键读得到真实键码：combat.input.dodge_key = 32（冲刺 Space）
+  OK   别系统的热键读得到真实键码：camera.return_key = 70（相机回中 F）
+  OK   别系统的热键读得到真实键码：survival.eat_key = 72（进食 H）
+  OK   别系统的热键读得到真实键码：base.custom_editor.toggle_key = 66（地面编辑器 B）
+  OK   别系统的热键读得到真实键码：debug.stat_panel_key = 4194340（数值栏 F9）
+  OK   五行齐全（实得 5）
+  OK   状态表非空（实得 5 条：frozen, burning, stun, poison, bleed）
+  OK   每一条状态都有技能真的挂得上：全有人用
+  OK   池里每一招的字段全部接得到真表：无问题
+  OK   allowed_keys 装得下整个池子：26 个键 ≥ 13 招
+  OK   白名单不与任何现有按键打架：无问题
+  OK   头九个键仍是数字 1~9（49..57 原样在前），老招的热键没被挪走
+  OK   状态定义可用：无问题
+  OK   skills.defaults 覆盖了代码会读的全部键：无缺
+  OK   魔法书图标在位：res://Assets/Art/Sprites/Items/item_grimoire.png
+  OK   每局至少掉一本魔法书
+  OK   grimoire 没被登记成资源（否则会连累 Meta._prune_unknown_resources）
+--- B 段：状态容器 UnitStatus ---
+  OK   空容器：三个乘数都是单位元、染色纯白（旧内容零影响）
+  OK   施加冻结成功
+  OK   冻结 = 停 AI + 速度乘成 0（宿主不必特判）
+  OK   冻结把身上染成冰蓝
+  OK   冻结按时长自然到期（1.6s）
+  OK   到期后挂上 0.9s 解冻免疫期
+  OK   免疫期内再冻整个作废（不能连冻到死）
+  OK   免疫期过了能再冻
+  · 持续伤害状态逐条结算（表里有几条验几条，不点名 id）
+  OK   burning 施加成功
+  OK   burning 4.0s / 每 0.5s 一跳 = 8 跳（实得 8）
+  OK   burning 一跳 4 伤 × 8 跳 = 累计 32（实得 32）
+  OK   burning 跳完自己结束
+  OK   burning 叠到 max_stacks 就顶住（实得 3 层 / 上限 3）
+  OK   burning 层数真的进每跳伤害（实得 [12]）
+  OK   poison 施加成功
+  OK   poison 6.0s / 每 1.0s 一跳 = 6 跳（实得 6）
+  OK   poison 一跳 2 伤 × 6 跳 = 累计 12（实得 12）
+  OK   poison 跳完自己结束
+  OK   poison 叠到 max_stacks 就顶住（实得 4 层 / 上限 4）
+  OK   poison 层数真的进每跳伤害（实得 [8]）
+  OK   bleed 施加成功
+  OK   bleed 2.5s / 每 0.5s 一跳 = 5 跳（实得 5）
+  OK   bleed 一跳 3 伤 × 5 跳 = 累计 15（实得 15）
+  OK   bleed 跳完自己结束
+  OK   bleed 叠到 max_stacks 就顶住（实得 3 层 / 上限 3）
+  OK   bleed 层数真的进每跳伤害（实得 [9]）
+  OK   表里 3 条持续伤害状态全部走完了上面这把尺（少于 3 条说明有状态漏了 tick 字段）
+  OK   挂上运行时合成的减伤增益
+  OK   增益期间承伤 ×0.6
+  OK   增益到点自动摘掉
+  OK   未知状态 id 不生效（只警告一次）
+--- C 段：学习、槽位与成长 ---
+  OK   第一本学会 frost_nova
+  OK   学会的招数不超过槽数（实得 3）
+  OK   重复捡书 = 升级，不是白捡
+  OK   练到顶 = Lv5（实得 5）
+  OK   满级后再学只报 maxed
+  OK   不存在的技能学不了
+  OK   两个槽都能学上
+  OK   第三个槽没有 → 新技能被拒（实得 slots_full）
+  OK   槽满不影响已有技能继续升级
+  OK   空手时 roll_skill 掷得出表里的 id（leaf_blade）
+  OK   全学会后仍能掷（升级用的那一条）
+  OK   set_known 丢掉表里已删的 id、且不收等级 0（实得 1 条）
+  OK   热键码 → 技能 id 认得出来
+  OK   没人绑的键返回空串
+  OK   1 级不合成状态定义（与出厂表等价）
+  OK   满级伤害高于 1 级（18.0 → 36.0）
+  OK   满级冷却短于 1 级（9.0 → 6.1）
+  OK   满级半径大于 1 级（112.0 → 144.0）
+  OK   升过级的技能才合成放大后的状态定义
+--- D 段：真身进局（门槛 / 冷却 / 自动释放 / 噪音 / 护盾 / 治疗 / 吸血 / 增伤 / 加速 / 弹幕 / 中毒 / 流血）---
+  OK   局内有角色
+  OK   角色身上挂着一份 SkillSystem，且认得宿主
+  OK   这名角色有名册身份（uid=1）
+  OK   名册里带的技能在出击时注入了（frost_nova Lv2）
+  OK   射程内没敌人 → 自动释放的门槛不开
+  OK   冷却是满的 → 手动抢放不受门槛限制
+  OK   射程内出现敌人 → 门槛开
+  OK   手动放得出冰霜新星
+  OK   范围内挨了一下（实得 1 次）
+  OK   命中的目标被挂上 frozen（实得 ["frozen"]）
+  OK   放完立刻进冷却
+  OK   冷却中放不出去（同一帧第二次调用被拒）
+  OK   技能计入噪音表（peak 150 ≥ 表值 150）
+  OK   地面圈落了一份（前 0 后 1）
+  OK   冷却一到就自动补了一发（541/600 帧，命中前 0 后 1）
+  OK   自动补完立刻重新进冷却（剩余 9.00 / 满 9.00）
+  OK   技能射程不超过观察视野（160 ≤ 640）
+  OK   敌人走出半径 → 门槛又关上
+  OK   裸值挨 40 掉 40（防御 0）
+  OK   护盾挂得上（走 UnitStatus 的运行时合成定义）
+  OK   盾期间同样一刀只掉 20（先 ×0.5 再扣防御 0，实得 20）
+  OK   盾到点自己没了，承伤回到 ×1
+--- E 段：技能弹道（索敌口径 + 灼烧传递 + 溅射）---
+  OK   余烬弹自带一份弹道表，贴图在位
+  OK   溅射半径 44px 大于命中判定 16px
+  OK   余烬弹有射程读数（300px）
+  OK   射程内最近的就是这颗靶（@Node2D@6154:<Node2D#2393253098761>）
+  OK   aim_dir 朝射程内最近的敌人（夹角 0.0°）
+  OK   自动普攻关掉后索敌不变（夹角 0.0°）
+  OK   射程内没人时退回角色朝向（aim=(0.0, 1.0) facing=(0.0, 1.0)）
+  OK   正面目标中弹（实得 1 次）
+  OK   命中把灼烧带给了目标（实得 ["burning"]）
+  OK   溅射半径内的第二个目标也挨了一下（实得 1 次）
+  OK   溅射的那一发同样挂上灼烧
+  OK   半径外的目标不受溅射影响（实得 0 次）
+--- 多重弹幕：一次出手放数发，扇形对称摊开、逐发抽伤害 ---
+  OK   火星溅表里写着 3 发 / 一共摊开 34°
+  OK   两招弹幕都不写溅射半径：三发各打各的，落点再各炸一次等于把扇面白摊
+  OK   没写这两个键的老招仍按单发走（defaults 兜住 = 加机制不改老数值）
+  OK   余烬弹出手（projectile_count 缺省 1）
+  OK   这一次出手放出 1 发（实得 1 发）
+  OK   这一发也正对瞄准方向
+  OK   火星溅出手：一次 cast，不是三次
+  OK   一次出手放出 3 发（实得 3 发）
+  OK   三发只算一次发声：噪音涨了 85（表值 85，按发记会是 255）
+  OK   三发绕瞄准方向对称摊开：实测 -17.0, 0.0, 17.0°（期望 −17/0/+17，最大偏差 0.00°）｜瞄准 90° (0.0, 1.0)，各发绝对角 73°, 90°, 107°
+  OK   三发各自都带着灼烧（多发最容易漏成只有头一发认得状态）
+  OK   40 轮出手每轮都放出 3 发（实得 40 轮 / 120 发，0 轮不是 3 发）
+  OK   每一发的伤害都落在单发面板的方差带里（12±20% = 9..15，越界 0 发）
+  OK   同一轮里三发可以打出不同数字（40/40 轮出现了不同）→ 逐发抽，不是抽一个数复制三份
+  OK   落叶刃出手
+  OK   落叶刃放出 2 发（实得 2 发）
+  OK   两发左右各偏 8°（实测 -8.0, 8.0°）= 表里 16° 的一半对称｜瞄准 90° (0.0, 1.0)，各发绝对角 82°, 98°
+  OK   两发都带眩晕（木系配控制：那招要的是打断，不是叠 DoT）
+  OK   控制招的冷却比弹幕招短：6.5 / 7.0
+--- 击退：按招覆盖全局 enemy.knockback_px ---
+  OK   两招土系各带自己的击退距离（46 / 78 px）
+  OK   落石放出去了
+  OK   落石把 46px 原样传了下去（实得 46）
+  OK   靶子确实被推到正下方 46px 外（实到 (4128.0, 8302.081)）
+  OK   落石顺手挂上眩晕（实得 ["stun"]）
+  OK   地裂放出去了
+  OK   同一套代码，地裂推得更远（78px）
+  OK   冰爆放出去了
+  OK   冰爆照样打得到它（击退没把命中也一起关掉）
+  OK   没写 knockback_px 的招一格都不推（实得 0）
+--- 治疗 / 吸血：圣光十字当场回一口，嗜血让每次出手都回血 ---
+  OK   圣光十字是一次性治疗（回 34 血，表里没有时长这一键）
+  OK   嗜血是一层有时限的 25% 吸血
+  OK   圣光十字放出去了
+  OK   1 级回 34 血（HP 33 → 67）
+  OK   只剩 5 点血时再放一次
+  OK   过量治疗夹满在 110 而不是溢出（heal() 那一份实现负责夹）
+  OK   满级圣光十字放出去了
+  OK   满级回 68 血（1 级 34，HP 1 → 69）：成长读的是 progression.heal_per_level
+  OK   嗜血放出去了
+  OK   身上那层嗜血读出 25%（实得 25%）
+  OK   打出 40 伤害回 10 血（HP 1 → 11，40 × 25%）
+  OK   范围技那条出口也回血（HP 1 → 7，命中 1 次）
+  OK   技能弹道发出去了
+  OK   这一发认得射手，命中才回得了血
+  OK   身上没嗜血这层 → 打出 400 伤害一格都不回
+--- 增益：狂战面具拿增伤换承伤，疾风羽只改腿 ---
+  OK   面具是「增伤 + 负减伤」一对：出手 +40%，承伤 ×1.15
+  OK   疾风羽表里只有加速：伤害 / 治疗 / 吸血 / 状态一键都没写
+  OK   全表第一招 auto_cast=false（跑与不停归玩家判断）
+  OK   面具戴上了
+  OK   出手乘数读出 ×1.40（实得 ×1.40）
+  OK   代价在同一层里：承伤 ×1.15（实得 ×1.15）
+  OK   同样 40 伤：裸着掉 40，戴面具掉 46（先 ×1.15 再扣防御 0）
+  OK   技能那条出口按 ×1.40 放大：12 发全在 22..29 这一档，一格都没落回原档（≤21）（实得 22..28）
+  OK   普攻那条出口同样吃这层增益（100 基础 → 140，与技能同一个乘数）
+  OK   疾风羽放出去了
+  OK   移速乘数读出 ×1.50（实得 ×1.50）
+  OK   两层增益同时挂在身上，互不覆盖（加速没把增伤挤掉）
+  OK   4 秒后羽毛自己掉了，面具还在（同一份表，两条独立倒数）
+  OK   面具也到点摘掉，两个乘数一起回 ×1
+  OK   auto_cast=false：残血 + 空冷却喂满 2 秒，疾风羽一次都没自己开
+  OK   同一时刻同一批条件下，圣光十字自己开了（身上「无状态」，HP 35）
+--- 中毒 / 流血：蛇咬单体挂流血，孢子雾群体挂中毒且要两个人才自动放 ---
+  OK   两招各带一条新状态（蛇咬→bleed / 孢子雾→poison）
+  OK   孢子雾的 auto_cast_targets_min 真的读到了 2（没落回 defaults 的 1）
+  OK   蛇咬一格都不推：把人推开等于把他刚撕开的伤口合上
+  OK   蛇咬是全池冷却最短的一招（4.5s，次短的是别人）
+  OK   孢子雾是全池最静的一招（噪音 15，压在疾风羽 20 之下）
+  OK   蛇咬自带一份弹道表，贴图在位
+  OK   蛇咬的弹道命中了正面目标（实得 1 次）
+  OK   这一口把流血挂上了（实得 ["bleed"]）
+  OK   没有溅射：蛇咬一次只咬一个人（实得 0 次）
+  OK   半径内只有一个人 → 自动释放不开火（这一招等的是一圈人）
+  OK   凑到两个人（本来 0 个）→ 门槛开
+  OK   手动抢放不受门槛限制
+  OK   雾里两个人各挨了一下（实得 1 / 1 次）
+  OK   这一下把中毒挂到了每个人身上（实得 ["poison"] / ["poison"]）
+  OK   人撤空 → 门槛又关上（证明上面靠的是人数不是运气）
+--- G 段：魔法书拾取（学招 + 书消失）---
+  OK   踩上魔法书就学会一招（实得 { "gear_guard": 1 }）
+  OK   魔法书不是资源：resource_id 留空，不会被带进仓库
+  OK   书读完了就从场上消失（不会反复重掷）
+--- 负对照：skills.enabled=false ---
+  OK   开关开着时先放掉一发，留下冷却读数
+  OK   刚放完确实有冷却（9.00s）
+  OK   关开关后 can_cast=false
+  OK   关开关后 cast 放不出去
+  OK   关开关后 tick 里一次自动释放都没有（多 0 次）
+  OK   关开关后噪音表纹丝不动
+  OK   关开关后连冷却都不推进
+  OK   重新打开开关就又能放了
+--- F 段：撤离才永久 + 存档 round-trip ---
+  OK   场上这名角色有名册身份（uid=1）
+  OK   开局：名册里这个人一招不会
+  OK   局内学会 frost_nova
+  OK   这局没学新东西 → 名册里已有的技能原样保留（实得 { "ember_shot": 2 }）
+  OK   撤离成功 → 局内学的招进名册（实得 { "frost_nova": 3, "ember_shot": 1 }）
+  OK   阵亡的角色一个字节都不写（死了就是白学）
+  OK   _sanitize_skills 丢掉技能表里已删的 id（实得 { "frost_nova": 1, "ember_shot": 5 }）
+  OK   越界等级钳到 max_level（实得 5）
+  OK   读档清洗同样钳等级、删死 id（实得 { "frost_nova": 5 }）
+  OK   存盘 → 读档一轮技能表不变（{ "frost_nova": 1, "ember_shot": 5 } → { "ember_shot": 5, "frost_nova": 1 }）
+
+=== 共 201 项断言，失败 0 项 ===
+[probe_skills] 通过 201 / 201
+
+WARNING: [Status] skills.statuses 里没有 "no_such_status" 这一条 —— 同类缺失只警告这一次
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] apply (res://Scripts/combat/unit_status.gd:49)
+       [1] _b_status (res://Dev/probe_skills.gd:379)
+       [2] _ready (res://Dev/probe_skills.gd:148)
+       [3] _frames (res://Dev/probe_skills.gd:78)
+WARNING: [Skill] 想学一个不存在的技能：no_such_skill
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] learn (res://Scripts/combat/skill_system.gd:126)
+       [1] _c_learn (res://Dev/probe_skills.gd:402)
+       [2] _ready (res://Dev/probe_skills.gd:149)
+       [3] _frames (res://Dev/probe_skills.gd:78)

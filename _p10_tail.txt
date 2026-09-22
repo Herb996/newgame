@@ -1,0 +1,80 @@
+  OK   两层增益同时挂在身上，互不覆盖（加速没把增伤挤掉）
+  OK   4 秒后羽毛自己掉了，面具还在（同一份表，两条独立倒数）
+  OK   面具也到点摘掉，两个乘数一起回 ×1
+  OK   auto_cast=false：残血 + 空冷却喂满 2 秒，疾风羽一次都没自己开
+  OK   同一时刻同一批条件下，圣光十字自己开了（身上「无状态」，HP 35）
+--- G 段：魔法书拾取（学招 + 书消失）---
+  OK   踩上魔法书就学会一招（实得 { "cinder_sparks": 1 }）
+  OK   魔法书不是资源：resource_id 留空，不会被带进仓库
+  OK   书读完了就从场上消失（不会反复重掷）
+--- 负对照：skills.enabled=false ---
+  OK   开关开着时先放掉一发，留下冷却读数
+  OK   刚放完确实有冷却（9.00s）
+  OK   关开关后 can_cast=false
+  OK   关开关后 cast 放不出去
+  OK   关开关后 tick 里一次自动释放都没有（多 0 次）
+  OK   关开关后噪音表纹丝不动
+  OK   关开关后连冷却都不推进
+  OK   重新打开开关就又能放了
+--- F 段：撤离才永久 + 存档 round-trip ---
+  OK   场上这名角色有名册身份（uid=1）
+  OK   开局：名册里这个人一招不会
+  OK   局内学会 frost_nova
+  OK   这局没学新东西 → 名册里已有的技能原样保留（实得 { "ember_shot": 2 }）
+  OK   撤离成功 → 局内学的招进名册（实得 { "frost_nova": 3, "ember_shot": 1 }）
+  OK   阵亡的角色一个字节都不写（死了就是白学）
+  OK   _sanitize_skills 丢掉技能表里已删的 id（实得 { "frost_nova": 1, "ember_shot": 5 }）
+  OK   越界等级钳到 max_level（实得 5）
+  OK   读档清洗同样钳等级、删死 id（实得 { "frost_nova": 5 }）
+  OK   存盘 → 读档一轮技能表不变（{ "frost_nova": 1, "ember_shot": 5 } → { "ember_shot": 5, "frost_nova": 1 }）
+
+=== 共 163 项断言，失败 5 项 ===
+  !! 一次出手放出 3 发（实得 0 发）
+  !! 40 轮出手每轮都放出 3 发（实得 40 轮 / 0 发）
+  !! 同一轮里三发可以打出不同数字（0/40 轮出现了不同）→ 逐发抽，不是抽一个数复制三份
+  !! 落叶刃放出 2 发（实得 0 发）
+  !! 技能那条出口按 ×1.40 放大（面板 18.0 → 实打 25）
+[probe_skills] 通过 158 / 163
+
+WARNING: [Config] 缺少配置项 player.camera.return_key，使用默认值：-1
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] get_value (res://Scripts/config_loader.gd:93)
+       [1] _a_table (res://Dev/probe_skills.gd:173)
+       [2] _ready (res://Dev/probe_skills.gd:142)
+       [3] _frames (res://Dev/probe_skills.gd:73)
+WARNING: [Config] 缺少配置项 run.survival.eat_key，使用默认值：-1
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] get_value (res://Scripts/config_loader.gd:93)
+       [1] _a_table (res://Dev/probe_skills.gd:173)
+       [2] _ready (res://Dev/probe_skills.gd:142)
+       [3] _frames (res://Dev/probe_skills.gd:73)
+WARNING: [Config] 缺少配置项 run.base.custom_editor.toggle_key，使用默认值：-1
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] get_value (res://Scripts/config_loader.gd:93)
+       [1] _a_table (res://Dev/probe_skills.gd:173)
+       [2] _ready (res://Dev/probe_skills.gd:142)
+       [3] _frames (res://Dev/probe_skills.gd:73)
+WARNING: [Config] 缺少配置项 ui.debug.stat_panel_key，使用默认值：-1
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] get_value (res://Scripts/config_loader.gd:93)
+       [1] _a_table (res://Dev/probe_skills.gd:173)
+       [2] _ready (res://Dev/probe_skills.gd:142)
+       [3] _frames (res://Dev/probe_skills.gd:73)
+WARNING: [Status] skills.statuses 里没有 "no_such_status" 这一条 —— 同类缺失只警告这一次
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] apply (res://Scripts/combat/unit_status.gd:49)
+       [1] _b_status (res://Dev/probe_skills.gd:345)
+       [2] _ready (res://Dev/probe_skills.gd:143)
+       [3] _frames (res://Dev/probe_skills.gd:73)
+WARNING: [Skill] 想学一个不存在的技能：no_such_skill
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] learn (res://Scripts/combat/skill_system.gd:126)
+       [1] _c_learn (res://Dev/probe_skills.gd:368)
+       [2] _ready (res://Dev/probe_skills.gd:144)
+       [3] _frames (res://Dev/probe_skills.gd:73)

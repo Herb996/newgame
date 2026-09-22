@@ -53,6 +53,8 @@ var _bld_host: Node2D = null           # 额外建筑节点的容器（base_syst
 var _bld_spawn: Callable = Callable()  # (id, cell) -> Node2D：怎么造一栋楼由 base_system 说了算
 var _bld_nodes: Dictionary = {}        # "x,y" -> Building 节点（当前画面上的那批）
 var _footprint := 4                    # 建筑占地边长（config base.building_cells）
+var _factory_root: Node2D = null       # 出厂 12 栋的容器（base_system 提供），清空时整组隐掉
+var _factory_disabled_orig := false    # 进编辑那一刻的 factory_disabled：取消时回滚到它
 
 var _layer: int = Layer.GROUND
 var _value: int = 0            # 地面素材 id / 水面恒为 1 / 摆件 id / 建筑 = 调色板下标
@@ -77,6 +79,8 @@ func begin(opts: Dictionary) -> void:
 	_orig_blocked = _blocked.duplicate()
 	_bld_host = opts.get("buildings_host") as Node2D
 	_bld_spawn = opts.get("spawn_building", Callable()) as Callable
+	_factory_root = opts.get("factory_root") as Node2D
+	_factory_disabled_orig = _custom.get("factory_disabled", false)
 	_footprint = int(Config.get_value("base.building_cells", 4))
 	_bld_nodes.clear()
 	_undo.clear()
@@ -179,9 +183,14 @@ func clear_all() -> void:
 			_sync_cell(c)
 		total += changed.size()
 	_layer = prev
-	if total > 0:
-		print("[BaseEdit] 全部清空：擦掉 %d 格（可 ESC 撤销）" % total)
-		changed.emit(_undo.size())
+	# 出厂楼也一并清掉：置开关 + 立刻把整组出厂节点隐掉（不用等存档重生）。
+	# 这是「狠清空」的核心 —— 用户要的就是连传送门/仓库一起没。
+	if not _custom.get("factory_disabled", false):
+		_custom["factory_disabled"] = true
+		if _factory_root != null and is_instance_valid(_factory_root):
+			_factory_root.visible = false
+		print("[BaseEdit] 全部清空：同时禁用出厂楼（factory_disabled=true，视图已隐掉）")
+	changed.emit(_undo.size())
 
 
 ## 本次改动了多少格（面板上「已改动 N 格」用）
@@ -474,6 +483,12 @@ func _rebuild_buildings() -> void:
 
 ## 取消：按 diff 把每个被改过的格子写回旧值，再重画那一格（含四邻）。
 func _rollback() -> void:
+	# 出厂楼开关也要回滚：clear_all 置了 factory_disabled=true 但玩家反悔按了 ESC，
+	# 必须把整组出厂节点显回来、开关复位 —— 这一步不能依赖 _undo（可能一格没动过）。
+	# ⚠ 开关与显隐是反义：factory_disabled=false 表示「正常显示出厂楼」→ visible=true。
+	_custom["factory_disabled"] = _factory_disabled_orig
+	if _factory_root != null and is_instance_valid(_factory_root):
+		_factory_root.visible = not _factory_disabled_orig
 	if _undo.is_empty():
 		return
 	for id in _undo.keys():

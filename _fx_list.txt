@@ -1,0 +1,30 @@
+n=27
+slash_sword |  | frames=14 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+thrust_spear |  | frames=12 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+cast_staff |  | frames=14 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+spark_arrow |  | frames=14 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+spark_hit |  | frames=14 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+slash_claw |  | frames=13 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+cast_hex |  | frames=13 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+puff_dust |  | frames=14 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+slash_bite |  | frames=11 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+spit_web |  | frames=8 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+slam_ring |  | frames=7 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+burst_charge |  | frames=12 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+slash_rend |  | frames=11 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+spike_bone |  | frames=9 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+bash_rock |  | frames=8 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+slash_shadow |  | frames=12 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+thrust_harpoon |  | frames=9 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+splash_bomb |  | frames=7 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+sweep_fin |  | frames=12 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+slash_sabre |  | frames=10 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+shred_bolt |  | frames=8 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+slam_paw |  | frames=12 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+slash_tail |  | frames=10 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+hit_sword |  | frames=9 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+hit_pierce |  | frames=8 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+hit_holy |  | frames=7 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+hit_arrow |  | frames=14 | _comment,additive,fade_out,fps,frames,modulate,offset_px,rot_degrees,scale,texture,z_index
+grimoire: {"_comment": "魔法书：局内掉落的拾取物，**不是资源，绝不注册进顶层 resources**。两条理由：① meta_progression._prune_unknown_resources() 会把仓库里 config 不认识的资源键直接删掉；② resources 同时是背包格子的合法键集合，书不该占格子、更不该被带进基地仓库。走近自动拾取（与资源点同一套归属判定：范围内最近的活人）。拾取瞬间**当场学会**，但只在撤离成功时才写进名册（用户 2026-09-21 定：「局内掉落，撤离才永久」）—— 本局死亡/超时则这份学习记录跟着本局一起作废，和身上的 loot 同罚。sprite 缺失时 LootNode 会退回一圈柔光（会警告一次），素材在任务 #56 里补。", "resource_id": "grimoire", "name": "魔法书", "sprite": "res://Assets/Art/Sprites/Items/item_grimoire.png", "color": "#c8a2ff", "icon_px": 40.0, "nodes_per_run": 2, "min_distance_from_spawn_cells": 10, "roll_mode": "random_prefer_unlearned", "level_up_on_repeat": true, "persist_on": "extracted"}
+drop_weights: {"frost_nova": 1, "ember_shot": 1, "gear_guard": 1, "falling_rocks": 1, "quake_split": 1, "holy_cross": 1, "blood_hunger": 1, "battle_madness": 1, "swift_feather": 1, "cinder_sparks": 1, "leaf_blade": 1, "snake_bite": 1, "spore_cloud": 1, "ripple_cold": 1, "vine_grasp": 1, "ice_shard": 1, "numb_dart": 1, "fault_mark": 1}

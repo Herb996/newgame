@@ -38,6 +38,13 @@ var tile_size: int = 16
 ## （见 enemy.gd::alert_from_attacker）——**不能**用命中点，那就在敌人脚下。
 ## 由 setup() 从当时的 global_position 抓取，所以调用方必须先摆位再 setup。
 var origin := Vector2.ZERO
+## 射手本体（玩家）。命中时要按它身上的吸血层数回血，所以这一发得知道自己是谁打的。
+## 走独立字段而不是 setup() 的参数：普攻那一份调用与技能那一份都要顺手带上，
+## 参数位一挤就得改两处签名。**箭落地时人可能已经没了**（换局/死亡回收），
+## 所以用之前一律 is_instance_valid 过一遍。
+## 只拿它做"回血"这一件事：伤害仍然在出膛那帧算好塞进 damage —— 见 player.gd
+## 那句"不在命中帧回头找射手要武器参数"，这条规矩没被这个字段推翻。
+var source: Node = null
 
 var _travelled := 0.0
 var _done := false
@@ -138,6 +145,10 @@ func _physics_process(delta: float) -> void:
 ## 直击与溅射共用这一句，所以"烧到的人一定被灼烧"不会因为走了第二条路径而漏掉。
 func _strike(t: Node) -> void:
 	t.take_damage(damage)
+	# 吸血：这一发打出去多少，射手身上那层嗜血就按成数回多少（口径与范围技一致）。
+	# 与下面几条同一个约定 —— 只认方法名，射手没这个方法就是不回血，不在此处特判谁。
+	if source != null and is_instance_valid(source) and source.has_method("apply_lifesteal"):
+		source.call("apply_lifesteal", damage)
 	# 状态施加只认方法名：敌人/动物各自实现 apply_status()，没实现的就是不吃状态，
 	# 弹道这边不需要知道谁是谁（与 player.gd 范围技那条路同一个约定）。
 	if _status_id != "" and t.has_method("apply_status"):
