@@ -48,5 +48,35 @@ func setup(root: Node2D, map_data: Dictionary) -> void:
 		root.add_child(node)
 		node.setup(pool[randi() % pool.size()])
 
-	print("[Loot] 资源点生成完成：%d 个（密度 %.0f%%，%d 种资源按稀有度加权）" % [
-		count, density * 100.0, kind_count])
+	var spawn_px: Vector2 = map_data.get("spawn", Vector2.ZERO)
+	var books := _spawn_grimoires(root, candidates, count, spawn_px, tile_size)
+
+	print("[Loot] 资源点生成完成：%d 个（密度 %.0f%%，%d 种资源按稀有度加权）+ 魔法书 %d 本" % [
+		count, density * 100.0, kind_count, books])
+
+
+## 魔法书掉在**没被资源点用掉**的格子上（candidates 已经洗过牌，所以位置天然随机）。
+## 数量、离出生点的最小距离都在 skills.grimoire 里；nodes_per_run<=0 就是这局没有书。
+## 刻意离出生点远：出门两步就捡到书 = 技能白送，走一段路才有取舍。
+func _spawn_grimoires(root: Node2D, candidates: Array, used: int, spawn_px: Vector2,
+		tile_size: int) -> int:
+	var want := int(Config.get_value("skills.grimoire.nodes_per_run", 0))
+	if want <= 0:
+		return 0
+	var min_cells := float(Config.get_value("skills.grimoire.min_distance_from_spawn_cells", 0.0))
+	var spawn_cell := spawn_px / float(tile_size)
+	var made := 0
+	for i in range(used, candidates.size()):
+		if made >= want:
+			break
+		var c: Vector2i = candidates[i]
+		if Vector2(float(c.x - int(spawn_cell.x)), float(c.y - int(spawn_cell.y))).length() < min_cells:
+			continue
+		var node := NODE_SCENE.instantiate()
+		node.position = Vector2(c) * tile_size + Vector2(tile_size * 0.5, tile_size * 0.5)
+		root.add_child(node)
+		node.setup_grimoire()
+		made += 1
+	if made < want:
+		push_warning("[Loot] 魔法书只放下 %d/%d 本（可达空格不够远或不够多）" % [made, want])
+	return made

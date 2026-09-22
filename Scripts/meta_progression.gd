@@ -191,6 +191,20 @@ func set_building_cell(id: String, cell: Vector2i) -> void:
 	save_game()
 
 
+## 玩家改完基地地面/水面/摆件后的落盘口子（地面编辑器点「保存」走这里）。
+## 进来先 sanitize —— 面板那边画的就是这份数据，但存档要经得起「换素材表」和
+## 「手改 JSON」两件事：素材数变少了得把越界 id 夹回最后一款，而不是留个黑洞。
+func set_base_custom(c: Dictionary) -> void:
+	base_custom = BaseCustomization.sanitize(c)
+	base_custom["size"] = int(Config.get_value("base.map_size", 64))
+	save_game()
+	print("[Meta] 基地自定义已保存（地面 %d / 水 %d / 摆件 %d / 建筑 %d 栋）" % [
+			(base_custom.get("ground", {}) as Dictionary).size(),
+			(base_custom.get("water", {}) as Dictionary).size(),
+			(base_custom.get("props", {}) as Dictionary).size(),
+			(base_custom.get("buildings", {}) as Dictionary).size()])
+
+
 # ------------------------------------------------------------
 # 局内加成注入
 # ------------------------------------------------------------
@@ -311,6 +325,7 @@ func _sanitize_roster(raw) -> Array:
 				"level": clampi(int(e.get("level", 0)), 0, max_level()),
 				"xp": maxf(0.0, float(e.get("xp", 0.0))),
 				"traits": _sanitize_traits(e.get("traits", {})),
+				"skills": _sanitize_skills(e.get("skills", {})),
 			})
 	# uid 撞号会让「谁是谁」彻底乱掉：重新分配一遍
 	var uid := 1
@@ -502,6 +517,73 @@ func _roll_trait(u: Dictionary) -> void:
 ## 取某人的特性层数表（拷贝，防止调用方改到存档内部字典）
 func traits_of(uid: int) -> Dictionary:
 	return Dictionary(unit_by_uid(uid).get("traits", {})).duplicate()
+
+
+# ------------------------------------------------------------
+# 技能（config skills.json，2026-09-21 起）
+#
+# 存在 roster 条目里（和 level/xp/traits 同级），这样 save_game / SaveSlots
+# 那套按位置传参的写档、以及 load_save 的两个分支，全都不用改签名。
+#
+# 「局内掉落、撤离才永久」（用户 2026-09-21 定）：局内学到的招只活在角色的
+# SkillSystem 里，撤离成功才由 bank_skills_from_survivors() 抄回名册；
+# 失败/阵亡那条路一个字节都不写 —— 死了就是白学，不需要额外的回滚代码。
+# ------------------------------------------------------------
+
+## 取某人已学会的技能（id -> 等级，拷贝）
+func skills_of(uid: int) -> Dictionary:
+	return Dictionary(unit_by_uid(uid).get("skills", {})).duplicate()
+
+
+## 覆盖某人整张技能表并落盘（撤离结算走这里；单独 set 一级也走这里）
+func set_skills(uid: int, levels: Dictionary) -> void:
+	var u := unit_by_uid(uid)
+	if u.is_empty():
+		return
+	u["skills"] = _sanitize_skills(levels)
+	save_game()
+
+
+## 清洗：技能表里已经删掉的 id 一律丢掉，等级钳进 [1, max_level]。
+## 留个死 id 在档里比丢一条更糟 —— 技能栏会显示一个按不动的空槽。
+func _sanitize_skills(raw) -> Dictionary:
+	var out := {}
+	if not (raw is Dictionary):
+		return out
+	var defs := SkillSystem.all_defs()
+	var max_lv := int(Config.get_value("skills.progression.max_level", 5))
+	for id in (raw as Dictionary).keys():
+		var key := str(id)
+		if not defs.has(key):
+			continue
+		var lv := int((raw as Dictionary)[id])
+		if lv >= 1:
+			out[key] = clampi(lv, 1, max_lv)
+	return out
+
+
+## 撤离成功：把**存活**队员身上这份技能表抄回名册（和 grant_xp_to_survivors 同一批人、
+## 同一个判据 —— 阵亡的已经除名，这里再跳过一次更保险）
+func bank_skills_from_survivors() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	for p in tree.get_nodes_in_group("player"):
+		if not is_instance_valid(p):
+			continue
+		var uid := 0
+		if "roster_uid" in p:
+			uid = int(p.get("roster_uid"))
+		if uid == 0:
+			continue      # 无名册身份的临时角色（无头回归造的）没有可存的地方
+		if p.has_method("is_dead") and bool(p.call("is_dead")):
+			continue
+		if not p.has_method("skills"):
+			continue
+		var ss := p.call("skills") as SkillSystem
+		if ss == null or ss.known.is_empty():
+			continue      # 这局一招没学：别把名册里原有的技能清空
+		set_skills(uid, ss.known)
 
 
 ## 升到下一级所需经验 = round(base × growth^当前等级)

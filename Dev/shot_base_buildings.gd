@@ -53,8 +53,13 @@ func _ready() -> void:
 	# 运行时清单：8 栋是否都实例化了、贴图是否真的加载（空 texture = 缺图）
 	var n := 0
 	for b in get_tree().get_nodes_in_group("buildings"):
-		var body: Sprite2D = b.get_node_or_null("Body") as Sprite2D
-		var tex := body.texture.resource_path.get_file() if body != null and body.texture != null else "(null!)"
+		# ⚠ 别直接读 Body.texture：动画建筑（quarry/portal）走 AnimBody（序列帧），
+		# Body 上是空 —— 直接读会全部误报 "(null!)"。统一走 get_body_texture()。
+		var t: Texture2D = b.call("get_body_texture") if b.has_method("get_body_texture") else null
+		var tex := "(null!)"
+		if t != null:
+			var at := t as AtlasTexture
+			tex = (at.atlas.resource_path.get_file() if at != null else t.resource_path.get_file())
 		print("[BaseShot] 建筑 %-10s %-8s cell=%s tex=%s"
 				% [str(b.get("building_id")), str(b.get("display_name")),
 				   str(b.get("cell")), tex])

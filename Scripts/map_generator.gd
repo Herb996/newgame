@@ -210,6 +210,20 @@ static func _biomes() -> Array:
 		_biome_cache = _load_biomes()
 	return _biome_cache
 
+
+## 丢弃群系缓存，下次读取时从 Config 重新组装。
+##
+## 为什么需要它：基地自定义地面可以选**超出局内那 4 个群系**的地形素材（见
+## base_customization.gd 头注释），而本文件里所有图集布局（biome_count / atlas_cols /
+## _build_tileset / blob_index）都是从 `_biomes()` 派生的 —— 想让基地那一份「扩充素材表」
+## 在渲染时生效，唯一干净的做法就是把它临时写成 Config 覆盖层再清一次缓存；
+## 用完同样要清一次，让局内地图重新读回出厂那 4 个群系。
+## ⚠ 调用方必须保证 设 → 用 → 清 三步在同一个同步函数体里：这个缓存是**进程级**的，
+##   中间插进别的代码（或 await）就会把基地素材泄漏到局内地图上。
+static func clear_biome_cache() -> void:
+	_biome_cache = []
+
+
 static func _load_biomes() -> Array:
 	var raw = Config.get_value("map.biomes", null)
 	if raw == null or not (raw is Array) or raw.is_empty():

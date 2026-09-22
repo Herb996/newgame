@@ -318,11 +318,12 @@ func take_damage(amount: int) -> void:
 		_die()
 
 
-## 被击退：与 enemy.gd 同接口
-func apply_knockback(impulse: Vector2) -> void:
+## 被击退：与 enemy.gd 同接口（dist_px<0 = 用全局那份，技能段写了就按技能的）
+func apply_knockback(impulse: Vector2, dist_px: float = -1.0) -> void:
 	if impulse.length() < 1.0:
 		return
-	global_position += impulse.normalized() * float(Config.get_value("enemy.knockback_px", 32.0))
+	var d := dist_px if dist_px > 0.0 else float(Config.get_value("enemy.knockback_px", 32.0))
+	global_position += impulse.normalized() * d
 
 
 func _die() -> void:

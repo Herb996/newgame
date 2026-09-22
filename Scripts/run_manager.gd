@@ -132,6 +132,9 @@ func _end_run(result: String) -> void:
 		# 发经验只认**活着的名册成员**：阵亡的已经在 player.on_death() 里除名了，
 		# 这里再按 is_dead() 兜一道；没有名册身份的临时角色（命令行 / 无头回归）跳过。
 		Meta.grant_xp_to_survivors()
+		# 技能同一条规矩：撤离成功才把局内学会的招抄回名册（用户 2026-09-21 定）。
+		# died / timeout 不会走到这里，所以「死了白学」不需要任何回滚代码。
+		Meta.bank_skills_from_survivors()
 	# died / timeout：banked 保持为空 —— 全员身上的东西一件都带不走
 	run_ended.emit(result, banked)
 	print("[Run] 一局结束：%s | 带回资源 %s | 丢弃资源 %s" % [

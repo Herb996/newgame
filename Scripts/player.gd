@@ -95,6 +95,14 @@ var traits: Dictionary = {}
 # 注入进来，补上物资即清空 → 扣减是**当前状态**的函数，不进存档。
 # 临时角色 / 无 SurvivalSystem 的场合为空 → 一切扣减归零。
 var supply_penalties: Dictionary = {}
+# 状态层（技能系统 2026-09-21）：冻结/灼烧这类有时长的效果都进这一个容器，
+# 定义全在 config 的 skills.statuses。我方一般只会吃到增益（齿轮护盾的减伤），
+# 但容器不分敌我 —— 以后要有"敌人把玩家冻住"，这里一行都不用改。
+var _statuses := UnitStatus.new()
+# 技能控制器（一个角色一份）：会哪几招 + 各自的冷却 + 自动释放的判断都关在它里面
+# （见 Scripts/combat/skill_system.gd）。known 这张表在撤离成功之前**只是暂记**，
+# 写盘由 Meta 负责；本局死了就跟着人一起没了（用户定：局内掉落、撤离才永久）。
+var _skills := SkillSystem.new()
 # --- 背包（2026-09-19 起「每人一份」，之前是 RunManager 里全队共用的一本账）---
 # 本角色身上携带的资源：{"wood": 20, "food": 3}。规则不变 —— **每种占 1 格**、
 # 已有种类无限叠加，种类数上限见 backpack_capacity()。
@@ -202,6 +210,14 @@ func _ready() -> void:
 	_animator.load_from_config(sprite_cfg, _view_cfg_for(sprite_cfg))
 	facing = Vector2(0, 1)   # 出生默认朝下方（标准俯视）
 	speed = _compute_speed()
+	# 灼烧这类持续伤害在我方身上走「非战斗来源」那条通道：不进硬直、不挂无敌帧。
+	# 走 take_damage 的话每 0.5 秒一跳就把人钉在硬直里，还顺带免掉了敌人的真伤。
+	# 血量下限用默认 0 —— 灼烧**能**把人烧死，它和饥饿不是一回事。
+	_statuses.dot_handler = Callable(self, "apply_direct_damage")
+	# 技能控制器：认人（施法者就是我自己）+ 清冷却。会哪几招由 main.gd 在
+	# add_child 前后用 set_known() 注入（与 traits 同一批），这里不主动读存档。
+	_skills.setup(self)
+	_skills.reset()
 	var select_radius := float(Config.get_value("player.select_radius_px", 16.0))
 	(_select_area.get_node("CollisionShape2D").shape as CircleShape2D).radius = select_radius
 	# 选中标记用**暖色**：头顶那颗等级光点是蓝白系，两个蓝色悬浮物挤在一起
@@ -335,6 +351,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode == dodge_key:
 			push_input(&"dodge")
+			return
+		# 技能热键（默认 1~6，码值见 config skills.list[*].key）：**抢在自动之前主动放一招**。
+		# 不预判"会不会放得出去"：没学过 / 还在冷却，cast() 自己返回 false，
+		# 在这里再算一遍等于把技能规则抄第二份（改数值时必然对不上）。
+		var skill_id := _skills.skill_at_keycode(int(event.physical_keycode))
+		if skill_id != "" and _skills.cast(skill_id):
+			get_viewport().set_input_as_handled()
 			return
 		# ESC：先用来「退出待点选模式」（指定攻击 / 巡逻设点），
 		# 没有待点选状态时才放行给 Main（那边才轮到退出游戏）。
@@ -979,6 +1002,12 @@ func _init_combat() -> void:
 
 
 func _tick_combat_timers(delta: float) -> void:
+	# 状态层（冻结/灼烧/护盾）先走一句：时长倒数和 DoT 结算都在容器里。
+	# 我方的 DoT 走 apply_direct_damage 而不是 take_damage —— 见下面 dot_handler 那行。
+	_statuses.tick(delta, self)
+	# 技能：冷却倒数 + 自动释放（它内部按 skills.auto_scan_seconds 自己节流）。
+	# 放在这里而不是另开一个 _process：普攻/闪避的计时都在这一句里，读起来是一体的。
+	_skills.tick(delta)
 	if _invincible_timer > 0.0:
 		_invincible_timer -= delta
 	if _dodge_cooldown > 0.0:
@@ -1130,6 +1159,38 @@ func fire_projectile() -> bool:
 	return true
 
 
+## 发射一枚**技能**弹道（SkillSystem 调用）。与 fire_projectile() 分两份写而不是合并：
+## 普攻那一份要按武器表取参数、还要叠 projectile_speed 特性与物资短缺扣减；技能带的是
+## 自己那张表（skills.list.<id>.projectile），合并的结果是"给弓加特性"会意外改掉余烬弹。
+## 唯一共用的是墙表与格宽 —— 那两个是地图级数据，只有角色自己拿得到，所以由这里代劳。
+func fire_skill_projectile(cfg: Dictionary, dir: Vector2, damage: int) -> bool:
+	var parent := get_parent()
+	if parent == null:
+		return false
+	var p := PROJECTILE.new()
+	p.name = "SkillProjectile"
+	parent.add_child(p)
+	p.global_position = global_position + dir * float(cfg.get("muzzle_offset_px", 22.0))
+	p.setup(cfg, dir, damage, _walls, _tile_size)
+	return true
+
+
+## 挂一条增益（齿轮护盾那类）。技能侧只给"改哪个乘数、改多少、持续多久"，
+## 倒数与承伤计算全在 UnitStatus 里 —— 与敌方减益共用一条管线，不另开一套计时。
+func apply_buff(id: String, mods: Dictionary, duration: float) -> bool:
+	return _statuses.apply_modifier(id, mods, duration)
+
+
+## 学一招 / 升一级（魔法书拾取调用）。返回原样的结果字典，让调用方决定怎么向玩家交代。
+func learn_skill(id: String) -> Dictionary:
+	return _skills.learn(id)
+
+
+## 技能控制器（菜单栏技能栏、魔法书面板、探针都从这里读，不去翻角色的私有字段）。
+func skills() -> SkillSystem:
+	return _skills
+
+
 ## 是否是可受伤目标（敌人 / 中立生物）
 static func _is_damageable(node: Node) -> bool:
 	for g in DAMAGEABLE_GROUPS:
@@ -1142,10 +1203,13 @@ static func _is_damageable(node: Node) -> bool:
 func take_damage(amount: int, source_pos: Vector2 = Vector2.ZERO) -> bool:
 	if _dead or is_invincible():
 		return false
+	# 顺序：**先乘护盾、再扣固定防御**。反过来会让护盾只去削"已经被防御扣完的残值"，
+	# 同一层盾在铁皮角色身上几乎看不出效果，数值读起来自相矛盾。
+	var incoming := int(round(float(amount) * _statuses.damage_taken_mult()))
 	# 防御特性：入伤先扣固定减免，扣到 0 就是完全挡下（不掉血、不进硬直）
 	# 物资短缺会把净防御扣成负数 → 同样一击掉更多血（短缺本身不直接掉血）
 	var defense := trait_flat("defense") - supply_penalty("defense")
-	var mitigated := maxi(amount - int(defense), 0)
+	var mitigated := maxi(incoming - int(defense), 0)
 	if mitigated <= 0:
 		return false
 	hp = maxi(hp - mitigated, 0)
@@ -1391,7 +1455,9 @@ func follow_path() -> void:
 		velocity = Vector2.ZERO
 	else:
 		# 地形减速：雪原（biome.speed）与河水（river.slow）都落在这张表里。
-		velocity = dir.normalized() * speed * terrain_speed_at(my_cell)
+		# 状态乘数也走同一个出口：冻结 = 乘 0，于是"被冻住"在寻路这层不需要特判
+		# （冲刺/受击那些状态自己把 velocity 归零，本来就不经过这里）。
+		velocity = dir.normalized() * speed * terrain_speed_at(my_cell) * _statuses.speed_mult()
 	move_and_slide()
 
 	# 卡住检测：本想移动却几乎没挪动（被墙/实体挡住）→ 计数触发重算。

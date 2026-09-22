@@ -239,7 +239,7 @@
     },
     "buildings": [
       {
-        "_comment": "基地建筑表（2026-09-18 全量换上 Tiny Swords Blue Buildings 素材，现 12 栋；2026-09-21 随基地扩到 80×80 改成 **5 列 × 4 行 = 20 槽**：列 x∈{12,25,38,51,64}、行 y∈{21,33,45,57}，建筑间横向空 9 格、纵向空 8 格（屋顶上探 1.6 格不会压到上一行）。**⚠ 行距为什么是 12 不是 18**：16:9 窗口进基地的远景只框得住 **80×45 格**——camera_controller._refresh_zoom_limits 把 _zoom_lo 夹在「视口宽 ÷ 地图宽」= 0.375（再远就会露出地图外的黑边，所以宁可上下裁），画面纵向因此只有 y∈[17.5,62.5]。四行必须整条塞进这个带里：首行 21（屋顶顶到 19.4）、末行脚底 61。上一版行距 18 把首末行放在 11/65 → **上下各一整行在屏外**，「进基地一眼看全所有建筑」直接落空（main._enter_base 的 frame_world_rect 再怎么框都会被夹回来）。**建筑渲染全自动**：Building.gd 按贴图尺寸等比缩放到 4×4 格框（屋顶可向上探出 1.4 倍）、脚底对齐占地底边，贴图缺失时保底一块 id 配色方块不消失。cell = 占地**左上角**格、占 4×4；玩家重摆过的位置存在 Meta.base_layout 优先于这里的 cell（新增 id 不在存档里 → 直接用配置值；⚠ 这里涨版要同步涨 `base.layout_version`，否则老档会被自己那份旧网格的重摆位置钉住，看不到新构图）。hint 为空 = 纯装饰（点击只 push_warning 不会崩，main 的 match 有 default 分支）。**出击入口是 portal（2026-09-20 从 gate 换过来，gate 降为装饰），见 DESIGN §2.4**。**空槽预留（美术规格与生图 prompt 见 docs/BUILDING_ART_PROMPTS.md，图到位就照 quarry 那条照抄追加）**：[51,33] fountain 喷泉广场（传送门东侧）、[38,45] blacksmith 铁匠铺（传送门正南，装备修理/制作落点）、[64,45] cemetery 墓园（东南荒原侧，接「单位死亡永久」）、[12,57] treehouse 树屋营地（西南林沼）、[25,57] dragon_altar 龙形祭坛、[38,57] statue_pillar 雕像柱、[51,57] ruin_dome 圆顶残迹；[64,57] 留白。",
+        "_comment": "基地建筑表（2026-09-18 全量换上 Tiny Swords Blue Buildings 素材，现 12 栋；2026-09-21 随基地扩到 80×80 改成 **5 列 × 4 行 = 20 槽**：列 x∈{12,25,38,51,64}、行 y∈{21,33,45,57}，建筑间横向空 9 格、纵向空 8 格（屋顶上探 1.6 格不会压到上一行）。**⚠ 行距为什么是 12 不是 18**：16:9 窗口进基地的远景只框得住 **80×45 格**——camera_controller._refresh_zoom_limits 把 _zoom_lo 夹在「视口宽 ÷ 地图宽」= 0.375（再远就会露出地图外的黑边，所以宁可上下裁），画面纵向因此只有 y∈[17.5,62.5]。四行必须整条塞进这个带里：首行 21（屋顶顶到 19.4）、末行脚底 61。上一版行距 18 把首末行放在 11/65 → **上下各一整行在屏外**，「进基地一眼看全所有建筑」直接落空（main._enter_base 的 frame_world_rect 再怎么框都会被夹回来）。**建筑渲染全自动**：Building.gd 按贴图尺寸等比缩放到 4×4 格框（屋顶可向上探出 1.4 倍）、脚底对齐占地底边，贴图缺失时保底一块 id 配色方块不消失。cell = 占地**左上角**格、占 4×4；玩家重摆过的位置存在 Meta.base_layout 优先于这里的 cell（新增 id 不在存档里 → 直接用配置值；⚠ 这里涨版要同步涨 `base.layout_version`，否则老档会被自己那份旧网格的重摆位置钉住，看不到新构图）。hint 为空 = 纯装饰（点击只 push_warning 不会崩，main 的 match 有 default 分支）。**出击入口是 portal（2026-09-20 从 gate 换过来，gate 降为装饰），见 DESIGN §2.4**。**空槽预留（美术规格与生图 prompt 见 docs/BUILDING_ART_PROMPTS.md，图到位就照 quarry 那条照抄追加）**：[51,33] fountain 喷泉广场（传送门东侧）、[38,45] blacksmith 铁匠铺（传送门正南，装备修理/制作落点）、[64,45] cemetery 墓园（东南荒原侧，接「单位死亡永久」）、[12,57] treehouse 树屋营地（西南林沼）、[25,57] dragon_altar 龙形祭坛、[38,57] statue_pillar 雕像柱、[51,57] ruin_dome 圆顶残迹；[64,57] 留白。**动画建筑（2026-09-21）**：条目可选 anim_frames / anim_fps —— 给了就按「横排序列帧」切图循环播放（帧宽 = 整图宽 ÷ anim_frames、帧高 = 整图高），走 Building.gd 的 AnimBody（AnimatedSprite2D + 运行时 AtlasTexture，不拆图、不重新导入），没给就走 Body 静态贴图；缩放/脚踩对齐/标签定位动画与静态共用一套规则，所以换成序列帧不会变大变小。当前两栋：quarry 滚轮 8 帧 @8fps（blue_quarry_roll_sheet.png）、portal 漩涡 16 帧 @12fps（blue_portal_vortex_sheet.png）。",
         "id": "warehouse",
         "name": "仓库",
         "cell": [
@@ -347,7 +347,9 @@
         ],
         "hint": "",
         "h3d": 2.6,
-        "sprite": "res://Assets/Art/Sprites/Buildings/blue_quarry.png"
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_quarry_roll_sheet.png",
+        "anim_frames": 8,
+        "anim_fps": 8
       },
       {
         "id": "portal",
@@ -358,7 +360,9 @@
         ],
         "hint": "左键进入传送门 · 选择出击小队",
         "h3d": 3.4,
-        "sprite": "res://Assets/Art/Sprites/Buildings/blue_portal.png"
+        "sprite": "res://Assets/Art/Sprites/Buildings/blue_portal_vortex_sheet.png",
+        "anim_frames": 16,
+        "anim_fps": 12
       },
       {
         "id": "catapult",
@@ -371,6 +375,42 @@
         "h3d": 1.6,
         "sprite": "res://Assets/Art/Sprites/Buildings/blue_catapult.png"
       }
-    ]
+    ],
+    "ground_materials_note": "**基地地面素材表（2026-09-21 起玩家可自定义）**：每条 = 一款可刷的地面。**素材 = 一张 Tiny Swords 官方地形图 + 一个染色**，两者相乘得到最终外观，所以加素材不用新画图 —— 只要换 `tileset`（TS 目录下的 5 张配色图之一）或调 `tint` 就能开出雪原/沙漠/焦土这类新地面（tint 是逐通道乘数，>1 提亮、<1 压暗）。**id 就是存档里 ground 层存的那个值，已经用过的 id 绝不能改指别的外观**（老存档会整片变色），只能往后追加。id 0..3 与局内四个群系（草/荒/林/沼）保持同一套 name+tileset+tint，基地与局内观感一致；4 起才是基地专属。`swatch` 只用于编辑面板上的色卡方块，不参与渲染。技术细节见 Scripts/base_materials.gd 与 Scripts/base_customization.gd 头注释：渲染时这份表会被临时写成 Config 覆盖层喂给 MapGenerator 建图集，用完立刻还原（因为图集布局全部由群系数量推导）。",
+    "ground_materials": [
+      {"id": 0, "name": "草地", "tileset": "tilemap_color1.png", "tint": [1.0, 1.0, 1.0], "swatch": [0.30, 0.36, 0.18]},
+      {"id": 1, "name": "荒原", "tileset": "tilemap_color4.png", "tint": [1.02, 0.98, 0.94], "swatch": [0.33, 0.27, 0.18]},
+      {"id": 2, "name": "森林", "tileset": "tilemap_color3.png", "tint": [0.94, 1.0, 0.96], "swatch": [0.20, 0.28, 0.15]},
+      {"id": 3, "name": "沼泽", "tileset": "tilemap_color5.png", "tint": [1.35, 0.82, 0.42], "swatch": [0.72, 0.62, 0.30]},
+      {"id": 4, "name": "雪原", "tileset": "tilemap_color2.png", "tint": [1.25, 1.32, 1.45], "swatch": [0.86, 0.89, 0.95]},
+      {"id": 5, "name": "沙漠", "tileset": "tilemap_color4.png", "tint": [1.55, 1.32, 0.82], "swatch": [0.86, 0.72, 0.42]},
+      {"id": 6, "name": "焦土", "tileset": "tilemap_color5.png", "tint": [1.35, 0.55, 0.45], "swatch": [0.62, 0.30, 0.24]},
+      {"id": 7, "name": "黑曜岩", "tileset": "tilemap_color2.png", "tint": [0.62, 0.60, 0.80], "swatch": [0.20, 0.19, 0.28]},
+      {"id": 8, "name": "苔原", "tileset": "tilemap_color3.png", "tint": [0.80, 1.20, 1.05], "swatch": [0.24, 0.50, 0.36]},
+      {"id": 9, "name": "血沼", "tileset": "tilemap_color5.png", "tint": [1.45, 0.70, 0.90], "swatch": [0.70, 0.32, 0.52]}
+    ],
+    "prop_materials_note": "**基地摆件素材表**：id 与 MapGenerator.DECOR_* / BaseCustomization.PROP_* 对齐（1~6 是局内那套装饰、7~9 是矿脉），这里只登记**名字**（面板显示）与是否默认可用；贴图由 MapGenerator._decor_textures 按 id 给，跟所在地面的素材无关。",
+    "prop_materials": [
+      {"id": 1, "name": "树"},
+      {"id": 2, "name": "岩石"},
+      {"id": 3, "name": "碎石"},
+      {"id": 4, "name": "地裂"},
+      {"id": 5, "name": "浅滩"},
+      {"id": 6, "name": "灌木"},
+      {"id": 7, "name": "铁矿脉"},
+      {"id": 8, "name": "金矿脉"},
+      {"id": 9, "name": "油矿脉"}
+    ],
+    "custom_editor_note": "**基地地面编辑器（B 键开关）**：进编辑态后会把瓦片网格铺出来，左键笔刷涂上当前素材、右键擦回默认（草地）、Shift + 左键拖矩形整块填充。点「保存」才写进当前存档槽，点「取消」丢弃本次改动。",
+    "custom_editor": {
+      "toggle_key": 66,
+      "brush_sizes": [1, 2, 3, 5],
+      "default_brush": 1,
+      "default_material": 0,
+      "grid_alpha": 0.10,
+      "hover_alpha": 0.35,
+      "rect_fill_alpha": 0.25,
+      "save_hint_seconds": 2.0
+    }
   }
 }

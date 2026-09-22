@@ -46,6 +46,12 @@ var _sprite: Sprite2D = null
 ## 空串 = 不放，与"配置里没这两个键"完全等价（EffectLibrary 见空串直接 return）。
 var _fx_impact := ""
 var _fx_miss := ""
+## 命中后附加的状态（技能弹道用；普攻那两张表不写这两个键 → 全程空串/0，行为不变）。
+## status_id 查的是 skills.statuses，与近战范围技走的是同一个 apply_status() 入口。
+var _status_id := ""
+var _status_def: Dictionary = {}
+## >0 = 命中点周围这么多个像素内的其他目标也吃**同一发**伤害（溅射）。
+var _aoe_radius := 0.0
 
 
 ## cfg 直接吃 config 的 combat.weapons.<id>.projectile 段
@@ -61,6 +67,10 @@ func setup(cfg: Dictionary, p_dir: Vector2, p_damage: int,
 	hit_radius = float(cfg.get("hit_radius_px", 16.0))
 	_fx_impact = str(cfg.get("fx_impact", ""))
 	_fx_miss = str(cfg.get("fx_miss", ""))
+	_status_id = str(cfg.get("status_id", ""))
+	var sd = cfg.get("status_def", null)
+	_status_def = sd if sd is Dictionary else {}
+	_aoe_radius = float(cfg.get("aoe_radius_px", 0.0))
 
 	z_index = 30
 	rotation = dir.angle()          # 贴图朝速度方向；Arrow.png 在画布里居中，不用补偿
@@ -71,6 +81,11 @@ func setup(cfg: Dictionary, p_dir: Vector2, p_damage: int,
 		_sprite.texture = load(tex_path)
 		var s := float(cfg.get("scale", 1.0))
 		_sprite.scale = Vector2(s, s)
+		# 可选整体染色：技能弹道借用现成箭图也能看出"这发不一样"（余烬=橙）。
+		# 普攻表里没这个键 → 不调 modulate，与改动前完全一致。
+		var mod := str(cfg.get("modulate", ""))
+		if mod != "":
+			_sprite.modulate = Color(mod)
 		add_child(_sprite)
 
 
@@ -95,15 +110,17 @@ func _physics_process(delta: float) -> void:
 
 	# 命中优先于撞墙：贴脸射击时两者可能同时成立，打中比消失更符合直觉
 	if target != null:
-		target.take_damage(damage)
-		# 「受到攻击也要动」：告诉它这一箭是从哪飞来的（出膛点，不是命中点 ——
-		# 命中点就在它脚下，拿它当声源等于没让它动）。见 enemy.gd::alert_from_attacker。
-		if origin != Vector2.ZERO and target.has_method("alert_from_attacker"):
-			target.call("alert_from_attacker", origin)
-		# 受击视觉反馈（白闪+挤压+击退）；origin 已在上面判过非零，方向=远离箭来向
-		if origin != Vector2.ZERO and target.has_method("play_hit_fx"):
-			target.call("play_hit_fx", origin)
-		# 命中微冻：本项目弹道只出自玩家武器，所以算"我方打出伤害"那一档
+		_strike(target)
+		# 溅射：技能弹道（余烬弹）在命中点再扫一圈。普攻那两张表没有 aoe_radius_px
+		# 这个键 → 这里恒为 0，一句都不执行，箭的行为与改动前逐帧一致。
+		if _aoe_radius > 0.0:
+			var r2 := _aoe_radius * _aoe_radius
+			for n in _targets():
+				if n == target:
+					continue
+				if global_position.distance_squared_to((n as Node2D).global_position) <= r2:
+					_strike(n)
+		# 命中微冻：本项目弹道只出自玩家武器与玩家技能，都算"我方打出伤害"那一档
 		HitStop.pulse(get_tree(), "on_deal_damage")
 		_spawn_fx(_fx_impact)
 		_finish()
@@ -115,6 +132,23 @@ func _physics_process(delta: float) -> void:
 	if _travelled >= max_distance:
 		_spawn_fx(_fx_miss)
 		_finish()
+
+
+## 打到**一个**目标：伤害 + （技能弹道才有的）状态 + 受击反馈。
+## 直击与溅射共用这一句，所以"烧到的人一定被灼烧"不会因为走了第二条路径而漏掉。
+func _strike(t: Node) -> void:
+	t.take_damage(damage)
+	# 状态施加只认方法名：敌人/动物各自实现 apply_status()，没实现的就是不吃状态，
+	# 弹道这边不需要知道谁是谁（与 player.gd 范围技那条路同一个约定）。
+	if _status_id != "" and t.has_method("apply_status"):
+		t.call("apply_status", _status_id, _status_def)
+	# 「受到攻击也要动」：告诉它这一箭是从哪飞来的（出膛点，不是命中点 ——
+	# 命中点就在它脚下，拿它当声源等于没让它动）。见 enemy.gd::alert_from_attacker。
+	if origin != Vector2.ZERO and t.has_method("alert_from_attacker"):
+		t.call("alert_from_attacker", origin)
+	# 受击视觉反馈（白闪+挤压+击退）
+	if origin != Vector2.ZERO and t.has_method("play_hit_fx"):
+		t.call("play_hit_fx", origin)
 
 
 ## 弹道收尾时的特效：挂在**自己的父节点**上而不是自己身上 —— 自己这一帧就 queue_free，

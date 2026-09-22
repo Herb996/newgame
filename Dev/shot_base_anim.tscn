@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Dev/shot_base_anim.gd" id="1_shotanim"]
+
+[node name="ShotBaseAnim" type="Node"]
+script = ExtResource("1_shotanim")

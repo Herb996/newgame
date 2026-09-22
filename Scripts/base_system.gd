@@ -32,6 +32,12 @@ var _footprint := 4
 ## 自定义摆件层要挂到哪个节点（地面建好时记下，建筑摆完再补一层摆件）。
 ## 走生成器那条路时保持 null —— 装饰已经在那一坨节点里了。
 var _props_host: Node2D = null
+## 地面与摆件的父节点（BaseMapRoot）。留到编辑模式用：玩家涂地面时要直接
+## 拿到那两层去增量刷新，而不是把整个基地拆了重建（重建会把相机也甩回去）。
+var _map_root: Node2D = null
+## 玩家用画笔摆出来的楼的容器（与出厂那 12 栋分开挂，互不干扰）。
+## 编辑器要重建玩家楼时只清这个节点、不碰出厂楼；重摆出厂楼也不影响它。
+var _player_bld_root: Node2D = null
 
 
 ## 生成基地（由 main 调用），返回玩家出生点
@@ -49,6 +55,11 @@ func setup(root: Node2D) -> Vector2:
 	var map_root := Node2D.new()
 	map_root.name = "BaseMapRoot"
 	root.add_child(map_root)
+	_map_root = map_root
+	var pbl_root := Node2D.new()
+	pbl_root.name = "BasePlayerBuildings"
+	root.add_child(pbl_root)
+	_player_bld_root = pbl_root
 	var ground := _build_ground(map_root)
 
 	# 玩家出生点
@@ -65,12 +76,17 @@ func setup(root: Node2D) -> Vector2:
 		var cell := Vector2i(int(cell_cfg[0]), int(cell_cfg[1]))
 		var bld := BUILDING_SCENE.instantiate()
 		root.add_child(bld)
-		bld.setup(id, str(b["name"]), str(b.get("hint", "按 E")), str(b.get("sprite", "")))
+		bld.setup(id, str(b["name"]), str(b.get("hint", "按 E")), str(b.get("sprite", "")),
+				int(b.get("anim_frames", 0)), float(b.get("anim_fps", 8.0)))
 		bld.set_cell(cell)
 		bld.interacted.connect(_on_building_interacted)
 		bld.reposition_requested.connect(_on_reposition_requested)
 		_buildings[id] = bld
 		_cells[id] = cell
+
+	# 玩家用画笔摆出来的楼（存档里的 base_custom.buildings）。得在 _build_custom_props()
+	# 之前落好 —— 摆件层要靠「所有楼占地」把"房子里长树"的格子筛掉，玩家楼也算在内。
+	_spawn_player_buildings(Meta.base_custom)
 
 	# 摆件必须在建筑之后：要拿建筑占地把"房子里长树"的格子筛掉
 	_build_custom_props()
@@ -135,6 +151,7 @@ func _build_custom_props() -> void:
 
 
 ## 所有建筑的占地格子（每栋 footprint×footprint），键同 base_customization 的 "x,y"
+## 出厂楼 + 玩家画笔摆的楼都要算进去：前者防摆件长在房子里，后者防新楼压旧楼。
 func _building_cells_set() -> Dictionary:
 	var occ := {}
 	for id in _cells.keys():
@@ -142,7 +159,50 @@ func _building_cells_set() -> Dictionary:
 		for dy in range(_footprint):
 			for dx in range(_footprint):
 				occ[BaseCustomization.key_of(c.x + dx, c.y + dy)] = true
+	for key in (Meta.base_custom.get("buildings", {}) as Dictionary).keys():
+		var cell := BaseCustomization.parse_key(str(key))
+		if cell.is_empty():
+			continue
+		for k in BaseCustomization.building_footprint_keys(int(cell[0]), int(cell[1]), _footprint):
+			occ[k] = true
 	return occ
+
+
+## 按存档里的玩家建筑表重建那一坨楼（重进基地时调一次）。
+## 编辑器开着时这套节点由编辑器自己管（editor._rebuild_buildings），
+## 这里只管"没开编辑器、纯读档"的情形。
+func _spawn_player_buildings(custom: Dictionary) -> void:
+	if _player_bld_root == null:
+		return
+	for key in (custom.get("buildings", {}) as Dictionary).keys():
+		var cell := BaseCustomization.parse_key(str(key))
+		if cell.is_empty():
+			continue
+		var id_str := str((custom["buildings"] as Dictionary)[key])
+		make_building(id_str, Vector2i(int(cell[0]), int(cell[1])))
+
+
+## 造一栋玩家建筑（画笔摆出来的，挂在 BasePlayerBuildings 下）。
+## 出厂那 12 栋走 setup() 里的另一条路，不在这里。
+## 必须对外可 Callable —— 编辑器通过 edit_targets().spawn_building 调它，
+## 自己不知道"怎么造楼"（连 sprite / 帧数都从 config 的 base.buildings 取）。
+## 注意：玩家楼**不**写进 _buildings / _cells —— 那两个是出厂楼交互/重摆用的，
+## 玩家楼 id 与出厂楼同源，写进去会把出厂楼的位置记录覆盖掉。点玩家楼照样走
+## _on_building_interacted 路由（signal 带的是节点自己的 id），只是不参与重摆。
+func make_building(id: String, anchor: Vector2i) -> Node2D:
+	var spec: Dictionary = BaseMaterials.building_spec(id)
+	if spec.is_empty():
+		push_warning("[Base] 未知建筑 id，跳过画笔放置：%s" % id)
+		return null
+	var bld := BUILDING_SCENE.instantiate()
+	_player_bld_root.add_child(bld)
+	bld.setup(id, str(spec.get("name", id)), str(spec.get("hint", "按 E")),
+			str(spec.get("sprite", "")),
+			int(spec.get("anim_frames", 0)), float(spec.get("anim_fps", 8.0)))
+	bld.set_cell(anchor)
+	bld.interacted.connect(_on_building_interacted)
+	bld.reposition_requested.connect(_on_reposition_requested)
+	return bld
 
 
 ## 基地地形 → 生成器实际读的 map.* 路径。generate() 只认 map.*，所以基地这套参数只能
@@ -176,6 +236,26 @@ func _terrain_seed() -> int:
 	if forced != 0:
 		return forced
 	return TERRAIN_SEED_BASE + maxi(0, int(SaveSlots.active_slot)) * 7919
+
+
+## 地面编辑器要操作的那几个东西（见 Scripts/base_custom_editor.gd）：
+## 直接把地面层 / 摆件层这两个现成节点交出去，玩家涂一格就只刷新那一小片，
+## 而不是把整个基地拆了重建（重建会把相机位置也甩回出发点，手感很差）。
+## ⚠ blocked（建筑占地）每次重进基地都可能变（玩家挪过建筑），所以每次都重算。
+func edit_targets() -> Dictionary:
+	var ground: Node = null
+	if _map_root != null and is_instance_valid(_map_root):
+		ground = _map_root.get_node_or_null("BaseGround")
+	return {
+		"size": _size,
+		"tile": _tile,
+		"custom": Meta.base_custom,
+		"ground_layer": ground,
+		"props_host": _map_root,
+		"blocked": _building_cells_set(),
+		"buildings_host": _player_bld_root,
+		"spawn_building": Callable(self, "make_building"),
+	}
 
 
 func _on_building_interacted(building_id: String) -> void:
@@ -236,10 +316,8 @@ func begin_reposition(id: String) -> Dictionary:
 		return {}
 	var bld: Node2D = _buildings[id]
 	bld.visible = false
-	var tex: Texture2D = null
-	var body := bld.get_node_or_null("Body") as Sprite2D
-	if body != null:
-		tex = body.texture
+	# 动画建筑没有 Body.texture（走 AnimBody），统一问建筑自己要当前显示的那一帧
+	var tex: Texture2D = bld.call("get_body_texture") if bld.has_method("get_body_texture") else null
 	return {
 		"footprint": Vector2i(_footprint, _footprint),
 		"anchors": compute_anchors(id),

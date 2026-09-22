@@ -186,6 +186,12 @@ var _is_phantom := false           # true = 我是一具分身（不是本体）
 var _swap_step := 0                # 本体已触发的「掉 20% 血」台阶数（每跨一个台阶，和分身换一次位置）
 var _resummon_timer := 0.0         # 本体「每隔 N 秒再补召 1~2 具」的倒计时（只有本体在跑）
 
+# --- 状态层（技能系统，2026-09-21）---
+# 冻结 / 灼烧 / 以后任何状态都进这一个容器：一张 id→{剩余,层数} 的表，
+# 定义全在 config 的 skills.statuses 里（见 Scripts/combat/unit_status.gd）。
+# 没有状态时它是空表，下面那几处乘数都是 1.0 / false —— 等于这些代码不存在。
+var _statuses := UnitStatus.new()
+
 # --- 噪音警觉度（DESIGN.md 第二部分 噪音机制）---
 var noise_alertness := 0.0
 var _noise_source := Vector2.ZERO   # 最后听到的声源位置（调查状态前往这里）
@@ -231,11 +237,18 @@ func _physics_process(delta: float) -> void:
 	if _dying:
 		_tick_death(delta)           # 死亡动画推进（播完才淡出）；不跑 AI、不再受伤
 		return
+	# 状态层必须在下面 `_dormant` 的提前 return **之前**走：远处的敌人解冻中却没人
+	# 替它倒数，剩余时长会永久卡在解冻那一帧（下次进视野直接是"永远差一点到期"）。
+	# DoT 伤害由容器直接回调本脚本 take_damage()，于是减伤特性、血条刷新照旧生效。
+	_statuses.tick(delta, self)
+	var frozen := _statuses.halts_ai()
 	if _attack_cooldown > 0.0:
 		_attack_cooldown -= delta
 	if _attack_timer > 0.0:
 		_attack_timer -= delta
-	if _attack_hit_at > 0.0:
+	if frozen:
+		_attack_hit_at = 0.0         # 冻住 = 手里那一刀作废（不是暂停、解冻再补上）
+	elif _attack_hit_at > 0.0:
 		_attack_hit_at -= delta
 		if _attack_hit_at <= 0.0:
 			_deal_attack_damage()      # 前摇走完：这一刀落地（或挥空）
@@ -255,7 +268,9 @@ func _physics_process(delta: float) -> void:
 	_dormant = distance_to_player_cells() > ai_active_radius_cells()
 	if _dormant:
 		return
-	if _hit_stun > 0.0:
+	if frozen:
+		pass                         # 冻住：整段 AI/导航/出手让位，只留下面的动画与染色照常刷新
+	elif _hit_stun > 0.0:
 		_hit_stun -= delta           # 受击微停顿：AI/导航让位，但动画与染色照常刷新
 	else:
 		_tick_pack(delta)          # 成群：找同类结伙 + 成员跟上群主（只有带 pack 的兵种有开销）
@@ -824,7 +839,9 @@ func _update_alert_visual() -> void:
 		else:
 			# 后段：泛红回落
 			tint = tint.lerp(Color(1.0, 0.28, 0.22), r / 0.5)
-	_body.modulate = tint
+	# 状态染色乘在最后：冻住发冰蓝、烧起来发红，颜色全在 config 的 skills.statuses 里。
+	# 没挂状态时 visual_tint() 返回纯白，这一句等于不存在。
+	_body.modulate = tint * _statuses.visual_tint()
 
 
 # ------------------------------------------------------------
@@ -1132,8 +1149,10 @@ func clear_move_target() -> void:
 	_path_index = 0
 
 
+## 巡逻速度。**状态乘数只在这一个出口乘一次**：chase_speed() 从它派生，
+## 于是冻结（speed_mult=0）一处生效、全场景停下，不必在每个状态里各判一次"我冻住了吗"。
 func patrol_speed() -> float:
-	return float(Config.get_value("enemy.speed", 90)) * speed_mult
+	return float(Config.get_value("enemy.speed", 90)) * speed_mult * _statuses.speed_mult()
 
 
 func chase_speed() -> float:
@@ -1287,6 +1306,16 @@ func _in_bounds(cell: Vector2i) -> bool:
 # ------------------------------------------------------------
 # 战斗
 # ------------------------------------------------------------
+
+## 施加一个状态（技能系统调用；id 见 config 的 skills.statuses，定义在 unit_status.gd）。
+## 方法名就是软约定：AoE/弹道那边只用 `has_method("apply_status")` 探测，不认具体类型，
+## 所以中立动物、以后的新单位接同一个方法就能吃冻结与灼烧，不用改技能代码。
+## 已死/正在淡出的不吃状态（否则会在尸体上挂出一份永远播不完的状态表）。
+func apply_status(id: String, def_override: Dictionary = {}) -> bool:
+	if hp <= 0 or _dying:
+		return false
+	return _statuses.apply(id, def_override)
+
 
 ## 受到玩家攻击伤害（由 Player.resolve_attack_hit / 技能效果调用）
 func take_damage(amount: int) -> void:
@@ -1656,11 +1685,14 @@ func _set_squash_mul(v: Vector2) -> void:
 		_animator.set_scale_mul(v)
 
 
-## 被击退：按冲量做一段位移
-func apply_knockback(impulse: Vector2) -> void:
+## 被击退。dist_px<0 = 用全局 enemy.knockback_px（普攻那一路的旧行为，一字不变）；
+## 技能段里写了 knockback_px 的（落石 / 地裂）按各自那份数推 —— 于是「这招推得动、
+## 那招推不动」是配置差异，不是代码里多开一条分叉。
+func apply_knockback(impulse: Vector2, dist_px: float = -1.0) -> void:
 	if impulse.length() < 1.0:
 		return
-	global_position += impulse.normalized() * float(Config.get_value("enemy.knockback_px", 8.0))
+	var d := dist_px if dist_px > 0.0 else float(Config.get_value("enemy.knockback_px", 8.0))
+	global_position += impulse.normalized() * d
 
 
 ## 出手距离（探针和 AI 都用这个数，不要在别处再算一遍）

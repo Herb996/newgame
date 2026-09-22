@@ -96,6 +96,14 @@ SUITES = [
     #    （搬到攻击侧就会出现"要扣血才决定砍不砍"的倒置）。
     # 期望值一律由**生效配置**现算，所以 user://settings.json 里调过剑/弓伤害也不会假红。
     ("Dev/probe_damage_pipeline.tscn", "_r_dmgpipe.log", ("[DmgProbe]",)),
+    # 2026-09-21 技能系统（skills.json + UnitStatus + SkillSystem + 魔法书）。守两件最容易
+    # 悄悄烂掉的事：① 表必须自洽 —— 技能引用的 fx_cast/fx_hit/五行/状态 id 写错、热键撞号、
+    #    槽数与技能数不符，在运行时全是"静默不放技能"，实拍看不出来；
+    # ② 「局内学、撤离才永久」这条持久规矩 —— 阵亡不写档、这局没学不能清空名册已有技能、
+    #    死 id 与越界等级在读档清洗时被剪掉、存盘读档一轮不变。
+    # 中间三段（状态容器 / 学习成长 / 进局释放）顺带把冻结连冻免疫、灼烧按 tick 跳血、
+    # 溅射传状态、护盾"先乘盾再扣防御"、skills.enabled=false 零释放这些行为钉住。
+    ("Dev/probe_skills.tscn", "_r_skills.log", ("[probe_skills]",)),
 ]
 
 BAD_MARKS = ("SCRIPT ERROR", "Parse Error", "Invalid call", "Invalid access",

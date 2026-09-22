@@ -13,6 +13,9 @@ shape = SubResource("RectangleShape2D_1")
 
 [node name="Body" type="Sprite2D" parent="."]
 
+[node name="AnimBody" type="AnimatedSprite2D" parent="."]
+visible = false
+
 [node name="NameLabel" type="Label" parent="."]
 offset_left = -80.0
 offset_top = -300.0

@@ -17,6 +17,8 @@ const SOAK_PROBE := preload("res://Scripts/soak_probe.gd")
 const SELECTION_SCRIPT := preload("res://Scripts/selection_controller.gd")
 const SEPARATION_SCRIPT := preload("res://Scripts/combat/unit_separation.gd")
 const STAT_PANEL_SCRIPT := preload("res://Scripts/debug_stat_panel.gd")
+const CUSTOM_EDITOR_SCRIPT := preload("res://Scripts/base_custom_editor.gd")
+const CUSTOM_PANEL_SCRIPT := preload("res://Scripts/base_custom_panel.gd")
 
 enum Mode { BASE, RUN }
 
@@ -79,6 +81,12 @@ var _selection: Control = null
 ## 只创建一次、跨局常驻：它调的是 Config 覆盖层与在场单位，跟"这一局"没有绑定关系。
 ## 导出包（OS.is_debug_build() == false 且没强开开关）→ 保持 null，节点根本不创建。
 var _stat_panel: CanvasLayer = null
+
+## 基地地面自定义编辑器（B 键开关）：世界层笔刷 + 左侧素材面板。
+## 只在 Mode.BASE 期间存在，离开基地（进局）一律 null —— game_root 会被整棵释放，
+## 里面那两层「地面 / 摆件」也是那时候一起没的。
+var _custom_editor: Node2D = null
+var _custom_panel: CanvasLayer = null
 
 
 func _ready() -> void:
@@ -450,6 +458,7 @@ func _clear_selection() -> void:
 func _enter_base() -> void:
 	mode = Mode.BASE
 	_end_placement()
+	_end_custom_editor(false)      # 上一轮若还在编辑：直接丢弃（见 _end_custom_editor）
 	hud.visible = false
 	# 菜单栏（含小地图槽）只在局内：基地里它是空的（没有单位可指挥、没有地图）
 	menu_bar.set_active(false)
@@ -486,6 +495,7 @@ func _enter_base() -> void:
 ## 进入一局
 func _enter_run() -> void:
 	mode = Mode.RUN
+	_end_custom_editor(false)      # 地面编辑只属于基地，进局必须收干净
 	hud.visible = true
 	menu_bar.set_active(true)
 	# 菜单栏的噪音读数是「本局」的：开局清零，否则上一局的暴露度会带进来
@@ -540,6 +550,9 @@ func _enter_run() -> void:
 				+ Vector2((float(i) - float(squad.size() - 1) * 0.5) * tile_size * 0.8, 0.0)
 		player.setup_navigation(result.walls, tile_size)
 		game_root.add_child(player)
+		# 技能注入必须在 add_child **之后**：_skills 是 _ready() 里 new 出来并 reset 的，
+		# 提前 set 会被那一遍 reset 抹掉。技能不改属性，所以不像 traits 需要抢在首帧前。
+		player.skills().set_known(Meta.skills_of(player.roster_uid))
 		players.append(player)
 	# 首名角色默认选中（RTS 点选可随时切换指挥对象）
 	if not players.is_empty():
@@ -628,6 +641,92 @@ func _on_building_interacted(building_id: String) -> void:
 
 
 ## 右键建筑 → 启动「重摆」模式（复用 PlacementMode：绿格 + 幽灵 + 点格落位）
+# ------------------------------------------------------------
+# 基地地面自定义编辑器（B 键）
+# ------------------------------------------------------------
+
+## 基地入口。config `base.custom_editor.toggle_key` 存的是**物理键码**（66 = B），
+## 与项目里其它改键保持一致。
+func _input(event: InputEvent) -> void:
+	if not (event is InputEventKey):
+		return
+	var key := int(Config.get_value("base.custom_editor.toggle_key", KEY_B))
+	var ek := event as InputEventKey
+	if ek.pressed and not ek.echo and int(ek.keycode) == key:
+		if _custom_editor == null:
+			_open_custom_editor()
+		else:
+			# 再按一次 = 与 ESC 同义：**放弃**本次改动。面板上写明了这一点，
+			# 想留下必须点「保存」—— 默默自动保存会让"试两笔看看"变成不可逆操作。
+			_end_custom_editor(false)
+		get_viewport().set_input_as_handled()
+
+
+func _open_custom_editor() -> void:
+	if mode != Mode.BASE or _custom_editor != null:
+		return
+	if _placement != null:
+		return                             # 正在摆建筑，别两套编辑态打架
+	var opts: Dictionary = base_system.edit_targets()
+	var ground = opts.get("ground_layer")
+	if ground == null:
+		push_warning("[Base] 地面层不在（基地不是自定义表？），编辑模式起不来")
+		return
+	if _custom_panel == null:
+		_custom_panel = CUSTOM_PANEL_SCRIPT.new()
+		_custom_panel.name = "BaseCustomPanel"
+		add_child(_custom_panel)
+		_custom_panel.save_requested.connect(_on_custom_saved)
+		_custom_panel.cancel_requested.connect(_on_custom_cancelled)
+	_custom_editor = CUSTOM_EDITOR_SCRIPT.new()
+	_custom_editor.name = "BaseCustomEditor"
+	game_root.add_child(_custom_editor)
+	_custom_editor.committed.connect(_on_custom_saved)
+	_custom_editor.cancelled.connect(_on_custom_cancelled)
+	_custom_editor.begin(opts)
+	_custom_panel.open_for(_custom_editor)
+	print("[Base] 地面编辑模式：素材 %d 款 / 摆件 %d 种"
+			% [BaseMaterials.ground_count(), BaseMaterials.prop_count()])
+
+
+## keep_changes=true 只收摊、不回滚（给调用方自己处理数据）；
+## false = 让 editor 把画面与数据都退回进编辑前的样子。
+func _end_custom_editor(keep_changes: bool) -> void:
+	if _custom_editor != null and is_instance_valid(_custom_editor):
+		if keep_changes:
+			_custom_editor.call("end")
+		else:
+			_custom_editor.call("cancel")
+	if _custom_panel != null and is_instance_valid(_custom_panel):
+		_custom_panel.call("close_ui")
+	_custom_editor = null
+
+
+## 面板/editor 的「保存」：写进当前存档槽。画面早就是新的了，不用重建基地。
+func _on_custom_saved(_custom: Dictionary = {}) -> void:
+	var data := _custom.duplicate(true)
+	if data.is_empty() and _custom_editor != null and is_instance_valid(_custom_editor):
+		# 面板上的「保存」按钮不带数据，问编辑器要它当前这份
+		data = (_custom_editor.call("current_custom") as Dictionary).duplicate(true)
+	if not data.is_empty():
+		Meta.set_base_custom(data)
+	_base_custom_teardown()
+
+
+func _on_custom_cancelled() -> void:
+	_base_custom_teardown()
+
+
+## 拆 editor 节点，但**不**再调一次 cancel —— 回调里再 cancel 会无限递归。
+func _base_custom_teardown() -> void:
+	if _custom_editor != null and is_instance_valid(_custom_editor):
+		_custom_editor.call("end")
+		_custom_editor.queue_free()
+	_custom_editor = null
+	if _custom_panel != null and is_instance_valid(_custom_panel):
+		_custom_panel.call("close_ui")
+
+
 func _on_reposition_requested(building_id: String) -> void:
 	if _placement != null:
 		return   # 已在重摆中，忽略
